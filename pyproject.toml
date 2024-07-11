@@ -9,11 +9,19 @@ description = "Modeling complex perturbations with flow matching and optimal tra
 readme = "README.md"
 requires-python = ">=3.10"
 license = {file = "LICENSE"}
-authors = [
-    {TODO},
+aauthors = [
+    {name = "Dominik Klein"},
+    {name = "Jonas Simon Fleck"},
+    {name = "Alejandro Tejada"},
+    {name = "Daniil Bobrovskiy"},
+    {name = "Lea Zimmermann"},
 ]
 maintainers = [
-    {TODO},
+    {name = "Dominik Klein"},
+    {name = "Jonas Simon Fleck"},
+    {name = "Alejandro Tejada"},
+    {name = "Daniil Bobrovskiy"},
+    {name = "Lea Zimmermann"},
 ]
 urls.Documentation = "https://cell_flow_perturbation.readthedocs.io/"
 urls.Source = "https://github.com/theislab/cell_flow_perturbation"
