@@ -7,6 +7,8 @@ from flax import linen as nn
 from flax.training import train_state
 from ott.neural.networks.layers import time_encoder
 
+__all__ = ["VelocityFieldWithAttention", "CondVelocityField", "GENOTVelocityFieldWithAttention"]
+
 
 def get_masks(dataset: list[jnp.ndarray]) -> jnp.ndarray:
     """Get masks based on whether there are only 0s in one row

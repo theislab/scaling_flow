@@ -33,8 +33,6 @@ dependencies = [
     "orbax",
     "flax",
     "cloudpickle",
-    "hydra",
-    "hydra-submitit-launcher",
     # for debug logging (referenced from the issue template)
     "session-info",
 ]
