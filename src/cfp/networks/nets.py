@@ -60,7 +60,10 @@ class CondVelocityField(nn.Module):
     time_dims: Sequence[int] | None = None
     time_encoder: Callable[[jnp.ndarray], jnp.ndarray] = time_encoder.cyclical_time_encoder
     act_fn: Callable[[jnp.ndarray], jnp.ndarray] = nn.silu
-    dropout_rate: float = 0.0
+    dropout_rate_time: float = 0.0
+    dropout_rate_hidden: float = 0.0
+    dropout_rate_condition: float = 0.0
+    dropout_rate_output: float = 0.0
 
     @nn.compact
     def __call__(
@@ -88,17 +91,17 @@ class CondVelocityField(nn.Module):
         t = self.time_encoder(t)
         for time_dim in time_dims:
             t = self.act_fn(nn.Dense(time_dim)(t))
-            t = nn.Dropout(rate=self.dropout_rate, deterministic=not train)(t)
+            t = nn.Dropout(rate=self.dropout_rate_time, deterministic=not train)(t)
 
         for hidden_dim in self.hidden_dims:
             x = self.act_fn(nn.Dense(hidden_dim)(x))
-            x = nn.Dropout(rate=self.dropout_rate, deterministic=not train)(x)
+            x = nn.Dropout(rate=self.dropout_rate_hidden, deterministic=not train)(x)
 
         if self.condition_dims is not None:
             assert condition is not None, "No condition was passed."
             for cond_dim in self.condition_dims:
                 condition = self.act_fn(nn.Dense(cond_dim)(condition))
-                condition = nn.Dropout(rate=self.dropout_rate, deterministic=not train)(condition)
+                condition = nn.Dropout(rate=self.dropout_rate_condition, deterministic=not train)(condition)
             if return_embedding:
                 return condition
             feats = jnp.concatenate([t, x, condition], axis=-1)
@@ -107,7 +110,7 @@ class CondVelocityField(nn.Module):
 
         for output_dim in self.output_dims[:-1]:
             feats = self.act_fn(nn.Dense(output_dim)(feats))
-            feats = nn.Dropout(rate=self.dropout_rate, deterministic=not train)(feats)
+            feats = nn.Dropout(rate=self.dropout_rate_output, deterministic=not train)(feats)
 
         # No activation function for the final layer
         return nn.Dense(self.output_dims[-1])(feats)
@@ -165,7 +168,10 @@ class VelocityFieldWithAttention(nn.Module):
     time_dims: Sequence[int] | None = None
     time_encoder: Callable[[jnp.ndarray], jnp.ndarray] = time_encoder.cyclical_time_encoder
     act_fn: Callable[[jnp.ndarray], jnp.ndarray] = nn.silu
-    dropout_rate: float = 0.0
+    dropout_rate_time: float = 0.0
+    dropout_rate_hidden: float = 0.0
+    dropout_rate_condition: float = 0.0
+    dropout_rate_output: float = 0.0
 
     def __post_init__(self):
         self.get_masks = jax.jit(get_masks)
@@ -202,11 +208,11 @@ class VelocityFieldWithAttention(nn.Module):
         t = self.time_encoder(t)
         for time_dim in time_dims:
             t = self.act_fn(nn.Dense(time_dim)(t))
-            t = nn.Dropout(rate=self.dropout_rate, deterministic=not train)(t)
+            t = nn.Dropout(rate=self.dropout_rate_time, deterministic=not train)(t)
 
         for hidden_dim in self.hidden_dims:
             x = self.act_fn(nn.Dense(hidden_dim)(x))
-            x = nn.Dropout(rate=self.dropout_rate, deterministic=not train)(x)
+            x = nn.Dropout(rate=self.dropout_rate_hidden, deterministic=not train)(x)
 
         assert condition is not None, "No condition sequence was passed."
 
@@ -219,7 +225,7 @@ class VelocityFieldWithAttention(nn.Module):
         attention = nn.MultiHeadDotProductAttention(
             num_heads=self.num_heads,
             qkv_features=self.qkv_feature_dim,
-            dropout_rate=self.dropout_rate,
+            dropout_rate=self.dropout_rate_condition,
             deterministic=not train,
         )
         emb = attention(condition, mask=mask)
@@ -227,7 +233,7 @@ class VelocityFieldWithAttention(nn.Module):
 
         for cond_dim in self.condition_dims:
             condition = self.act_fn(nn.Dense(cond_dim)(condition))
-            condition = nn.Dropout(rate=self.dropout_rate, deterministic=not train)(condition)
+            condition = nn.Dropout(rate=self.dropout_rate_condition, deterministic=not train)(condition)
         if return_embedding:
             return condition
 
@@ -235,7 +241,7 @@ class VelocityFieldWithAttention(nn.Module):
 
         for output_dim in self.output_dims[:-1]:
             feats = self.act_fn(nn.Dense(output_dim)(feats))
-            feats = nn.Dropout(rate=self.dropout_rate, deterministic=not train)(feats)
+            feats = nn.Dropout(rate=self.dropout_rate_output, deterministic=not train)(feats)
 
         # no activation function for the final layer
         out = nn.Dense(self.output_dims[-1])(feats)
@@ -309,7 +315,10 @@ class GENOTVelocityFieldWithAttention(nn.Module):
     time_dims: Sequence[int] | None = None
     time_encoder: Callable[[jnp.ndarray], jnp.ndarray] = time_encoder.cyclical_time_encoder
     act_fn: Callable[[jnp.ndarray], jnp.ndarray] = nn.silu
-    dropout_rate: float = 0.0
+    dropout_rate_time: float = 0.0
+    dropout_rate_hidden: float = 0.0
+    dropout_rate_condition: float = 0.0
+    dropout_rate_output: float = 0.0
 
     def __post_init__(self):
         self.get_masks = jax.jit(get_masks)
@@ -346,11 +355,11 @@ class GENOTVelocityFieldWithAttention(nn.Module):
         t = self.time_encoder(t)
         for time_dim in time_dims:
             t = self.act_fn(nn.Dense(time_dim)(t))
-            t = nn.Dropout(rate=self.dropout_rate, deterministic=not train)(t)
+            t = nn.Dropout(rate=self.dropout_rate_time, deterministic=not train)(t)
 
         for hidden_dim in self.hidden_dims:
             x = self.act_fn(nn.Dense(hidden_dim)(x))
-            x = nn.Dropout(rate=self.dropout_rate, deterministic=not train)(x)
+            x = nn.Dropout(rate=self.dropout_rate_hidden, deterministic=not train)(x)
 
         condition_forward = condition[:, 0, : self.split_dim]  # the first split_dim elements are the source data points
         condition_attention = condition[..., self.split_dim :]  # the remaining elements are conditions
@@ -366,26 +375,26 @@ class GENOTVelocityFieldWithAttention(nn.Module):
         attention = nn.MultiHeadDotProductAttention(
             num_heads=self.num_heads,
             qkv_features=self.qkv_feature_dim,
-            dropout_rate=self.dropout_rate,
+            dropout_rate=self.dropout_rate_condition,
             deterministic=not train,
         )
         emb = attention(condition_attention, mask=mask)
         condition = emb[:, 0, :]  # only continue with token 0
         for cond_dim in self.condition_dims_post_attention:
             condition = self.act_fn(nn.Dense(cond_dim)(condition))
-            condition = nn.Dropout(rate=self.dropout_rate, deterministic=not train)(condition)
+            condition = nn.Dropout(rate=self.dropout_rate_condition, deterministic=not train)(condition)
 
         if return_embedding:
             return condition
 
         for cond_dim in self.condition_dims_forward:
             condition_forward = self.act_fn(nn.Dense(cond_dim)(condition_forward))
-            condition_forward = nn.Dropout(rate=self.dropout_rate, deterministic=not train)(condition_forward)
+            condition_forward = nn.Dropout(rate=self.dropout_rate_condition, deterministic=not train)(condition_forward)
 
         cond_all = jnp.concatenate((condition_forward, condition), axis=1)
         for cond_dim in self.condition_dims:
             condition = self.act_fn(nn.Dense(cond_dim)(cond_all))
-            condition = nn.Dropout(rate=self.dropout_rate, deterministic=not train)(condition)
+            condition = nn.Dropout(rate=self.dropout_rate_condition, deterministic=not train)(condition)
         if return_embedding:
             return condition
 
@@ -393,7 +402,7 @@ class GENOTVelocityFieldWithAttention(nn.Module):
 
         for output_dim in self.output_dims[:-1]:
             feats = self.act_fn(nn.Dense(output_dim)(feats))
-            feats = nn.Dropout(rate=self.dropout_rate, deterministic=not train)(feats)
+            feats = nn.Dropout(rate=self.dropout_rate_output, deterministic=not train)(feats)
 
         # no activation function for the final layer
         out = nn.Dense(self.output_dims[-1])(feats)
