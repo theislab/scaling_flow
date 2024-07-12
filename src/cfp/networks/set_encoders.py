@@ -11,6 +11,7 @@ from flax.training import train_state
 from jax.nn import initializers
 
 __all__ = [
+    "MultiHeadAttention",
     "MLPEncoder",
     "DeepSet",
     "DeepSetEncoder",
@@ -23,6 +24,45 @@ __all__ = [
     "SetEncoder",
     "ConditionSetEncoder",
 ]
+
+
+class MultiHeadAttention(nn.Module):
+    """Multi-head attention which aggregates sets by learning a token.
+    
+    Args:
+        num_heads: Number of heads.
+        qkv_feature_dim: Feature dimension for the query, key, and value.
+        max_seq_length: Maximum number of elements in the set.
+        dropout_rate: Dropout rate.
+    """
+
+    num_heads: int
+    qkv_feature_dim: int
+    max_seq_length: int
+    dropout_rate: float = 0.0
+
+    @nn.compact
+    def __call__(self, condition: jnp.ndarray, training: bool = True) -> jnp.ndarray:
+        token_shape = (len(condition), 1) if condition.ndim > 2 else (1,)
+        class_token = nn.Embed(num_embeddings=1, features=condition.shape[-1])(jnp.int32(jnp.zeros(token_shape)))
+
+        condition = jnp.concatenate((class_token, condition), axis=-2)
+        mask = self.get_masks(condition)
+
+        attention = nn.MultiHeadDotProductAttention(
+            num_heads=self.num_heads,
+            qkv_features=self.qkv_feature_dim,
+            dropout_rate=self.dropout_rate,
+            deterministic=not training,
+        )
+        emb = attention(condition, mask=mask)
+        condition = emb[:, 0, :]  # only continue with token 0
+
+        for cond_dim in self.condition_dims:
+            condition = self.act_fn(nn.Dense(cond_dim)(condition))
+            condition = nn.Dropout(rate=self.dropout_rate, deterministic=not training)(condition)
+        return condition
+
 
 
 class MLPEncoder(nn.Module):
