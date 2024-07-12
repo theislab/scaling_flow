@@ -17,6 +17,20 @@ from jax.nn import initializers
 from ott.neural.networks.layers.posdef import PositiveDense
 from ott.math import matrix_square_root
 
+__all__ = [
+    "MLPEncoder",
+    "DeepSet",
+    "DeepSetEncoder",
+    "FSPool",
+    "FSPoolEncoder",
+    "MAB",
+    "SAB",
+    "PMA",
+    "SetTransformer",
+    "SetEncoder",
+    "ConditionSetEncoder",
+]
+
 
 class MLPEncoder(nn.Module):
     """A MLP that encodes a condition into a latent vector.
