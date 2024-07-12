@@ -2,7 +2,7 @@ from functools import partial
 
 import jax
 import numpy as np
-
+from cfp.data.data import PerturbationData
 __all__ = ["JaxSampler"]
 
 
@@ -11,31 +11,10 @@ class JaxSampler:
 
     def __init__(
         self,
-        idcs_source: jax.Array,
-        idcs_conditions: jax.Array,
-        idcs_target: jax.Array,
-        src_str_to_idx: dict[str, int],
-        src_idx_to_data: dict[int, jax.Array],
-        tgt_str_to_idx: dict[str, int],
-        tgt_idx_to_data: dict[int, jax.Array],
-        cond_str_to_idx: dict[str, int],
-        cond_idx_to_data: dict[int, jax.Array],
-        batch_size: int,
+        data: PerturbationData,
     ):
-        assert len(idcs_source) == len(idcs_conditions)
-        assert len(idcs_source) == len(idcs_target)
-        """Initialize data sampler."""
-        self.batch_size = batch_size
-        self.idcs_source = idcs_source
-        self.idcs_conditions = idcs_conditions
-        self.idcs_target = idcs_target
-        self.n_conditions = len(idcs_source)
-        self.src_str_to_idx = src_str_to_idx
-        self.src_idx_to_data = src_idx_to_data
-        self.tgt_str_to_idx = tgt_str_to_idx
-        self.tgt_idx_to_data = tgt_idx_to_data
-        self.cond_str_to_idx = cond_str_to_idx
-        self.cond_idx_to_data = cond_idx_to_data
+       self.perturbation_data = data
+
 
         @partial(jax.jit, static_argnames=["dist_idx"])
         def _sample_batch(
