@@ -16,7 +16,6 @@ from ott.neural import datasets
 from ott.neural.methods.flows import dynamics, otfm, genot
 from ott.neural.networks.layers import time_encoder
 from ott.solvers import utils as solver_utils
-from torch.utils.data import DataLoader
 from tqdm import tqdm
 
 from cfp.metrics import compute_mean_metrics, compute_metrics, compute_metrics_fast
