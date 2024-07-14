@@ -1,4 +1,4 @@
-from cfp.networks.set_encoders import (
+from .set_encoders import (
     ConditionSetEncoder,
     DeepSetEncoder,
     FSPoolEncoder,
@@ -6,8 +6,4 @@ from cfp.networks.set_encoders import (
     SetEncoder,
     SetTransformer,
 )
-from cfp.networks.velocity_field import (
-    CondVelocityField,
-    GENOTVelocityFieldWithAttention,
-    VelocityFieldWithAttention,
-)
+from .velocity_field import ConditionalVelocityField
