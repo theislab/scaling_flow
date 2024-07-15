@@ -4,7 +4,7 @@ from ott.tools.sinkhorn_divergence import sinkhorn_divergence
 from sklearn.metrics import pairwise_distances, r2_score
 from sklearn.metrics.pairwise import rbf_kernel
 
-__all__ = ["compute_metrics", "compute_metrics_fast"]
+__all__ = ["compute_metrics", "compute_metrics_fast", "compute_mean_metrics"]
 
 
 def compute_r_squared(x: np.ndarray, y: np.ndarray) -> float:

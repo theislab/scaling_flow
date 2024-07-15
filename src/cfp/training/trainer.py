@@ -5,44 +5,38 @@ import traceback
 from typing import Literal, Optional, Dict, Callable, Iterable, Union, Any
 from functools import partial
 
-import hydra
 import jax
 import jax.numpy as jnp
 import jax.tree_util as jtu
 import numpy as np
+import flax.linen as nn
 import optax
-import orbax
 import scanpy as sc
-import wandb
-from omegaconf import DictConfig, OmegaConf
 from ott.neural import datasets
 from ott.neural.methods.flows import dynamics, otfm, genot
 from ott.neural.networks.layers import time_encoder
 from ott.solvers import utils as solver_utils
-from torch.utils.data import DataLoader
 from tqdm import tqdm
 
 from cfp.metrics import compute_mean_metrics, compute_metrics, compute_metrics_fast
-from cfp.networks import ConditionSetEncoder
 
 
 class CellFlowTrainer:
 
     def __init__(
         self,
-        model: Union[otfm.OTFlowmatching, genot.GENOT],
-        dl: Iterable,
-        set_encoder: str = "transformer",
+        dataloader: Iterable,
+        model: Union[otfm.OTFlowMatching, genot.GENOT],
     ):
         self.model = model
-        self.dl = dl
-        self.set_encoder = ConditionSetEncoder(set_encoder=set_encoder)
+        self.dataloader = dataloader
+        self.vector_field = ConditionalVelocityField()
 
     def train(
         self,
         num_iterations: int,
         valid_freq: int,
-        callback_fn: Callable[[Union[otfm.OTFlowmatching, genot.GENOT]], Any],
+        callback_fn: Callable[[Union[otfm.OTFlowMatching, genot.GENOT]], Any],
     ) -> None:
 
         training_logs = {"loss": []}
@@ -50,9 +44,11 @@ class CellFlowTrainer:
         for it in tqdm(range(num_iterations)):
             rng, rng_resample, rng_step_fn = jax.random.split(rng, 3)
             idx = int(
-                jax.random.randint(rng, shape=[], minval=0, maxval=self.dl.n_conditions)
+                jax.random.randint(
+                    rng, shape=[], minval=0, maxval=self.dataloader.n_conditions
+                )
             )
-            batch = self.dl.sample_batch(idx, rng)
+            batch = self.dataloader.sample_batch(idx, rng)
             src, tgt = batch["src_lin"], batch["tgt_lin"]
             src_cond = batch.get("src_condition")
 
