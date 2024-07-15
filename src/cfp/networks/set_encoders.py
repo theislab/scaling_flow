@@ -28,7 +28,7 @@ __all__ = [
 
 class MultiHeadAttention(nn.Module):
     """Multi-head attention which aggregates sets by learning a token.
-    
+
     Args:
         num_heads: Number of heads.
         qkv_feature_dim: Feature dimension for the query, key, and value.
@@ -62,7 +62,6 @@ class MultiHeadAttention(nn.Module):
             condition = self.act_fn(nn.Dense(cond_dim)(condition))
             condition = nn.Dropout(rate=self.dropout_rate, deterministic=not training)(condition)
         return condition
-
 
 
 class MLPEncoder(nn.Module):
