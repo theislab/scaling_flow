@@ -12,7 +12,7 @@ class CellFlowTrainer:
     def __init__(
         self,
         dataloader: Iterable,
-        model: Union[otfm.OTFlowMatching, genot.GENOT],
+        model: otfm.OTFlowMatching | genot.GENOT,
     ):
         self.model = model
         self.dataloader = dataloader
@@ -22,7 +22,7 @@ class CellFlowTrainer:
         self,
         num_iterations: int,
         valid_freq: int,
-        callback_fn: Callable[[Union[otfm.OTFlowMatching, genot.GENOT]], Any],
+        callback_fn: Callable[[otfm.OTFlowMatching | genot.GENOT], Any],
     ) -> None:
         training_logs = {"loss": []}
         rng = jax.random.PRNGKey(0)

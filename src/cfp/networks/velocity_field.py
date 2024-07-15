@@ -1,4 +1,3 @@
-import functools
 from collections.abc import Callable, Sequence
 from dataclasses import field as dc_field
 from typing import Any
@@ -10,8 +9,8 @@ from flax import linen as nn
 from flax.training import train_state
 from ott.neural.networks.layers import time_encoder
 
-from cfp.networks.modules import MLPBlock
 from cfp.networks import SetEncoder
+from cfp.networks.modules import MLPBlock
 
 __all__ = ["ConditionalVelocityField"]
 
@@ -129,6 +128,4 @@ class ConditionalVelocityField(nn.Module):
         cond = jnp.ones((1, self.max_set_size, self.condition_dim))
         cond_sizes = jnp.array([1])
         params = self.init(rng, t, x, cond, cond_sizes, training=False)["params"]
-        return train_state.TrainState.create(
-            apply_fn=self.apply, params=params, tx=optimizer
-        )
+        return train_state.TrainState.create(apply_fn=self.apply, params=params, tx=optimizer)
