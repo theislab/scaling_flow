@@ -33,7 +33,7 @@ dependencies = [
     "orbax",
     "flax",
     "cloudpickle",
-    # for debug logging (referenced from the issue template)
+    "diffrax",
     "session-info",
 ]
 

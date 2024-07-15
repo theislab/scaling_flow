@@ -7,32 +7,29 @@ from ott.neural.methods.flows import genot, otfm
 from ott.solvers import utils as solver_utils
 from tqdm import tqdm
 
-from cfp.networks import ConditionSetEncoder
-
 
 class CellFlowTrainer:
     def __init__(
         self,
-        model: otfm.OTFlowmatching | genot.GENOT,
-        dl: Iterable,
-        set_encoder: str = "transformer",
+        dataloader: Iterable,
+        model: Union[otfm.OTFlowMatching, genot.GENOT],
     ):
         self.model = model
-        self.dl = dl
-        self.set_encoder = ConditionSetEncoder(set_encoder=set_encoder)
+        self.dataloader = dataloader
+        self.vector_field = ConditionalVelocityField()
 
     def train(
         self,
         num_iterations: int,
         valid_freq: int,
-        callback_fn: Callable[[otfm.OTFlowmatching | genot.GENOT], Any],
+        callback_fn: Callable[[Union[otfm.OTFlowMatching, genot.GENOT]], Any],
     ) -> None:
         training_logs = {"loss": []}
         rng = jax.random.PRNGKey(0)
         for it in tqdm(range(num_iterations)):
             rng, rng_resample, rng_step_fn = jax.random.split(rng, 3)
-            idx = int(jax.random.randint(rng, shape=[], minval=0, maxval=self.dl.n_conditions))
-            batch = self.dl.sample_batch(idx, rng)
+            idx = int(jax.random.randint(rng, shape=[], minval=0, maxval=self.dataloader.n_conditions))
+            batch = self.dataloader.sample_batch(idx, rng)
             src, tgt = batch["src_lin"], batch["tgt_lin"]
             src_cond = batch.get("src_condition")
 

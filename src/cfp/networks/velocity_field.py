@@ -1,5 +1,6 @@
 import functools
 from collections.abc import Callable, Sequence
+from dataclasses import field as dc_field
 from typing import Any
 
 import jax
@@ -10,6 +11,7 @@ from flax.training import train_state
 from ott.neural.networks.layers import time_encoder
 
 from cfp.networks.modules import MLPBlock
+from cfp.networks import SetEncoder
 
 __all__ = ["ConditionalVelocityField"]
 
@@ -38,10 +40,9 @@ class ConditionalVelocityField(nn.Module):
     output_dim: int
     condition_dim: int = 0
     condition_encoder: Callable[[Any], jnp.ndarray] | None = None
+    max_set_size: int = 2
+    condition_encoder_kwargs: dict = dc_field(default_factory=dict)
     act_fn: Callable[[jnp.ndarray], jnp.ndarray] = nn.silu
-    time_encoder: Callable[[jnp.ndarray], jnp.ndarray] = functools.partial(
-        time_encoder.cyclical_time_encoder, n_freqs=1024
-    )
     time_embedding_dims: Sequence[int] = (1024, 1024, 1024)
     time_dropout: float = 0.0
     hidden_dims: Sequence[int] = (1024, 1024, 1024)
@@ -51,6 +52,13 @@ class ConditionalVelocityField(nn.Module):
 
     def setup(self):
         """Initialize the network."""
+        if self.condition_encoder is not None:
+            self.cond_encoder = SetEncoder(
+                set_encoder=self.condition_encoder,
+                max_set_size=self.max_set_size,
+                act_fn=self.act_fn,
+                **self.condition_encoder_kwargs,
+            )
         self.time_encoder = MLPBlock(
             dims=self.time_embedding_dims,
             act_fn=self.act_fn,
@@ -75,7 +83,8 @@ class ConditionalVelocityField(nn.Module):
         self,
         t: jnp.ndarray,
         x: jnp.ndarray,
-        condition: jnp.ndarray | None = None,
+        condition: jnp.ndarray,
+        cond_sizes: jnp.ndarray,
         training: bool = True,
     ) -> jnp.ndarray:
         """Forward pass through the neural vector field.
@@ -90,6 +99,9 @@ class ConditionalVelocityField(nn.Module):
         -------
           Output of the neural vector field of shape ``[batch, output_dim]``.
         """
+        if self.condition_encoder is not None:
+            condition = self.cond_encoder(condition, cond_sizes, training)
+        t = time_encoder.cyclical_time_encoder(t, n_freqs=1024)
         t = self.time_encoder(t, training)
         x = self.x_encoder(x, training)
         concatenated = jnp.concatenate((t, x, condition), axis=-1)
@@ -114,6 +126,9 @@ class ConditionalVelocityField(nn.Module):
           The training state.
         """
         t, x = jnp.ones((1, 1)), jnp.ones((1, input_dim))
-        cond = jnp.ones((1, self.condition_dim)) if self.condition_dim > 0 else None
-        params = self.init(rng, t, x, cond, train=False)["params"]
-        return train_state.TrainState.create(apply_fn=self.apply, params=params, tx=optimizer)
+        cond = jnp.ones((1, self.max_set_size, self.condition_dim))
+        cond_sizes = jnp.array([1])
+        params = self.init(rng, t, x, cond, cond_sizes, training=False)["params"]
+        return train_state.TrainState.create(
+            apply_fn=self.apply, params=params, tx=optimizer
+        )
