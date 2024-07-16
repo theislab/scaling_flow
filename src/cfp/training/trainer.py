@@ -1,24 +1,11 @@
-import functools
-import os
-import sys
-import traceback
-from typing import Literal, Optional, Dict, Callable, Iterable, Union, Any
-from functools import partial
+from collections.abc import Callable, Iterable
+from typing import Any
 
 import jax
-import jax.numpy as jnp
-import jax.tree_util as jtu
 import numpy as np
-import flax.linen as nn
-import optax
-import scanpy as sc
-from ott.neural import datasets
-from ott.neural.methods.flows import dynamics, otfm, genot
-from ott.neural.networks.layers import time_encoder
+from ott.neural.methods.flows import genot, otfm
 from ott.solvers import utils as solver_utils
 from tqdm import tqdm
-
-from cfp.metrics import compute_mean_metrics, compute_metrics, compute_metrics_fast
 
 
 class CellFlowTrainer:
@@ -26,7 +13,7 @@ class CellFlowTrainer:
     def __init__(
         self,
         dataloader: Iterable,
-        model: Union[otfm.OTFlowMatching, genot.GENOT],
+        model: otfm.OTFlowMatching | genot.GENOT,
     ):
         self.model = model
         self.dataloader = dataloader
@@ -36,7 +23,7 @@ class CellFlowTrainer:
         self,
         num_iterations: int,
         valid_freq: int,
-        callback_fn: Callable[[Union[otfm.OTFlowMatching, genot.GENOT]], Any],
+        callback_fn: Callable[[otfm.OTFlowMatching | genot.GENOT], Any],
     ) -> None:
 
         training_logs = {"loss": []}

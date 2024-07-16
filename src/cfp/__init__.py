@@ -1,6 +1,6 @@
 from importlib.metadata import version
 
-from . import data, metrics, networks, training, model
+from . import data, metrics, model, networks, training
 
 __all__ = ["networks", "metrics", "data", "training", "model"]
 

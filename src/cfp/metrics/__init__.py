@@ -1,1 +1,1 @@
-from .metrics import compute_metrics, compute_metrics_fast, compute_mean_metrics
+from .metrics import compute_mean_metrics, compute_metrics, compute_metrics_fast

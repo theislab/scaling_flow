@@ -147,3 +147,56 @@ skip = [
     "docs/references.md",
     "docs/notebooks/example.ipynb",
 ]
+
+[tool.rstcheck]
+ignore_directives = [
+    "toctree",
+    "currentmodule",
+    "autosummary",
+    "module",
+    "automodule",
+    "autoclass",
+    "bibliography",
+    "glossary",
+    "card",
+    "grid",
+]
+ignore_roles = [
+    "mod",
+]
+
+
+[tool.mypy]
+mypy_path = "$MYPY_CONFIG_FILE_DIR/src"
+python_version = "3.10"
+plugins = "numpy.typing.mypy_plugin"
+
+ignore_errors = false
+
+warn_redundant_casts = true
+warn_unused_configs = true
+warn_unused_ignores = true
+
+disallow_untyped_calls = false
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+disallow_any_generics = true
+
+strict_optional = true
+strict_equality = true
+warn_return_any = false
+warn_unreachable = false
+check_untyped_defs = true
+no_implicit_optional = true
+no_implicit_reexport = true
+no_warn_no_return = true
+
+show_error_codes = true
+show_column_numbers = true
+error_summary = true
+ignore_missing_imports = true
+
+disable_error_code = ["assignment", "comparison-overlap", "no-untyped-def", "override"]
+
+[tool.doc8]
+max_line_length = 120

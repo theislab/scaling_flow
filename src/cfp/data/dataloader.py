@@ -68,6 +68,10 @@ class JaxSampler:
                 shape=[self.batch_size],
             )
 
-            return {"src_lin": src[source_idcs], "tgt_lin": tgt[tgt_idcs], "src_condition": cond}
+            return {
+                "src_lin": src[source_idcs],
+                "tgt_lin": tgt[tgt_idcs],
+                "src_condition": cond,
+            }
 
         self.sample_batch = _sample_batch
