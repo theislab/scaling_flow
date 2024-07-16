@@ -85,7 +85,7 @@ def load_from_adata(
     src_dist = {covariate: adata.obs[covariate].cat.categories for covariate in source_covariates}
     src_counter = 0
     for src_combination in itertools.product(*src_dist.values()):
-        filter_dict = {covariate: value for covariate, value in zip(source_covariates, src_combination, strict=False)}
+        filter_dict = dict(zip(source_covariates, src_combination, strict=False))
         adata_filtered = filter_adata(adata, filter_dict)
         if len(adata_filtered) == 0:
             print(f"No cells found for filter {filter_dict}.")
@@ -101,9 +101,8 @@ def load_from_adata(
         tgt_counter = 0
         tgt_data[src_counter] = {}
         for tgt_combination in itertools.product(*tgt_dist.values()):
-            filter_dict_tgt = {
-                covariate: value for covariate, value in zip(source_covariates, tgt_combination, strict=False)
-            }
+            filter_dict_tgt = dict(zip(source_covariates, tgt_combination, strict=False))
+
             adata_filtered_tmp = filter_adata(adata_filtered_target, filter_dict_tgt)
             if len(adata_filtered_tmp) == 0:
                 print(f"No cells found for filter {filter_dict}.")

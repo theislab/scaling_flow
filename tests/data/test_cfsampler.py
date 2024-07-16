@@ -21,7 +21,7 @@ class TestSampling:
         pdata = load_from_adata(
             adata_perturbation,
             cell_data=cell_data,
-            control_covariates=control_covariates,
+            split_covariates=control_covariates,
             control_data=control_data,
             perturbation_covariates=perturbation_covariates,
             perturbation_covariate_combinations=[],
@@ -33,9 +33,9 @@ class TestSampling:
             assert pdata.n_controls == len(adata_perturbation.obs["cell_type"].cat.categories)
         assert isinstance(pdata.control_covariates, list)
         assert isinstance(pdata.perturbation_covariates, list)
-        assert isinstance(pdata.control_covariate_values, list)
+        assert isinstance(pdata.split_covariates, list)
         assert isinstance(pdata.perturbation_covariate_values, list)
-        assert pdata.max_length_combination == 1
+        assert pdata.max_comb_size == 1
 
         sampler = CFSampler(pdata, batch_size=batch_size)
         sample = sampler.sample(jax.random.PRNGKey(0))

@@ -1,7 +1,7 @@
 import itertools
 from collections.abc import Callable, Iterable, Sequence
 from dataclasses import dataclass
-from typing import Any, Literal, Tuple
+from typing import Any, Literal
 
 import anndata
 import jax
@@ -11,9 +11,9 @@ import pandas as pd
 import scipy.sparse as sp
 from tqdm import tqdm
 
-from cfp._constants import UNS_KEY_CONDITIONS
+from cfp._constants import CONTROL_HELPER, UNS_KEY_CONDITIONS
 
-__all__ = ["Perturbation_data"]
+__all__ = ["PerturbationData"]
 
 
 @dataclass
@@ -21,8 +21,9 @@ class PerturbationData:
     """
     Data class for perturbation data used in experiments.
 
-    Attributes:
-        control_covariates (Iterable[str]): Covariates defining the control group.
+    Attributes
+    ----------
+        split_covariates (Iterable[str]): Covariates defining the control group.
         perturbation_covariates (Iterable[str]): Covariates defining the perturbation group.
         control_covariate_values (Iterable[str]): Values of the control covariates.
         perturbation_covariate_values (Iterable[str]): Values of the perturbation covariates.
@@ -32,9 +33,10 @@ class PerturbationData:
         d_idx_to_tgt (dict[int, str]): Mapping from distribution index to target distribution identifier.
         tgt_data (dict[int, dict[int, dict[str, jax.Array]]]): Target data indexed by distribution and perturbation indices.
     """
+
     control_covariates: Iterable[str]
     perturbation_covariates: Iterable[str]
-    control_covariate_values: Iterable[str]
+    split_covariates: Iterable[str]
     perturbation_covariate_values: Iterable[str]
     perturbation_covariate_combinations: Iterable[Iterable[str]]
     d_idx_to_src: dict[int, str]
@@ -54,7 +56,7 @@ class PerturbationData:
         self.perturbation_covariate_no_combination = list(
             set(self.perturbation_covariates) - set(perturbation_covariate_combs)
         )
-        self.max_length_combination = (
+        self.max_comb_size = (
             max([len(group) for group in self.perturbation_covariate_combinations])
             if len(self.perturbation_covariate_combinations) > 0
             else 1
@@ -63,7 +65,7 @@ class PerturbationData:
     @property
     def n_controls(self) -> int:
         """Returns the number of control covariate values."""
-        return len(self.control_covariate_values)
+        return len(self.split_covariates)
 
     @property
     def n_perturbed(self) -> int:
@@ -106,9 +108,9 @@ def get_cell_data(adata: anndata.AnnData, cell_data: Literal["X"] | dict[str, st
 
     Parameters
     ----------
-    adata 
+    adata
         The :class:`anndata.AnnData` object containing the cell data.
-    cell_data 
+    cell_data
         Specification of where to find the cell data. If "X", the data is taken from adata.X.
         If a dictionary, it must contain "attr" and "key" to specify the location.
 
@@ -156,7 +158,14 @@ def _check_shape(arr: float | np.ndarray) -> np.ndarray:
     raise ValueError("TODO. wrong data for embedding.")
 
 
-def _add_perturbation_covariates(adata: anndata.AnnData, adata_filtered: anndata.AnnData, tgt_data: dict[int, dict[int, jax.Array]], obs_col: Tuple[int, int], src_counter: int, tgt_counter: int) -> dict:
+def _add_perturbation_covariates(
+    adata: anndata.AnnData,
+    adata_filtered: anndata.AnnData,
+    tgt_data: dict[int, dict[int, jax.Array]],
+    obs_col: tuple[int, int],
+    src_counter: int,
+    tgt_counter: int,
+) -> dict:
     values = list(adata_filtered.obs[obs_col[0]].unique())
     if len(values) != 1:
         raise ValueError("Too many categories within distribution found")
@@ -182,12 +191,10 @@ def _add_perturbation_covariates(adata: anndata.AnnData, adata_filtered: anndata
 def load_from_adata(
     adata: anndata.AnnData,
     cell_data: Literal["X"] | dict[str, str],
-    control_covariates: Sequence[str] | None,
     control_data: tuple[str, Any],
-    perturbation_covariates: Sequence[
-        tuple[str, str | None]
-    ],  
-    perturbation_covariate_combinations: Sequence[Sequence[str]],  
+    split_covariates: Sequence[tuple[str, str | None]],
+    perturbation_covariates: Sequence[tuple[str, str | None]],
+    perturbation_covariate_combinations: Sequence[Sequence[str]],
 ) -> PerturbationData:
     """Load cell data from an AnnData object.
 
@@ -196,11 +203,12 @@ def load_from_adata(
         cell_data: Where to read the cell data from. If of type :class:`dict`, the key
             "attr" should be present and the value should be an attribute of :class:`~anndata.AnnData`.
             The key `key` should be present and the value should be the key in the respective attribute
-        control_covariates: Covariates in adata.obs defining the source distribution.
         control_data: Tuple of length 2 with first element defining the column in :class:`~anndata.AnnData`
           and second element defining the value in `adata.obs[control_data[0]]` used to define the source
           distribution.
-        perturbation_covariates: Covariates in adata.obs characterizing the source distribution.
+        split_covariates: Covariates in adata.obs defining the control distribution.
+        perturbation_covariates: Covariates in adata.obs characterizing the source distribution (together
+          with `split_covariates`).
           First of a tuple is a column name in adata.obs, the second element is the key in
           adata.uns[`UNS_KEY_CONDITION`] if it exists, otherwise the obs column name if the
           embedding of the covariate should directly be read from it.
@@ -212,10 +220,10 @@ def load_from_adata(
         PerturbationData: Data container for the perturbation data.
     """
     # TODO(@MUCDK): add device to possibly only load to cpu
-    if control_covariates is None or len(control_covariates) == 0:
-        adata.obs["control_dummy"] = True
-        adata.obs["control_dummy"] = adata.obs["control_dummy"].astype("category")
-        control_covariates = ["control_dummy"]
+    if split_covariates is None or len(split_covariates) == 0:
+        adata.obs[CONTROL_HELPER] = True
+        adata.obs[CONTROL_HELPER] = adata.obs[CONTROL_HELPER].astype("category")
+        split_covariates = [CONTROL_HELPER]
     _verify_control_data(adata, control_data)
 
     if UNS_KEY_CONDITIONS not in adata.uns:
@@ -225,15 +233,15 @@ def load_from_adata(
     tgt_data = {}  # this has as keys the values of src_data, and as values further conditions
     d_idx_to_src = {}  # dict of dict mapping source ids to strings
     d_idx_to_tgt = {}  # dict of dict mapping target ids to strings
-    for covariate in control_covariates:
+    for covariate in split_covariates:
         assert covariate in adata.obs
         assert adata.obs[covariate].dtype.name == "category"
 
-    src_dist = {covariate: adata.obs[covariate].cat.categories for covariate in control_covariates}
+    src_dist = {covariate: adata.obs[covariate].cat.categories for covariate in split_covariates}
     src_counter = 0
     src_dists = list(itertools.product(*src_dist.values()))
     for src_combination in tqdm(src_dists):
-        filter_dict = {covariate: value for covariate, value in zip(control_covariates, src_combination, strict=False)}
+        filter_dict = dict(zip(split_covariates, src_combination, strict=False))
         adata_filtered = filter_adata(adata, filter_dict)
         if len(adata_filtered) == 0:
             continue
@@ -249,6 +257,7 @@ def load_from_adata(
         tgt_counter = 0
         tgt_data[src_counter] = {}
         for tgt_combination in itertools.product(*tgt_dist.values()):
+            tgt_combination += src_combination
             filter_dict_tgt = {
                 covariate[0]: value for covariate, value in zip(perturbation_covariates, tgt_combination, strict=False)
             }
@@ -273,7 +282,7 @@ def load_from_adata(
     ]
 
     return PerturbationData(
-        control_covariates,
+        split_covariates,
         [p[0] for p in perturbation_covariates],
         c_covariate_values,
         p_covariate_values,

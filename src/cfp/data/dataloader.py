@@ -25,7 +25,7 @@ class CFSampler:
         self.data = data
         self.batch_size = batch_size
         self.n_dists = np.sum(list(data.n_perturbations_given_control.values()))
-        self.max_seq_length = self.data.max_length_combination
+        self.max_comb_size = self.data.max_comb_size
 
         def _sample_distributions(rng):
             rng_1, rng_2 = jax.random.split(rng)
@@ -62,7 +62,7 @@ class CFSampler:
             src = self.data.src_data[src_idx]
             tgt = self.data.tgt_data[src_idx][tgt_idx]
             conds_no_combination = [
-                jnp.tile(self.data.tgt_data[src_idx][tgt_idx][pert_cond], (self.max_seq_length, 1))
+                jnp.tile(self.data.tgt_data[src_idx][tgt_idx][pert_cond], (self.max_comb_size, 1))
                 for pert_cond in self.data.perturbation_covariate_no_combination
             ]
             conds_combination = [
