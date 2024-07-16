@@ -1,4 +1,3 @@
-import functools
 from collections.abc import Callable, Sequence
 from dataclasses import field as dc_field
 from typing import Any
@@ -10,8 +9,8 @@ from flax import linen as nn
 from flax.training import train_state
 from ott.neural.networks.layers import time_encoder
 
-from cfp.networks.modules import MLPBlock
 from cfp.networks import SetEncoder
+from cfp.networks.modules import MLPBlock
 
 __all__ = ["ConditionalVelocityField"]
 
@@ -47,13 +46,13 @@ class ConditionalVelocityField(nn.Module):
     time_dropout: float = 0.0
     hidden_dims: Sequence[int] = (1024, 1024, 1024)
     hidden_dropout: float = 0.0
-    output_dims: Sequence[int] = (1024, 1024, 1024)
-    output_dropout: float = 0.0
+    decoder_dims: Sequence[int] = (1024, 1024, 1024)
+    decoder_dropout: float = 0.0
 
     def setup(self):
         """Initialize the network."""
         if self.condition_encoder is not None:
-            self.cond_encoder = SetEncoder(
+            self.set_encoder = SetEncoder(
                 set_encoder=self.condition_encoder,
                 max_set_size=self.max_set_size,
                 act_fn=self.act_fn,
@@ -72,9 +71,9 @@ class ConditionalVelocityField(nn.Module):
         )
 
         self.decoder = MLPBlock(
-            dims=self.output_dims,
+            dims=self.decoder_dims,
             act_fn=self.act_fn,
-            dropout_rate=self.output_dropout,
+            dropout_rate=self.decoder_dropout,
         )
 
         self.output_layer = nn.Dense(self.output_dim)
@@ -84,29 +83,41 @@ class ConditionalVelocityField(nn.Module):
         t: jnp.ndarray,
         x: jnp.ndarray,
         condition: jnp.ndarray,
-        cond_sizes: jnp.ndarray,
-        training: bool = True,
+        train: bool = True,
     ) -> jnp.ndarray:
         """Forward pass through the neural vector field.
 
         Args:
-          t: Time of shape ``[batch, 1]``.
-          x: Data of shape ``[batch, ...]``.
-          condition: Conditioning vector of shape ``[batch, ...]``.
-          training: If `True`, enables dropout for training.
+            t: Time of shape ``[batch, 1]``.
+            x: Data of shape ``[batch, ...]``.
+            condition: Conditioning vector of shape ``[batch, ...]``.
+            train: If `True`, enables dropout for training.
 
         Returns
         -------
-          Output of the neural vector field of shape ``[batch, output_dim]``.
+            Output of the neural vector field of shape ``[batch, output_dim]``.
         """
         if self.condition_encoder is not None:
-            condition = self.cond_encoder(condition, cond_sizes, training)
+            condition = self.set_encoder(condition, training=train)
         t = time_encoder.cyclical_time_encoder(t, n_freqs=1024)
-        t = self.time_encoder(t, training)
-        x = self.x_encoder(x, training)
+        t = self.time_encoder(t, training=train)
+        x = self.x_encoder(x, training=train)
         concatenated = jnp.concatenate((t, x, condition), axis=-1)
-        out = self.decoder(concatenated, training)
+        out = self.decoder(concatenated, training=train)
         return self.output_layer(out)
+
+    def encode_conditions(self, condition):
+        """Get the embedding of the condition.
+
+        Args:
+            condition: Conditioning vector of shape ``[batch, ...]``.
+            cond_sizes: Size of the condition
+
+        Returns
+        -------
+            Embedding of the condition.
+        """
+        return self.set_encoder(condition, training=False)
 
     def create_train_state(
         self,
@@ -117,18 +128,20 @@ class ConditionalVelocityField(nn.Module):
         """Create the training state.
 
         Args:
-          rng: Random number generator.
-          optimizer: Optimizer.
-          input_dim: Dimensionality of the velocity field.
+            rng: Random number generator.
+            optimizer: Optimizer.
+            input_dim: Dimensionality of the velocity field.
 
         Returns
         -------
-          The training state.
+            The training state.x
         """
         t, x = jnp.ones((1, 1)), jnp.ones((1, input_dim))
         cond = jnp.ones((1, self.max_set_size, self.condition_dim))
-        cond_sizes = jnp.array([1])
-        params = self.init(rng, t, x, cond, cond_sizes, training=False)["params"]
-        return train_state.TrainState.create(
-            apply_fn=self.apply, params=params, tx=optimizer
-        )
+        params = self.init(rng, t, x, cond, train=False)["params"]
+        return train_state.TrainState.create(apply_fn=self.apply, params=params, tx=optimizer)
+
+    @property
+    def output_dims(self):
+        """Dimonsions of the output layers."""
+        return self.decoder_dims + (self.output_dim,)

@@ -8,15 +8,12 @@ import optax
 from flax import linen as nn
 from flax.linen import initializers
 from flax.training import train_state
-from jax.nn import initializers
 
 __all__ = [
     "MultiHeadAttention",
     "MLPEncoder",
     "DeepSet",
     "DeepSetEncoder",
-    "FSPool",
-    "FSPoolEncoder",
     "MAB",
     "SAB",
     "PMA",
@@ -45,10 +42,9 @@ class MultiHeadAttention(nn.Module):
 
     @nn.compact
     def __call__(self, condition: jnp.ndarray, training: bool = True) -> jnp.ndarray:
+        """Call the module."""
         token_shape = (len(condition), 1) if condition.ndim > 2 else (1,)
-        class_token = nn.Embed(num_embeddings=1, features=condition.shape[-1])(
-            jnp.int32(jnp.zeros(token_shape))
-        )
+        class_token = nn.Embed(num_embeddings=1, features=condition.shape[-1])(jnp.int32(jnp.zeros(token_shape)))
 
         condition = jnp.concatenate((class_token, condition), axis=-2)
         mask = self.get_masks(condition)
@@ -64,9 +60,7 @@ class MultiHeadAttention(nn.Module):
 
         for cond_dim in self.condition_dims:
             condition = self.act_fn(nn.Dense(cond_dim)(condition))
-            condition = nn.Dropout(rate=self.dropout_rate, deterministic=not training)(
-                condition
-            )
+            condition = nn.Dropout(rate=self.dropout_rate, deterministic=not training)(condition)
         return condition
 
 
@@ -89,6 +83,7 @@ class MLPEncoder(nn.Module):
 
     @nn.compact
     def __call__(self, x: jnp.ndarray, training: bool | None = None) -> jnp.ndarray:
+        """Call the module."""
         training = nn.merge_param("training", self.training, training)
         if self.hidden_dim is None:
             return x
@@ -125,8 +120,7 @@ class MLPEncoder(nn.Module):
 
 
 class DeepSet(nn.Module):
-    """DeepSet layer mapping shape (input_dim, n) to (output_dim, n). Each block of n scalars is treated as the S_n permutation representation, and maps between blocks are
-    S_n-equivariant.
+    """DeepSet layer mapping shape (input_dim, n) to (output_dim, n).
 
     Args:
         input_dim: input dimension of the latent vector
@@ -148,6 +142,7 @@ class DeepSet(nn.Module):
 
     @nn.compact
     def __call__(self, x: jnp.ndarray) -> jnp.ndarray:
+        """Call the module."""
         alpha = self.param(
             "alpha",
             self.alpha_init,
@@ -202,6 +197,7 @@ class DeepSetEncoder(nn.Module):
         cond_sizes: jnp.ndarray | None = None,
         training: bool | None = None,
     ) -> jnp.ndarray:
+        """Call the module."""
         # prepare input and mask
         training = nn.merge_param("training", self.training, training)
         squeeze = x.ndim == 2
@@ -218,9 +214,7 @@ class DeepSetEncoder(nn.Module):
             for _ in range(self.n_layers_before_pool):
                 Wx = DeepSet(z.shape[1], self.hidden_dim_before_pool)
                 z = self.act_fn(Wx(z))
-                z = nn.Dropout(rate=self.dropout_rate_before_pool)(
-                    z, deterministic=not training
-                )
+                z = nn.Dropout(rate=self.dropout_rate_before_pool)(z, deterministic=not training)
             axis_pool = 2
             mask = jnp.expand_dims(mask, 1)
         elif self.equivar_transform == "mlp":
@@ -228,9 +222,7 @@ class DeepSetEncoder(nn.Module):
                 Wx = nn.Dense(self.hidden_dim_before_pool, use_bias=True)
                 z = Wx(z)
                 z = self.act_fn(z)
-                z = nn.Dropout(rate=self.dropout_rate_before_pool)(
-                    z, deterministic=not training
-                )
+                z = nn.Dropout(rate=self.dropout_rate_before_pool)(z, deterministic=not training)
             axis_pool = 1
             mask = jnp.expand_dims(mask, -1)
         else:
@@ -252,280 +244,7 @@ class DeepSetEncoder(nn.Module):
             Wx = nn.Dense(self.hidden_dim_after_pool, use_bias=True)
             z = Wx(z)
             z = self.act_fn(z)
-            z = nn.Dropout(rate=self.dropout_rate_after_pool)(
-                z, deterministic=not training
-            )
-        Wx = nn.Dense(self.output_dim, use_bias=True)
-        z = Wx(z)
-
-        return z.squeeze(0) if squeeze else z
-
-
-class FSPool(nn.Module):
-    """
-    Feature-wise sort pooling.
-
-    Parameters
-    ----------
-    in_channels : int
-        Number of input channels.
-    n_pieces : int
-        Number of pieces to split the input into.
-    relaxed : bool
-        Whether to use the relaxed version of the sort.
-    """
-
-    # Copyright 2019 Yan Zhang
-    # Permission is hereby granted, free of charge, to any person obtaining a copy of this
-    # software and associated documentation files (the "Software"), to deal in the Software
-    # without restriction, including without limitation the rights to use, copy, modify,
-    # merge, publish, distribute, sublicense, and/or sell copies of the Software, and to
-    # permit persons to whom the Software is furnished to do so, subject to the following conditions:
-    # The above copyright notice and this permission notice shall be included in all copies
-    # or substantial portions of the Software.
-
-    in_channels: int
-    n_pieces: int
-    relaxed: bool = False
-
-    def setup(self) -> None:
-        self.weight = self.param(
-            "weight", nn.initializers.zeros, (self.in_channels, self.n_pieces + 1)
-        )
-
-        @jax.jit
-        def _determine_weight(sizes):
-            """
-            Piecewise linear function. Evaluates f at the ratios in sizes.
-            This should be a faster implementation than doing the sum over max terms, since we know that most terms in it are 0.
-            """
-            # share same sequence length within each sample, so copy weighht across batch dim
-            weight = jnp.expand_dims(self.weight, 0)
-            weight = jnp.broadcast_to(
-                weight, (sizes.shape[0], weight.shape[1], weight.shape[2])
-            )
-
-            # linspace [0, 1] -> linspace [0, n_pieces]
-            index = self.n_pieces * sizes
-            index = jnp.expand_dims(index, 1)
-            index = jnp.broadcast_to(
-                index, (index.shape[0], weight.shape[1], index.shape[2])
-            )
-
-            # points in the weight vector to the left and right
-            idx = index.astype(jnp.int32)
-            frac = index - idx
-            left = jnp.take_along_axis(weight, idx, axis=2)
-            right = jnp.take_along_axis(
-                weight, jnp.clip(idx + 1, a_max=self.n_pieces), axis=2
-            )
-
-            # interpolate between left and right point
-            return (1 - frac) * left + frac * right
-
-        @jax.jit
-        def _deterministic_sort(s: jnp.ndarray, tau: int = 1) -> jnp.ndarray:
-            """
-            "Stochastic Optimization of Sorting Networks via Continuous Relaxations" https://openreview.net/forum?id=H1eSS3CcKX
-
-            Aditya Grover, Eric Wang, Aaron Zweig, Stefano Ermon
-
-            s: input elements to be sorted. Shape: batch_size x n x 1
-            tau: temperature for relaxation. Scalar.
-            """
-            n = s.shape[1]
-            one = jnp.ones((n, 1), dtype=jnp.float32)
-            A_s = jnp.abs(s - jnp.transpose(s, (0, 2, 1)))
-            B = jnp.matmul(A_s, jnp.matmul(one, jnp.transpose(one, (1, 0))))
-            scaling = (n + 1 - 2 * (jnp.arange(n) + 1)).astype(jnp.float32)
-            C = jnp.matmul(s, jnp.expand_dims(scaling, 0))
-            P_max = jnp.transpose((C - B), (0, 2, 1))
-            sm = nn.softmax
-            P_hat = sm(P_max / tau)
-            return P_hat
-
-        @jax.jit
-        def _cont_sort(x: jnp.ndarray, perm: jnp.ndarray | None = None, temp: int = 1):
-            """Helper function that calls deterministic_sort with the right shape.
-            Since it assumes a shape of (batch_size, n, 1) while the input x is of shape (batch_size, channels, n),
-            we can get this to the right shape by merging the first two dimensions.
-            If an existing perm is passed in, we compute the "inverse" (transpose of perm) and just use that to unsort x.
-            """
-            original_size = x.shape
-            x = x.reshape(-1, x.shape[2], 1)
-            if perm is None:
-                perm = _deterministic_sort(x, temp)
-            else:
-                perm = jnp.transpose(perm, (0, 2, 1))
-            x = jnp.matmul(perm, x)
-            x = x.reshape(original_size)
-            return x, perm
-
-        self.determine_weight = _determine_weight
-        self.cont_sort = _cont_sort
-
-    @nn.compact
-    def __call__(
-        self,
-        x: jnp.ndarray,
-        cond_sizes: jnp.ndarray | None = None,
-    ) -> tuple[jnp.ndarray, jnp.ndarray]:
-        """FSPool
-
-        x: FloatTensor of shape (batch_size, in_channels, set size).
-        This should contain the features of the elements in the set.
-        Variable set sizes should be padded to the maximum set size in the batch with 0s.
-
-        n: LongTensor of shape (batch_size).
-        This tensor contains the sizes of each set in the batch.
-        If not specified, assumes that every set has the same size of x.size(2).
-        Note that n.max() should never be greater than x.size(2), i.e. the specified set size in the
-        n tensor must not be greater than the number of elements stored in the x tensor.
-
-        Returns: pooled input x, used permutation matrix perm
-        """
-        squeeze = x.ndim == 2
-        if squeeze:
-            x = jnp.expand_dims(x, 0)
-
-        # can call withtout length tensor, uses same length for all sets in the batch
-        if cond_sizes is None:
-            cond_sizes = jnp.full(x.shape[0], x.shape[1])
-
-        # create tensor of ratios $r$
-        sizes, mask = self.fill_sizes(cond_sizes, x)
-        mask = jnp.broadcast_to(mask, x.shape)
-
-        # turn continuous into concrete weights
-        weight = self.determine_weight(sizes)
-
-        # make sure that fill value isn't affecting sort result
-        # sort is descending, so put unreasonably low value in places to be masked away
-        x = x + (1 - mask) * (-99999)
-        if self.relaxed:
-            x, perm = self.cont_sort(x, temp=self.relaxed)
-        else:
-            # FIXME: when we upgrade to jax 0.4.20, we can set `descending=True`
-            perm = jnp.argsort(x, axis=2)
-            perm = jnp.flip(perm, axis=2)
-            x = jnp.take_along_axis(x, perm, axis=2)
-
-        x = (x * weight * mask).sum(axis=2)
-        return x, perm
-
-    def fill_sizes(self, sizes: jnp.ndarray, x: jnp.ndarray | None = None):
-        """
-        sizes is a LongTensor of size [batch_size], containing the set sizes.
-        Each set size n is turned into [0/(n-1), 1/(n-1), ..., (n-2)/(n-1), 1, 0, 0, ..., 0, 0].
-        These are the ratios r at which f is evaluated at.
-        The 0s at the end are there for padding to the largest n in the batch.
-        If the input set x is passed in, it guarantees that the mask is the correct size even when sizes.max()
-        is less than x.size(), which can be a case if there is at least one padding element in each set in the batch.
-        """
-        if x is not None:
-            max_size = x.shape[2]
-        else:
-            max_size = sizes.max()
-        # size_tensor = jnp.full((sizes.shape[0], max_size), -1)
-
-        size_tensor = jnp.arange(max_size)
-        size_tensor = jnp.where(
-            (sizes == 1)[:, None],
-            size_tensor[None, :] + 1 / (sizes - 1).clip(min=1)[:, None],
-            size_tensor[None, :] / (sizes - 1).clip(min=1)[:, None],
-        )
-
-        mask = size_tensor <= 1
-        mask = mask[:, None, :]
-
-        return jnp.clip(size_tensor, a_max=1), mask
-
-    def create_train_state(
-        self,
-        rng: jax.Array,
-        optimizer: optax.OptState,
-        input_dim: int | tuple[int, ...],
-        **kwargs: Any,
-    ):
-        """Create initial training state."""
-        params = self.init(rng, x=jnp.ones((1, input_dim, 1)))["params"]
-        return train_state.TrainState.create(
-            apply_fn=self.apply,
-            params=params,
-            tx=optimizer,
-            **kwargs,
-        )
-
-
-class FSPoolEncoder(nn.Module):
-    """A FSPool encoder that encodes a condition into a latent vector.
-
-    Args:
-        hidden_dim: sequence specifying size of hidden dimensions.
-        output_dim: output dimension of the latent vector
-        act_fn: Activation function
-    """
-
-    hidden_dim_before_pool: int = 128
-    hidden_dim_after_pool: int = 128
-    n_layers_before_pool: int = 1
-    n_layers_after_pool: int = 1
-    output_dim: int = 5
-    act_fn: Callable[[jnp.ndarray], jnp.ndarray] = nn.silu
-    dropout_rate_before_pool: float = 0.0
-    dropout_rate_after_pool: float = 0.0
-    equivar_transform: Literal["deepset", "mlp"] = "mlp"
-    n_pieces: int = 5
-    relaxed: bool = False
-    training: bool | None = None
-
-    @nn.compact
-    def __call__(
-        self,
-        x: jnp.ndarray,
-        cond_sizes: jnp.ndarray | None = None,
-        training: bool | None = None,
-    ) -> jnp.ndarray:
-        # prepare input
-        training = nn.merge_param("training", self.training, training)
-        squeeze = x.ndim == 2
-        if squeeze:
-            x = jnp.expand_dims(x, 0)
-        z = x
-
-        # equivariant transform
-        if self.equivar_transform == "deepset":
-            z = z.transpose(0, 2, 1)
-            for _ in range(self.n_layers_before_pool):
-                Wx = DeepSet(z.shape[1], self.hidden_dim_before_pool)
-                z = self.act_fn(Wx(z))
-                z = nn.Dropout(rate=self.dropout_rate_before_pool)(
-                    z, deterministic=not training
-                )
-        elif self.equivar_transform == "mlp":
-            for l in range(self.n_layers_before_pool):
-                Wx = nn.Dense(self.hidden_dim_before_pool, use_bias=True)
-                z = Wx(z)
-                if l < self.n_layers_before_pool - 1:
-                    z = self.act_fn(z)
-                    z = nn.Dropout(rate=self.dropout_rate_before_pool)(
-                        z, deterministic=not training
-                    )
-            z = z.transpose(0, 2, 1)
-        else:
-            raise ValueError("Invalid equivariant transform")
-
-        z, _ = FSPool(self.hidden_dim_before_pool, self.n_pieces, self.relaxed)(
-            z, cond_sizes
-        )
-
-        for _ in range(self.n_layers_after_pool):
-            Wx = nn.Dense(self.hidden_dim_after_pool, use_bias=True)
-            z = Wx(z)
-            z = self.act_fn(z)
-            z = nn.Dropout(rate=self.dropout_rate_after_pool)(
-                z, deterministic=not training
-            )
+            z = nn.Dropout(rate=self.dropout_rate_after_pool)(z, deterministic=not training)
         Wx = nn.Dense(self.output_dim, use_bias=True)
         z = Wx(z)
 
@@ -543,6 +262,7 @@ class MAB(nn.Module):
 
     @nn.compact
     def __call__(self, Q, K, mask=None, training: bool | None = None):
+        """Call the module."""
         training = nn.merge_param("training", self.training, training)
         is_eval = not training
 
@@ -564,9 +284,7 @@ class MAB(nn.Module):
             A = jnp.where(mask, A, -1e9)
         A = nn.softmax(A)
 
-        O = jnp.concatenate(
-            jnp.split(Q_ + jnp.matmul(A, V_), self.num_heads, axis=0), axis=2
-        )
+        O = jnp.concatenate(jnp.split(Q_ + jnp.matmul(A, V_), self.num_heads, axis=0), axis=2)
 
         O = nn.Dropout(rate=self.dropout_rate)(O, deterministic=is_eval)
         if self.ln:
@@ -591,10 +309,9 @@ class SAB(nn.Module):
 
     @nn.compact
     def __call__(self, X, mask=None, training: bool | None = None):
+        """Call the module."""
         training = nn.merge_param("training", self.training, training)
-        return MAB(self.dim_out, self.num_heads, self.ln, self.dropout_rate, training)(
-            X, X, mask
-        )
+        return MAB(self.dim_out, self.num_heads, self.ln, self.dropout_rate, training)(X, X, mask)
 
 
 class PMA(nn.Module):
@@ -609,14 +326,11 @@ class PMA(nn.Module):
 
     @nn.compact
     def __call__(self, X, mask=None, training: bool | None = None):
+        """Call the module."""
         training = nn.merge_param("training", self.training, training)
-        S = self.param(
-            "S", initializers.xavier_uniform(), (1, self.num_seeds, self.dim)
-        )
+        S = self.param("S", initializers.xavier_uniform(), (1, self.num_seeds, self.dim))
         S = jnp.tile(S, (X.shape[0], 1, 1))
-        return MAB(self.dim, self.num_heads, self.ln, self.dropout_rate, training)(
-            S, X, mask
-        )
+        return MAB(self.dim, self.num_heads, self.ln, self.dropout_rate, training)(S, X, mask)
 
 
 class SetTransformer(nn.Module):
@@ -665,6 +379,7 @@ class SetTransformer(nn.Module):
     training: bool | None = None
 
     def setup(self):
+        """Setup the module."""
         self.enc_layers = [
             SAB(
                 self.dim_hidden_before_pool,
@@ -702,7 +417,12 @@ class SetTransformer(nn.Module):
         cond_sizes: jnp.ndarray | None = None,
         training: bool | None = None,
     ) -> jnp.ndarray:
+        """Call the module."""
         training = nn.merge_param("training", self.training, training)
+        squeeze = x.ndim == 2
+        if squeeze:
+            x = jnp.expand_dims(x, 0)
+
         if cond_sizes is None:
             cond_sizes = jnp.full(x.shape[0], x.shape[1])
 
@@ -721,7 +441,9 @@ class SetTransformer(nn.Module):
             else:
                 x = layer(x)
 
-        return x.squeeze(1)
+        x = x.squeeze(1)
+
+        return x.squeeze(0) if squeeze else x
 
 
 class SetEncoder(nn.Module):
@@ -738,7 +460,7 @@ class SetEncoder(nn.Module):
         Output dimension of the latent vector.
     act_fn : Callable[[jnp.ndarray], jnp.ndarray]
         Activation function.
-    set_encoder : Literal["deepset", "fspool", "transformer"]
+    set_encoder : Literal["deepset", "transformer"]
         Set encoder to use.
     set_encoder_kwargs : dict
         Keyword arguments for the set encoder.
@@ -761,7 +483,7 @@ class SetEncoder(nn.Module):
     act_fn: Callable[[jnp.ndarray], jnp.ndarray] = nn.leaky_relu
     dropout_rate_before_pool: float = 0.0
     dropout_rate_after_pool: float = 0.0
-    set_encoder: Literal["deepset", "fspool", "transformer"] = "deepset"
+    set_encoder: Literal["deepset", "transformer"] = "deepset"
     set_encoder_kwargs: dict = dc_field(default_factory=lambda: {})
     equivar_transform: Literal["deepset", "mlp"] = "mlp"
     training: bool | None = None
@@ -784,19 +506,6 @@ class SetEncoder(nn.Module):
         training = nn.merge_param("training", self.training, training)
         if self.set_encoder == "deepset":
             SetEncoder = DeepSetEncoder(
-                hidden_dim_before_pool=self.hidden_dim_before_pool,
-                hidden_dim_after_pool=self.hidden_dim_after_pool,
-                n_layers_before_pool=self.n_layers_before_pool,
-                n_layers_after_pool=self.n_layers_after_pool,
-                output_dim=self.output_dim,
-                act_fn=self.act_fn,
-                dropout_rate_before_pool=self.dropout_rate_before_pool,
-                dropout_rate_after_pool=self.dropout_rate_after_pool,
-                equivar_transform=self.equivar_transform,
-                **self.set_encoder_kwargs,
-            )
-        elif self.set_encoder == "fspool":
-            SetEncoder = FSPoolEncoder(
                 hidden_dim_before_pool=self.hidden_dim_before_pool,
                 hidden_dim_after_pool=self.hidden_dim_after_pool,
                 n_layers_before_pool=self.n_layers_before_pool,
@@ -861,7 +570,7 @@ class ConditionSetEncoder(nn.Module):
         Output dimension of the latent vector.
     act_fn : Callable[[jnp.ndarray], jnp.ndarray]
         Activation function.
-    set_encoder : Literal["deepset", "fspool", "transformer"]
+    set_encoder : Literal["deepset", "transformer"]
         Set encoder to use.
     set_encoder_kwargs : dict
         Keyword arguments for the set encoder.
@@ -884,7 +593,7 @@ class ConditionSetEncoder(nn.Module):
     act_fn: Callable[[jnp.ndarray], jnp.ndarray] = nn.leaky_relu
     dropout_rate_before_pool: float = 0.0
     dropout_rate_after_pool: float = 0.0
-    set_encoder: Literal["deepset", "fspool", "transformer"] = "deepset"
+    set_encoder: Literal["deepset", "transformer"] = "deepset"
     set_encoder_kwargs: dict = dc_field(default_factory=lambda: {})
     equivar_transform: Literal["deepset", "mlp"] = "mlp"
     training: bool | None = None

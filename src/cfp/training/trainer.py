@@ -1,53 +1,48 @@
-import functools
-import os
-import sys
-import traceback
-from typing import Literal, Optional, Dict, Callable, Iterable, Union, Any
-from functools import partial
+from collections.abc import Callable, Iterable
+from typing import Any
 
 import jax
-import jax.numpy as jnp
-import jax.tree_util as jtu
 import numpy as np
-import flax.linen as nn
-import optax
-import scanpy as sc
-from ott.neural import datasets
-from ott.neural.methods.flows import dynamics, otfm, genot
-from ott.neural.networks.layers import time_encoder
+from ott.neural.methods.flows import genot, otfm
 from ott.solvers import utils as solver_utils
 from tqdm import tqdm
 
-from cfp.metrics import compute_mean_metrics, compute_metrics, compute_metrics_fast
-
 
 class CellFlowTrainer:
+    """Trainer for the OTFM/GENOT model with a conditional velocity field."""
 
     def __init__(
         self,
         dataloader: Iterable,
-        model: Union[otfm.OTFlowMatching, genot.GENOT],
+        model: otfm.OTFlowMatching | genot.GENOT,
     ):
         self.model = model
         self.dataloader = dataloader
-        self.vector_field = ConditionalVelocityField()
 
     def train(
         self,
         num_iterations: int,
         valid_freq: int,
-        callback_fn: Callable[[Union[otfm.OTFlowMatching, genot.GENOT]], Any],
+        callback_fn: Callable[[otfm.OTFlowMatching | genot.GENOT], Any] | None = None,
     ) -> None:
+        """Trains the model.
 
+        Args:
+            num_iterations: Number of iterations to train the model.
+            valid_freq: Frequency of validation.
+            callback_fn: Callback
+
+        Returns
+        -------
+            None
+        """
         training_logs = {"loss": []}
         rng = jax.random.PRNGKey(0)
-        for it in tqdm(range(num_iterations)):
+
+        pbar = tqdm(range(num_iterations))
+        for it in pbar:
             rng, rng_resample, rng_step_fn = jax.random.split(rng, 3)
-            idx = int(
-                jax.random.randint(
-                    rng, shape=[], minval=0, maxval=self.dataloader.n_conditions
-                )
-            )
+            idx = int(jax.random.randint(rng, shape=[], minval=0, maxval=self.dataloader.n_conditions))
             batch = self.dataloader.sample_batch(idx, rng)
             src, tgt = batch["src_lin"], batch["tgt_lin"]
             src_cond = batch.get("src_condition")
@@ -71,7 +66,39 @@ class CellFlowTrainer:
                 train_loss = np.mean(training_logs["loss"][valid_freq:])
                 log_metrics = {"train_loss": train_loss}
 
-                callback_fn(
-                    self.model,
-                    log_metrics,
-                )
+                pbar.set_postfix({"loss": float(loss.mean().round(2))})
+
+                if callback_fn is not None:
+                    callback_fn(
+                        self.model,
+                        log_metrics,
+                    )
+
+    def encode_conditions(self, condition: np.ndarray) -> np.ndarray:
+        """Encode conditions
+
+        Args:
+            condition: Conditions to encode
+
+        Returns
+        -------
+            Encoded conditions
+        """
+        return self.model.vf.apply(
+            {"params": self.model.vf_state.params},
+            condition,
+            method="encode_conditions",
+        )
+
+    def predict(self, x: np.ndarray, condition: np.ndarray) -> np.ndarray:
+        """Predict
+
+        Args:
+            x: Input data
+            condition: Condition
+
+        Returns
+        -------
+            Predicted output
+        """
+        return self.model.transport(x, condition)
