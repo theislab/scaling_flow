@@ -1,9 +1,7 @@
-from functools import partial
 from typing import Any
 
 import jax
 import jax.numpy as jnp
-import numpy as np
 
 from cfp.data.data import PerturbationData
 
@@ -24,83 +22,25 @@ class CFSampler:
     def __init__(self, data: PerturbationData, batch_size: int = 64):
         self.data = data
         self.batch_size = batch_size
-        self.n_dists = np.sum(list(data.n_perturbations_given_control.values()))
-        self.max_comb_size = self.data.max_comb_size
-
-        def _sample_distributions(rng):
-            rng_1, rng_2 = jax.random.split(rng)
-            src_idx = jax.random.randint(
-                rng_1,
-                [
-                    1,
-                ],
-                0,
-                self.data.n_controls,
-            )
-            src_idx = src_idx.item()
-            tgt_idx = jax.random.randint(
-                rng_2,
-                [
-                    1,
-                ],
-                0,
-                self.data.n_perturbations_given_control[src_idx],
-            )
-            tgt_idx = tgt_idx.item()
-            return src_idx, tgt_idx
+        self.n_source_dists = data.n_controls
+        self.n_target_dists = data.n_perturbed
 
         def _sample(rng: jax.Array) -> Any:
-            rng_1, rng_2 = jax.random.split(rng)
-            src_idx, tgt_idx = _sample_distributions(rng_1)
-            return _sample_batch(rng_2, src_idx, tgt_idx)
-
-        @partial(jax.jit, static_argnames=["src_idx", "tgt_idx"])
-        def _sample_batch(rng: jax.Array, src_idx: jax.Array, tgt_idx: jax.Array) -> dict[str, jax.Array]:
-            """Jitted sample function."""
-            rng_1, rng_2, rng_3 = jax.random.split(rng, 3)
-
-            src = self.data.src_data[src_idx]
-            tgt = self.data.tgt_data[src_idx][tgt_idx]
-            conds_no_combination = [
-                jnp.tile(self.data.tgt_data[src_idx][tgt_idx][pert_cond], (self.max_comb_size, 1))
-                for pert_cond in self.data.perturbation_covariate_no_combination
-            ]
-            conds_combination = [
-                self.data.tgt_data[src_idx][tgt_idx][pert_cond]
-                for cond_group in self.data.perturbation_covariate_combinations
-                for pert_cond in cond_group
-            ]
-
-            to_concat = []
-            if len(conds_no_combination) > 0:
-                conds_no_combination = jnp.hstack(conds_no_combination)
-                to_concat.append(conds_no_combination)
-            if len(conds_combination) > 0:
-                conds_combination = jnp.vstack(conds_combination)
-                to_concat.append(conds_combination)
-
-            conds = jnp.concatenate(to_concat, axis=-1)
-            print(conds.shape)
-            conds = jnp.tile(conds, (self.batch_size, 1, 1))
-
-            source_idcs = jax.random.choice(
-                rng_2,
-                len(src),
-                replace=True,
-                shape=[self.batch_size],
+            rng_1, rng_2, rng_3, rng_4 = jax.random.split(rng, 4)
+            source_dist_idx = jax.random.randint(rng_1, [1], 0, self.n_source_dists.item())
+            source_cells = self.data.cell_data[self.data.split_covariates_mask == source_dist_idx]
+            source_batch = jax.random.choice(rng_2, source_cells, (self.batch_size,), replace=True)
+            target_dist_idx = jax.random.randint(
+                rng_3, [1], 0, self.data.control_to_perturbation[source_dist_idx].shape[0]
             )
-
-            tgt_idcs = jax.random.choice(
-                rng_3,
-                len(tgt),
-                replace=True,
-                shape=[self.batch_size],
-            )
+            target_cells = self.data.cell_data[self.data.perturbation_covariates_mask == target_dist_idx]
+            target_batch = jax.random.choice(rng_4, target_cells, (self.batch_size,), replace=True)
+            condition_batch = jnp.tile(self.data.conditions[self.condition_idx[target_dist_idx]], (self.batch_size, 1))
 
             return {
-                "src_lin": self.data.src_data[src_idx]["cell_data"][source_idcs],
-                "tgt_lin": self.data.tgt_data[src_idx][tgt_idx]["cell_data"][tgt_idcs],
-                "src_condition": conds,
+                "src_lin": source_batch,
+                "tgt_lin": target_batch,
+                "src_condition": condition_batch,
             }
 
         self.sample = _sample
