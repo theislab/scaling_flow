@@ -39,6 +39,7 @@ class ConditionalVelocityField(nn.Module):
     output_dim: int
     condition_dim: int = 0
     condition_encoder: Callable[[Any], jnp.ndarray] | None = None
+    condition_embedding_dim: int = 32
     max_set_size: int = 2
     condition_encoder_kwargs: dict = dc_field(default_factory=dict)
     act_fn: Callable[[jnp.ndarray], jnp.ndarray] = nn.silu
@@ -56,6 +57,7 @@ class ConditionalVelocityField(nn.Module):
                 set_encoder=self.condition_encoder,
                 max_set_size=self.max_set_size,
                 act_fn=self.act_fn,
+                output_dim=self.condition_embedding_dim,
                 **self.condition_encoder_kwargs,
             )
         self.time_encoder = MLPBlock(
