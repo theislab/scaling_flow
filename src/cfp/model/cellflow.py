@@ -1,7 +1,6 @@
-import numpy as np
 import anndata as ad
+from ott.neural.methods.flows import genot, otfm
 
-from ott.neural.methods.flows import otfm, genot
 from cfp.training.trainer import CellFlowTrainer
 
 

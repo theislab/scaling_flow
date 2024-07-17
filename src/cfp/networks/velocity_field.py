@@ -1,4 +1,3 @@
-import functools
 from collections.abc import Callable, Sequence
 from dataclasses import field as dc_field
 from typing import Any
@@ -10,8 +9,8 @@ from flax import linen as nn
 from flax.training import train_state
 from ott.neural.networks.layers import time_encoder
 
-from cfp.networks.modules import MLPBlock
 from cfp.networks import SetEncoder
+from cfp.networks.modules import MLPBlock
 
 __all__ = ["ConditionalVelocityField"]
 
