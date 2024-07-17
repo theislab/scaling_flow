@@ -12,7 +12,17 @@ from cfp.data.dataloader import JaxSampler
 
 
 class CellFlowTrainer:
-    """Trainer for the OTFM/GENOT model with a conditional velocity field."""
+    """Trainer for the OTFM/GENOT model with a conditional velocity field.
+
+    Args:
+        dataloader: Data sampler.
+        model: OTFM/GENOT model with a conditional velocity field.
+
+
+    Returns
+    -------
+        None
+    """
 
     def __init__(
         self,

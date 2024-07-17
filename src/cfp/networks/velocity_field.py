@@ -27,9 +27,8 @@ class ConditionalVelocityField(nn.Module):
         max_set_size: Maximum size of the set.
         condition_encoder_kwargs: Keyword arguments for the condition encoder.
         act_fn: Activation function.
-        time_encoder: Encoder for the time.
-        time_embedding_dims: Dimensions of the time embedding.
-        time_dropout: Dropout rate for the time embedding.
+        time_encoder_dims: Dimensions of the time embedding.
+        time_encoder_dropout: Dropout rate for the time embedding.
         hidden_dims: Dimensions of the hidden layers.
         hidden_dropout: Dropout rate for the hidden layers.
         decoder_dims: Dimensions of the output layers.
@@ -47,8 +46,8 @@ class ConditionalVelocityField(nn.Module):
     max_set_size: int = 2
     condition_encoder_kwargs: dict[str, Any] = dc_field(default_factory=dict)
     act_fn: Callable[[jnp.ndarray], jnp.ndarray] = nn.silu
-    time_embedding_dims: Sequence[int] = (1024, 1024, 1024)
-    time_dropout: float = 0.0
+    time_encoder_dims: Sequence[int] = (1024, 1024, 1024)
+    time_encoder_dropout: float = 0.0
     hidden_dims: Sequence[int] = (1024, 1024, 1024)
     hidden_dropout: float = 0.0
     decoder_dims: Sequence[int] = (1024, 1024, 1024)
@@ -65,9 +64,9 @@ class ConditionalVelocityField(nn.Module):
                 **self.condition_encoder_kwargs,
             )
         self.time_encoder = MLPBlock(
-            dims=self.time_embedding_dims,
+            dims=self.time_encoder_dims,
             act_fn=self.act_fn,
-            dropout_rate=self.time_dropout,
+            dropout_rate=self.time_encoder_dropout,
         )
 
         self.x_encoder = MLPBlock(
