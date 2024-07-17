@@ -66,29 +66,29 @@ class PerturbationData:
     def _get_cell_data(
         adata: anndata.AnnData, cell_data: Literal["X"] | dict[str, str]
     ) -> jax.Array:
+        error_message = "Cell data should be either 'X', a key in adata.obsm or a dictionary of the form {attr: key}."
         if cell_data == "X":
             cell_data = adata.X
             if isinstance(cell_data, sp.csr_matrix):
-                cell_data = jnp.asarray(cell_data.toarray())
+                return jnp.asarray(cell_data.toarray())
             else:
-                cell_data = jnp.asarray(cell_data)
-        else:
-            assert isinstance(
-                cell_data, dict
-            ), f"`cell_data` should be either 'X' or a dictionary, got {cell_data}."
-            attr = list(cell_data.keys())[0]
-            key = list(cell_data.values())[0]
-            cell_data = jnp.asarray(getattr(adata, attr)[key])
-        return cell_data
+                return jnp.asarray(cell_data)
+        if isinstance(cell_data, str):
+            if cell_data not in adata.obsm:
+                raise error_message
+            return jnp.asarray(adata.obsm[cell_data])
+        if not isinstance(cell_data, dict):
+            raise error_message
+        attr = list(cell_data.keys())[0]
+        key = list(cell_data.values())[0]
+        return jnp.asarray(getattr(adata, attr)[key])
 
     @staticmethod
     def _verify_control_data(adata: anndata.AnnData, data: tuple[str, Any]):
-        assert isinstance(
-            data, (tuple, list)
-        ), f"Control data should be a tuple of length 2, got {data}."
-        assert (
-            len(data) == 2
-        ), f"Control data should be a tuple of length 2, got {data}."
+        if not isinstance(data, (tuple, list)):
+            raise ValueError(f"Control data should be a tuple of length 2, got {data}.")
+        if len(data) != 2:
+            raise ValueError(f"Control data should be a tuple of length 2, got {data}.")
         if data[0] not in adata.obs:
             raise ValueError(f"Control column {data[0]} not found in adata.obs.")
         assert data[0] in adata.obs, f"Control column {data[0]} not found in adata.obs."
@@ -245,8 +245,8 @@ class PerturbationData:
         }
         tgt_dist_uns = {
             covariate: adata.obs[covariate].cat.categories
-            for emb_covariates in to_list(uns_perturbation_covariates.values())  # type: ignore[attr-defined]
-            for covariate in emb_covariates
+            for emb_covariates in uns_perturbation_covariates.values()  # type: ignore[attr-defined]
+            for covariate in to_list(emb_covariates)
         }
         tgt_dist_obs.update(tgt_dist_uns)
         src_counter = 0
