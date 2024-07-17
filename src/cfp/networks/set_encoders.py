@@ -31,13 +31,13 @@ class MultiHeadAttention(nn.Module):
     Args:
         num_heads: Number of heads.
         qkv_feature_dim: Feature dimension for the query, key, and value.
-        max_seq_length: Maximum number of elements in the set.
+        max_comb_length: Maximum number of elements in the set.
         dropout_rate: Dropout rate.
     """
 
     num_heads: int
     qkv_feature_dim: int
-    max_seq_length: int
+    max_comb_length: int
     dropout_rate: float = 0.0
 
     @nn.compact

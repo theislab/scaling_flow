@@ -7,12 +7,12 @@ from sklearn.metrics.pairwise import rbf_kernel
 __all__ = ["compute_metrics", "compute_metrics_fast", "compute_mean_metrics"]
 
 
-def compute_r_squared(x: np.ndarray, y: np.ndarray) -> float:
+def compute_r_squared(x: np.array, y: np.array) -> float:
     """Compute the R squared between true (x) and predicted (y)"""
     return r2_score(np.mean(x, axis=0), np.mean(y, axis=0))
 
 
-def compute_sinkhorn_div(x: np.ndarray, y: np.ndarray, epsilon: float) -> float:
+def compute_sinkhorn_div(x: np.array, y: np.array, epsilon: float) -> float:
     """Compute the Sinkhorn divergence between x and y."""
     return float(
         sinkhorn_divergence(
@@ -26,7 +26,7 @@ def compute_sinkhorn_div(x: np.ndarray, y: np.ndarray, epsilon: float) -> float:
     )
 
 
-def compute_e_distance(x: np.ndarray, y: np.ndarray) -> float:
+def compute_e_distance(x: np.array, y: np.array) -> float:
     """Compute the energy distance as in Peidli et al."""
     sigma_X = pairwise_distances(x, x, metric="sqeuclidean").mean()
     sigma_Y = pairwise_distances(y, y, metric="sqeuclidean").mean()
@@ -34,7 +34,7 @@ def compute_e_distance(x: np.ndarray, y: np.ndarray) -> float:
     return 2 * delta - sigma_X - sigma_Y
 
 
-def compute_metrics(x: np.ndarray, y: np.ndarray) -> dict[str, float]:
+def compute_metrics(x: np.array, y: np.array) -> dict[str, float]:
     """Compute different metrics for x (true) and y (predicted)."""
     metrics = {}
     metrics["r_squared"] = compute_r_squared(x, y)
@@ -82,7 +82,7 @@ def compute_scalar_mmd(target, transport, gammas=None):  # from CellOT repo
     return np.mean(list(lambda x: safe_mmd(target, transport, x), gammas))
 
 
-def compute_metrics_fast(x: np.ndarray, y: np.ndarray) -> dict[str, float]:
+def compute_metrics_fast(x: np.array, y: np.array) -> dict[str, float]:
     """Compute metrics which are fast to compute."""
     metrics = {}
     metrics["r_squared"] = compute_r_squared(x, y)
