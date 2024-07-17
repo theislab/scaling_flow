@@ -26,14 +26,16 @@ class CellFlowTrainer:
 
     def __init__(
         self,
-        dataloader: CFSampler,
         model: otfm.OTFlowMatching | genot.GENOT,
     ):
         self.model = model
-        self.dataloader = dataloader
+        self._match_fn_name = (
+            "data_match_fn" if isinstance(model, genot.GENOT) else "match_fn"
+        )
 
     def train(
         self,
+        dataloader: CFSampler,
         num_iterations: int,
         valid_freq: int,
         callback_fn: (
@@ -57,17 +59,14 @@ class CellFlowTrainer:
         pbar = tqdm(range(num_iterations))
         for it in pbar:
             rng, rng_resample, rng_step_fn = jax.random.split(rng, 3)
-            idx = int(
-                jax.random.randint(
-                    rng, shape=[], minval=0, maxval=self.dataloader.n_conditions
-                )
-            )
-            batch = self.dataloader.sample_batch(idx, rng)
+            batch = dataloader.sample(rng)
+
             src, tgt = batch["src_lin"], batch["tgt_lin"]
             src_cond = batch.get("src_condition")
 
-            if self.model.match_fn is not None:
-                tmat = self.model.match_fn(src, tgt)
+            match_fn = getattr(self.model, self._match_fn_name)
+            if match_fn is not None:
+                tmat = match_fn(src, tgt)
                 src_ixs, tgt_ixs = solver_utils.sample_joint(rng_resample, tmat)
                 src, tgt = src[src_ixs], tgt[tgt_ixs]
                 src_cond = None if src_cond is None else src_cond[src_ixs]

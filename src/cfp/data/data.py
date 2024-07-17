@@ -85,7 +85,7 @@ class PerturbationData:
 
     @staticmethod
     def _verify_control_data(adata: anndata.AnnData, data: tuple[str, Any]):
-        if not isinstance(data, (tuple, list)):
+        if not isinstance(data, tuple | list):
             raise ValueError(f"Control data should be a tuple of length 2, got {data}.")
         if len(data) != 2:
             raise ValueError(f"Control data should be a tuple of length 2, got {data}.")
@@ -98,7 +98,7 @@ class PerturbationData:
             except ValueError:
                 raise ValueError(
                     f"Control column {data[0]} could not be converted to categorical."
-                )
+                ) from None
         if data[1] not in adata.obs[data[0]].cat.categories:
             raise ValueError(f"Control value {data[1]} not found in {data[0]}.")
 
@@ -188,21 +188,12 @@ class PerturbationData:
 
         Args:
             adata: An :class:`~anndata.AnnData` object.
-            cell_data: Where to read the cell data from. If of type :class:`dict`, the key
-                "attr" should be present and the value should be an attribute of :class:`~anndata.AnnData`.
-                The key `key` should be present and the value should be the key in the respective attribute
-            control_data: Tuple of length 2 with first element defining the column in :class:`~anndata.AnnData`
-            and second element defining the value in `adata.obs[control_data[0]]` used to define all control cells.
-            split_covariates: Covariates in adata.obs to split all control cells into different control populations.
-            The perturbed cells are also split according to these columns, but if an embedding for these covariates
-            should be encoded in the model, the corresponding column should also be used in `obs_perturbation_covariates`
-            or `uns_perturbation_covariates`.
-            obs_perturbation_covariates: Tuples of covariates in adata.obs characterizing the perturbed cells (together
-            with `split_covariates` and `uns_perturbation_covariates`) and encoded by the values as found in `adata.obs`. If a tuple contains more than
+            cell_data: Where to read the cell data from. Either 'X', a key in adata.obsm or a dictionary of the form {attr: key}, where 'attr' is an attribute of the :class:`~anndata.AnnData` object and key is the 'key' in the corresponding key.
+            control_data: Tuple of length 2 with first element defining the column in :class:`~anndata.AnnData` and second element defining the value in `adata.obs[control_data[0]]` used to define all control cells.
+            split_covariates: Covariates in adata.obs to split all control cells into different control populations. The perturbed cells are also split according to these columns, but if an embedding for these covariates should be encoded in the model, the corresponding column should also be used in `obs_perturbation_covariates` or `uns_perturbation_covariates`.
+            obs_perturbation_covariates: Tuples of covariates in adata.obs characterizing the perturbed cells (together with `split_covariates` and `uns_perturbation_covariates`) and encoded by the values as found in `adata.obs`. If a tuple contains more than
             one element, this is interpreted as a combination of covariates that should be treated as an unordered set.
-            uns_perturbation_covariates: Dictionaries with keys in adata.uns[`UNS_KEY_CONDITION`] and values columns in adata.obs which characterize the perturbed cells (together
-                with `split_covariates` and `obs_perturbation_covariates`) and encoded by the values as found in `adata.uns[`UNS_KEY_CONDITION`][uns_perturbation_covariates.keys()]`.
-                If a value of the dictionary is a tuple with more than one element, this is interpreted as a combination of covariates that should be treated as an unordered set.
+            uns_perturbation_covariates: Dictionaries with keys in adata.uns[`UNS_KEY_CONDITION`] and values columns in adata.obs which characterize the perturbed cells (together with `split_covariates` and `obs_perturbation_covariates`) and encoded by the values as found in `adata.uns[`UNS_KEY_CONDITION`][uns_perturbation_covariates.keys()]`. If a value of the dictionary is a tuple with more than one element, this is interpreted as a combination of covariates that should be treated as an unordered set.
 
         Returns
         -------

@@ -4,7 +4,6 @@ from typing import Any
 
 import jax
 import jax.numpy as jnp
-from numpy.typing import ArrayLike
 import optax
 from flax import linen as nn
 from flax.training import train_state
@@ -128,6 +127,7 @@ class ConditionalVelocityField(nn.Module):
         rng: jax.Array,
         optimizer: optax.OptState,
         input_dim: int,
+        condition_dim: int | None = None,
     ) -> train_state.TrainState:
         """Create the training state.
 
@@ -140,8 +140,9 @@ class ConditionalVelocityField(nn.Module):
         -------
             The training state.x
         """
+        condition_dim = condition_dim or self.condition_dim
         t, x = jnp.ones((1, 1)), jnp.ones((1, input_dim))
-        cond = jnp.ones((1, self.max_set_size, self.condition_dim))
+        cond = jnp.ones((1, self.max_set_size, condition_dim))
         params = self.init(rng, t, x, cond, train=False)["params"]
         return train_state.TrainState.create(
             apply_fn=self.apply, params=params, tx=optimizer

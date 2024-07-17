@@ -30,7 +30,7 @@ class TestTrainer:
             optimizer=opt,
             rng=vf_rng,
         )
-        dl_list = [dataloader.sample_batch(i, vf_rng) for i in range(10)]
+        dl_list = [dataloader.sample(vf_rng) for i in range(10)]
         history = model(dl_list, n_iters=2, rng=vf_rng)
         assert isinstance(history, dict)
 
@@ -55,8 +55,8 @@ class TestTrainer:
             rng=vf_rng,
         )
 
-        trainer = cfp.training.CellFlowTrainer(dataloader=dataloader, model=model)
-        trainer.train(num_iterations=2, valid_freq=1)
+        trainer = cfp.training.CellFlowTrainer(model=model)
+        trainer.train(dataloader=dataloader, num_iterations=2, valid_freq=1)
         x_pred = trainer.predict(x_test, cond)
         assert x_pred.shape == x_test.shape
 

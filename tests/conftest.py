@@ -1,7 +1,7 @@
 import anndata as ad
+import jax.numpy as jnp
 import numpy as np
 import pandas as pd
-import jax.numpy as jnp
 import pytest
 
 from cfp._constants import UNS_KEY_CONDITIONS
@@ -13,7 +13,7 @@ def dataloader():
     class DataLoader:
         n_conditions = 10
 
-        def sample_batch(self, idx, rng):
+        def sample(self, rng):
             return {
                 "src_lin": jnp.ones((10, 5)) * 10,
                 "tgt_lin": jnp.ones((10, 5)),

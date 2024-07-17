@@ -1,14 +1,17 @@
-from typing import Literal, Any, Sequence, Callable
-from dataclasses import field as dc_field
+from collections.abc import Callable, Sequence
+from typing import Any, Literal
 
-import optax
 import anndata as ad
+import jax
+import optax
 from numpy.typing import ArrayLike
-from ott.neural.methods.flows import genot, otfm
+from ott.neural.methods.flows import dynamics, genot, otfm
+from ott.solvers import utils as solver_utils
 
-from cfp.training.trainer import CellFlowTrainer
-from cfp.networks.velocity_field import ConditionalVelocityField
+from cfp.data.data import PerturbationData
 from cfp.data.dataloader import CFSampler
+from cfp.networks.velocity_field import ConditionalVelocityField
+from cfp.training.trainer import CellFlowTrainer
 
 
 class CellFlow:
@@ -22,35 +25,62 @@ class CellFlow:
 
     def __init__(self, adata: ad.AnnData, solver: Literal["otfm", "genot"] = "otfm"):
         self.adata = adata
-        self.dataloader = None
         self.solver = solver
+        self.dataloader = None
         self.model = None
         self._solver = None
 
     def prepare_data(
-        # TODO: Adapt to new PerturbationData
         self,
-        condition_dim: int = 3,
-        max_set_size: int = 2,
+        cell_data: Literal["X"] | dict[str, str],
+        control_key: str | Sequence[str, Any],
+        obs_perturbation_covariates: Sequence[tuple[str, ...]] | None = None,
+        uns_perturbation_covariates: (
+            Sequence[dict[str, Sequence[str, ...] | str]] | None
+        ) = None,
+        split_covariates: Sequence[str] | None = None,
         **kwargs,
     ) -> None:
         """Prepare dataloader for training from anndata object.
 
-        **kwargs: Keyword arguments for CFSampler.
+        Args:
+            adata: An :class:`~anndata.AnnData` object.
+            cell_data: Where to read the cell data from. Either 'X', a key in adata.obsm or a dictionary of the form {attr: key}, where 'attr' is an attribute of the :class:`~anndata.AnnData` object and key is the 'key' in the corresponding key.
+            control_key: Tuple of length 2 with first element defining the column in :class:`~anndata.AnnData` and second element defining the value in `adata.obs[control_data[0]]` used to define all control cells.
+            split_covariates: Covariates in adata.obs to split all control cells into different control populations. The perturbed cells are also split according to these columns, but if an embedding for these covariates should be encoded in the model, the corresponding column should also be used in `obs_perturbation_covariates` or `uns_perturbation_covariates`.
+            obs_perturbation_covariates: Tuples of covariates in adata.obs characterizing the perturbed cells (together with `split_covariates` and `uns_perturbation_covariates`) and encoded by the values as found in `adata.obs`. If a tuple contains more than
+            one element, this is interpreted as a combination of covariates that should be treated as an unordered set.
+            uns_perturbation_covariates: Dictionaries with keys in adata.uns[`UNS_KEY_CONDITION`] and values columns in adata.obs which characterize the perturbed cells (together with `split_covariates` and `obs_perturbation_covariates`) and encoded by the values as found in `adata.uns[`UNS_KEY_CONDITION`][uns_perturbation_covariates.keys()]`. If a value of the dictionary is a tuple with more than one element, this is interpreted as a combination of covariates that should be treated as an unordered set.
+
+        Returns
+        -------
+            None
+
         """
-        # TODO: Adapt to new PerturbationData
-        # Should also set attributes for the model such as
-        # * max_set_size
-        # * condition_dim
-        self._max_set_size = max_set_size
-        self._condition_dim = condition_dim
-        self.dataloader = CFSampler(**kwargs)
+        obs_perturbation_covariates = obs_perturbation_covariates or []
+        uns_perturbation_covariates = uns_perturbation_covariates or {}
+        split_covariates = split_covariates or []
+        control_data = (
+            control_key if isinstance(control_key, tuple) else (control_key, True)
+        )
+
+        self.pdata = PerturbationData.load_from_adata(
+            self.adata,
+            cell_data=cell_data,
+            split_covariates=split_covariates,
+            control_data=control_data,
+            obs_perturbation_covariates=obs_perturbation_covariates,
+            uns_perturbation_covariates=uns_perturbation_covariates,
+        )
+
+        self._condition_dim = self.pdata.condition_data.shape[-1]
+        self._data_dim = self.pdata.cell_data.shape[-1]
 
     def prepare_model(
         self,
         condition_encoder: Literal["transformer", "deepset"] = "transformer",
         condition_embedding_dim: int = 32,
-        condition_encoder_kwargs: dict[str, Any] = dc_field(default_factory=dict),
+        condition_encoder_kwargs: dict[str, Any] | None = None,
         time_encoder_dims: Sequence[int] = (1024, 1024, 1024),
         time_encoder_dropout: float = 0.0,
         hidden_dims: Sequence[int] = (1024, 1024, 1024),
@@ -79,17 +109,19 @@ class CellFlow:
         -------
             None
         """
-        if self.dataloader is None:
+        if self.pdata is None:
             raise ValueError(
                 "Dataloader not initialized. Please call prepare_data first."
             )
 
+        condition_encoder_kwargs = condition_encoder_kwargs or {}
+
         vf = ConditionalVelocityField(
-            output_dim=self.adata.shape[1],
+            output_dim=self._data_dim,
             condition_encoder=condition_encoder,
             condition_dim=self._condition_dim,
             condition_embedding_dim=condition_embedding_dim,
-            max_set_size=self._max_set_size,
+            max_set_size=self.pdata.max_combination_length,
             condition_encoder_kwargs=condition_encoder_kwargs,
             time_encoder_dims=time_encoder_dims,
             time_encoder_dropout=time_encoder_dropout,
@@ -102,25 +134,30 @@ class CellFlow:
         if self.solver == "otfm":
             self._solver = otfm.OTFlowMatching(
                 vf=vf,
-                match_fn=genot.match_linear,
-                flow=genot.ConstantNoiseFlow(0.0),
+                match_fn=solver_utils.match_linear,
+                flow=dynamics.ConstantNoiseFlow(0.0),
                 optimizer=optimizer,
                 rng=jax.random.PRNGKey(seed),
             )
         elif self.solver == "genot":
             self._solver = genot.GENOT(
                 vf=vf,
+                data_match_fn=solver_utils.match_linear,
+                flow=dynamics.ConstantNoiseFlow(0.0),
+                source_dim=self._data_dim,
+                target_dim=self._data_dim,
                 optimizer=optimizer,
                 rng=jax.random.PRNGKey(seed),
             )
         # NOTE: The use of "model" is a bit confusing here, maybe we can harmonize the
         # naming a bit better
-        self.model = CellFlowTrainer(dataloader=self.dataloader, model=self._solver)
+        self.model = CellFlowTrainer(model=self._solver)
 
     def train(
         self,
         num_iterations: int,
-        valid_freq: int,
+        batch_size: int = 64,
+        valid_freq: int = 10,
         callback_fn: (
             Callable[[otfm.OTFlowMatching | genot.GENOT, dict[str, Any]], Any] | None
         ) = None,
@@ -136,10 +173,16 @@ class CellFlow:
         -------
             None
         """
+        if self.pdata is None:
+            raise ValueError("Data not initialized. Please call prepare_data first.")
+
         if self.model is None:
             raise ValueError("Model not initialized. Please call prepare_model first.")
 
+        self.dataloader = CFSampler(data=self.pdata, batch_size=batch_size)
+
         self.model.train(
+            dataloader=self.dataloader,
             num_iterations=num_iterations,
             valid_freq=valid_freq,
             callback_fn=callback_fn,
