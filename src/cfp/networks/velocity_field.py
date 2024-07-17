@@ -4,6 +4,7 @@ from typing import Any
 
 import jax
 import jax.numpy as jnp
+from numpy.typing import ArrayLike
 import optax
 from flax import linen as nn
 from flax.training import train_state
@@ -22,14 +23,17 @@ class ConditionalVelocityField(nn.Module):
         output_dim: Dimensionality of the output.
         condition_dim: Dimensionality of the condition.
         condition_encoder: Encoder for the condition.
+        condition_embedding_dim: Dimensions of the condition embedding.
+        max_set_size: Maximum size of the set.
+        condition_encoder_kwargs: Keyword arguments for the condition encoder.
         act_fn: Activation function.
         time_encoder: Encoder for the time.
         time_embedding_dims: Dimensions of the time embedding.
         time_dropout: Dropout rate for the time embedding.
         hidden_dims: Dimensions of the hidden layers.
         hidden_dropout: Dropout rate for the hidden layers.
-        output_dims: Dimensions of the output layers.
-        output_dropout: Dropout rate for the output layers.
+        decoder_dims: Dimensions of the output layers.
+        decoder_dropout: Dropout rate for the output layers.
 
     Returns
     -------
@@ -108,12 +112,11 @@ class ConditionalVelocityField(nn.Module):
         out = self.decoder(concatenated, training=train)
         return self.output_layer(out)
 
-    def encode_conditions(self, condition):
+    def encode_conditions(self, condition: jnp.ndarray) -> jnp.ndarray:
         """Get the embedding of the condition.
 
         Args:
             condition: Conditioning vector of shape ``[batch, ...]``.
-            cond_sizes: Size of the condition
 
         Returns
         -------
