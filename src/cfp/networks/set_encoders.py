@@ -34,21 +34,19 @@ class MultiHeadAttention(nn.Module):
     Args:
         num_heads: Number of heads.
         qkv_feature_dim: Feature dimension for the query, key, and value.
-        max_seq_length: Maximum number of elements in the set.
+        max_comb_length: Maximum number of elements in the set.
         dropout_rate: Dropout rate.
     """
 
     num_heads: int
     qkv_feature_dim: int
-    max_seq_length: int
+    max_comb_length: int
     dropout_rate: float = 0.0
 
     @nn.compact
     def __call__(self, condition: jnp.ndarray, training: bool = True) -> jnp.ndarray:
         token_shape = (len(condition), 1) if condition.ndim > 2 else (1,)
-        class_token = nn.Embed(num_embeddings=1, features=condition.shape[-1])(
-            jnp.int32(jnp.zeros(token_shape))
-        )
+        class_token = nn.Embed(num_embeddings=1, features=condition.shape[-1])(jnp.int32(jnp.zeros(token_shape)))
 
         condition = jnp.concatenate((class_token, condition), axis=-2)
         mask = self.get_masks(condition)
@@ -64,9 +62,7 @@ class MultiHeadAttention(nn.Module):
 
         for cond_dim in self.condition_dims:
             condition = self.act_fn(nn.Dense(cond_dim)(condition))
-            condition = nn.Dropout(rate=self.dropout_rate, deterministic=not training)(
-                condition
-            )
+            condition = nn.Dropout(rate=self.dropout_rate, deterministic=not training)(condition)
         return condition
 
 
@@ -218,9 +214,7 @@ class DeepSetEncoder(nn.Module):
             for _ in range(self.n_layers_before_pool):
                 Wx = DeepSet(z.shape[1], self.hidden_dim_before_pool)
                 z = self.act_fn(Wx(z))
-                z = nn.Dropout(rate=self.dropout_rate_before_pool)(
-                    z, deterministic=not training
-                )
+                z = nn.Dropout(rate=self.dropout_rate_before_pool)(z, deterministic=not training)
             axis_pool = 2
             mask = jnp.expand_dims(mask, 1)
         elif self.equivar_transform == "mlp":
@@ -228,9 +222,7 @@ class DeepSetEncoder(nn.Module):
                 Wx = nn.Dense(self.hidden_dim_before_pool, use_bias=True)
                 z = Wx(z)
                 z = self.act_fn(z)
-                z = nn.Dropout(rate=self.dropout_rate_before_pool)(
-                    z, deterministic=not training
-                )
+                z = nn.Dropout(rate=self.dropout_rate_before_pool)(z, deterministic=not training)
             axis_pool = 1
             mask = jnp.expand_dims(mask, -1)
         else:
@@ -252,9 +244,7 @@ class DeepSetEncoder(nn.Module):
             Wx = nn.Dense(self.hidden_dim_after_pool, use_bias=True)
             z = Wx(z)
             z = self.act_fn(z)
-            z = nn.Dropout(rate=self.dropout_rate_after_pool)(
-                z, deterministic=not training
-            )
+            z = nn.Dropout(rate=self.dropout_rate_after_pool)(z, deterministic=not training)
         Wx = nn.Dense(self.output_dim, use_bias=True)
         z = Wx(z)
 
@@ -289,9 +279,7 @@ class FSPool(nn.Module):
     relaxed: bool = False
 
     def setup(self) -> None:
-        self.weight = self.param(
-            "weight", nn.initializers.zeros, (self.in_channels, self.n_pieces + 1)
-        )
+        self.weight = self.param("weight", nn.initializers.zeros, (self.in_channels, self.n_pieces + 1))
 
         @jax.jit
         def _determine_weight(sizes):
@@ -301,24 +289,18 @@ class FSPool(nn.Module):
             """
             # share same sequence length within each sample, so copy weighht across batch dim
             weight = jnp.expand_dims(self.weight, 0)
-            weight = jnp.broadcast_to(
-                weight, (sizes.shape[0], weight.shape[1], weight.shape[2])
-            )
+            weight = jnp.broadcast_to(weight, (sizes.shape[0], weight.shape[1], weight.shape[2]))
 
             # linspace [0, 1] -> linspace [0, n_pieces]
             index = self.n_pieces * sizes
             index = jnp.expand_dims(index, 1)
-            index = jnp.broadcast_to(
-                index, (index.shape[0], weight.shape[1], index.shape[2])
-            )
+            index = jnp.broadcast_to(index, (index.shape[0], weight.shape[1], index.shape[2]))
 
             # points in the weight vector to the left and right
             idx = index.astype(jnp.int32)
             frac = index - idx
             left = jnp.take_along_axis(weight, idx, axis=2)
-            right = jnp.take_along_axis(
-                weight, jnp.clip(idx + 1, a_max=self.n_pieces), axis=2
-            )
+            right = jnp.take_along_axis(weight, jnp.clip(idx + 1, a_max=self.n_pieces), axis=2)
 
             # interpolate between left and right point
             return (1 - frac) * left + frac * right
@@ -499,33 +481,25 @@ class FSPoolEncoder(nn.Module):
             for _ in range(self.n_layers_before_pool):
                 Wx = DeepSet(z.shape[1], self.hidden_dim_before_pool)
                 z = self.act_fn(Wx(z))
-                z = nn.Dropout(rate=self.dropout_rate_before_pool)(
-                    z, deterministic=not training
-                )
+                z = nn.Dropout(rate=self.dropout_rate_before_pool)(z, deterministic=not training)
         elif self.equivar_transform == "mlp":
             for l in range(self.n_layers_before_pool):
                 Wx = nn.Dense(self.hidden_dim_before_pool, use_bias=True)
                 z = Wx(z)
                 if l < self.n_layers_before_pool - 1:
                     z = self.act_fn(z)
-                    z = nn.Dropout(rate=self.dropout_rate_before_pool)(
-                        z, deterministic=not training
-                    )
+                    z = nn.Dropout(rate=self.dropout_rate_before_pool)(z, deterministic=not training)
             z = z.transpose(0, 2, 1)
         else:
             raise ValueError("Invalid equivariant transform")
 
-        z, _ = FSPool(self.hidden_dim_before_pool, self.n_pieces, self.relaxed)(
-            z, cond_sizes
-        )
+        z, _ = FSPool(self.hidden_dim_before_pool, self.n_pieces, self.relaxed)(z, cond_sizes)
 
         for _ in range(self.n_layers_after_pool):
             Wx = nn.Dense(self.hidden_dim_after_pool, use_bias=True)
             z = Wx(z)
             z = self.act_fn(z)
-            z = nn.Dropout(rate=self.dropout_rate_after_pool)(
-                z, deterministic=not training
-            )
+            z = nn.Dropout(rate=self.dropout_rate_after_pool)(z, deterministic=not training)
         Wx = nn.Dense(self.output_dim, use_bias=True)
         z = Wx(z)
 
@@ -564,9 +538,7 @@ class MAB(nn.Module):
             A = jnp.where(mask, A, -1e9)
         A = nn.softmax(A)
 
-        O = jnp.concatenate(
-            jnp.split(Q_ + jnp.matmul(A, V_), self.num_heads, axis=0), axis=2
-        )
+        O = jnp.concatenate(jnp.split(Q_ + jnp.matmul(A, V_), self.num_heads, axis=0), axis=2)
 
         O = nn.Dropout(rate=self.dropout_rate)(O, deterministic=is_eval)
         if self.ln:
@@ -592,9 +564,7 @@ class SAB(nn.Module):
     @nn.compact
     def __call__(self, X, mask=None, training: bool | None = None):
         training = nn.merge_param("training", self.training, training)
-        return MAB(self.dim_out, self.num_heads, self.ln, self.dropout_rate, training)(
-            X, X, mask
-        )
+        return MAB(self.dim_out, self.num_heads, self.ln, self.dropout_rate, training)(X, X, mask)
 
 
 class PMA(nn.Module):
@@ -610,13 +580,9 @@ class PMA(nn.Module):
     @nn.compact
     def __call__(self, X, mask=None, training: bool | None = None):
         training = nn.merge_param("training", self.training, training)
-        S = self.param(
-            "S", initializers.xavier_uniform(), (1, self.num_seeds, self.dim)
-        )
+        S = self.param("S", initializers.xavier_uniform(), (1, self.num_seeds, self.dim))
         S = jnp.tile(S, (X.shape[0], 1, 1))
-        return MAB(self.dim, self.num_heads, self.ln, self.dropout_rate, training)(
-            S, X, mask
-        )
+        return MAB(self.dim, self.num_heads, self.ln, self.dropout_rate, training)(S, X, mask)
 
 
 class SetTransformer(nn.Module):

@@ -1,77 +1,77 @@
-from functools import partial
+from typing import Any
 
 import jax
-import numpy as np
+import jax.numpy as jnp
 
-__all__ = ["JaxSampler"]
+from cfp.data.data import PerturbationData
+
+__all__ = ["CFSampler"]
 
 
-class JaxSampler:
-    """Data sampler for Jax."""
+class CFSampler:
+    """Data sampler for :class:`~cfp.data.data.PerturbationData`.
 
-    def __init__(
-        self,
-        idcs_source: jax.Array,
-        idcs_conditions: jax.Array,
-        idcs_target: jax.Array,
-        src_str_to_idx: dict[str, int],
-        src_idx_to_data: dict[int, jax.Array],
-        tgt_str_to_idx: dict[str, int],
-        tgt_idx_to_data: dict[int, jax.Array],
-        cond_str_to_idx: dict[str, int],
-        cond_idx_to_data: dict[int, jax.Array],
-        batch_size: int,
-    ):
-        assert len(idcs_source) == len(idcs_conditions)
-        assert len(idcs_source) == len(idcs_target)
-        """Initialize data sampler."""
+    Parameters
+    ----------
+    data : PerturbationData
+        The data object to sample from.
+    batch_size : int
+        The batch size.
+    """
+
+    def __init__(self, data: PerturbationData, batch_size: int = 64):
+        self.data = data
         self.batch_size = batch_size
-        self.idcs_source = idcs_source
-        self.idcs_conditions = idcs_conditions
-        self.idcs_target = idcs_target
-        self.n_conditions = len(idcs_source)
-        self.src_str_to_idx = src_str_to_idx
-        self.src_idx_to_data = src_idx_to_data
-        self.tgt_str_to_idx = tgt_str_to_idx
-        self.tgt_idx_to_data = tgt_idx_to_data
-        self.cond_str_to_idx = cond_str_to_idx
-        self.cond_idx_to_data = cond_idx_to_data
-
-        @partial(jax.jit, static_argnames=["dist_idx"])
-        def _sample_batch(
-            dist_idx: jax.Array,
-            rng: jax.Array,
-        ) -> dict[str, jax.Array]:
-            """Jitted sample function."""
-            rng_1, rng_2, rng_3 = jax.random.split(rng, 3)
-            src_idx, conds_idx, tgt_idx = (
-                self.idcs_source[dist_idx],
-                self.idcs_conditions[dist_idx],
-                self.idcs_target[dist_idx],
+        self.n_source_dists = data.n_controls
+        self.n_target_dists = data.n_perturbations
+        self.conditional_samplings = [
+            lambda key: jax.random.choice(
+                key, self.data.control_to_perturbation[i].shape[0]  # noqa: B023
             )
+            for i in range(self.n_source_dists)
+        ]
 
-            src = self.src_idx_to_data[src_idx]
-            tgt = self.tgt_idx_to_data[tgt_idx]
-            cond = np.tile(self.cond_idx_to_data[conds_idx], (len(src), 1))
-
-            source_idcs = jax.random.choice(
+        @jax.jit
+        def _sample(rng: jax.Array) -> Any:
+            rng_1, rng_2, rng_3, rng_4 = jax.random.split(rng, 4)
+            source_dist_idx = jax.random.choice(rng_1, self.n_source_dists)
+            source_cells_mask = self.data.split_covariates_mask == source_dist_idx
+            src_cond_p = source_cells_mask / jnp.count_nonzero(source_cells_mask)
+            source_batch_idcs = jax.random.choice(
                 rng_2,
-                len(src),
+                self.data.split_covariates_mask,
+                [self.batch_size],
                 replace=True,
-                shape=[self.batch_size],
+                p=src_cond_p,
             )
+            source_batch = self.data.cell_data[source_batch_idcs]
 
-            tgt_idcs = jax.random.choice(
-                rng_3,
-                len(tgt),
+            target_dist_idx = jax.lax.switch(
+                source_dist_idx, self.conditional_samplings, rng_3
+            )
+            target_cells_mask = (
+                self.data.perturbation_covariates_mask == target_dist_idx
+            )
+            tgt_cond_p = target_cells_mask / jnp.count_nonzero(target_cells_mask)
+            target_batch_idcs = jax.random.choice(
+                rng_4,
+                self.data.perturbation_covariates_mask,
+                [self.batch_size],
                 replace=True,
-                shape=[self.batch_size],
+                p=tgt_cond_p,
+            )
+            target_batch = self.data.cell_data[target_batch_idcs]
+            if self.data.condition_data is None:
+                return {"src_lin": source_batch, "tgt_lin": target_batch}
+
+            condition_batch = jnp.tile(
+                self.data.condition_data[target_dist_idx], (self.batch_size, 1, 1)
             )
 
             return {
-                "src_lin": src[source_idcs],
-                "tgt_lin": tgt[tgt_idcs],
-                "src_condition": cond,
+                "src_lin": source_batch,
+                "tgt_lin": target_batch,
+                "src_condition": condition_batch,
             }
 
-        self.sample_batch = _sample_batch
+        self.sample = _sample

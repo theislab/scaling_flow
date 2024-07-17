@@ -24,7 +24,5 @@ def test_velocity_field(condition_encoder):
     vf_rng = jax.random.PRNGKey(111)
     opt = optax.adam(1e-3)
     vf_state = vf.create_train_state(vf_rng, opt, 5)
-    x_out = vf_state.apply_fn(
-        {"params": vf_state.params}, t_test, x_test, cond, cond_sizes, training=True
-    )
+    x_out = vf_state.apply_fn({"params": vf_state.params}, t_test, x_test, cond, cond_sizes, training=True)
     assert x_out.shape == (10, 5)

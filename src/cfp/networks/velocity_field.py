@@ -128,6 +128,4 @@ class ConditionalVelocityField(nn.Module):
         cond = jnp.ones((1, self.max_set_size, self.condition_dim))
         cond_sizes = jnp.array([1])
         params = self.init(rng, t, x, cond, cond_sizes, training=False)["params"]
-        return train_state.TrainState.create(
-            apply_fn=self.apply, params=params, tx=optimizer
-        )
+        return train_state.TrainState.create(apply_fn=self.apply, params=params, tx=optimizer)

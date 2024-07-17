@@ -9,7 +9,6 @@ from tqdm import tqdm
 
 
 class CellFlowTrainer:
-
     def __init__(
         self,
         dataloader: Iterable,
@@ -25,16 +24,11 @@ class CellFlowTrainer:
         valid_freq: int,
         callback_fn: Callable[[otfm.OTFlowMatching | genot.GENOT], Any],
     ) -> None:
-
         training_logs = {"loss": []}
         rng = jax.random.PRNGKey(0)
         for it in tqdm(range(num_iterations)):
             rng, rng_resample, rng_step_fn = jax.random.split(rng, 3)
-            idx = int(
-                jax.random.randint(
-                    rng, shape=[], minval=0, maxval=self.dataloader.n_conditions
-                )
-            )
+            idx = int(jax.random.randint(rng, shape=[], minval=0, maxval=self.dataloader.n_conditions))
             batch = self.dataloader.sample_batch(idx, rng)
             src, tgt = batch["src_lin"], batch["tgt_lin"]
             src_cond = batch.get("src_condition")

@@ -1,1 +1,1 @@
-from cfp.data.dataloader import JaxSampler
+from cfp.data.dataloader import CFSampler
