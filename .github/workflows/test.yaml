@@ -26,11 +26,11 @@ jobs:
           - os: ubuntu-latest
             python: "3.10"
           - os: ubuntu-latest
-            python: "3.12"
+            python: "3.11"
           - os: ubuntu-latest
             python: "3.12"
-            pip-flags: "--pre"
-            name: PRE-RELEASE DEPENDENCIES
+          - os: macos-latest
+            python: "3.12"
 
     name: ${{ matrix.name }} Python ${{ matrix.python }}
 
