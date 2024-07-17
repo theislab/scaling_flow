@@ -9,8 +9,8 @@ from flax import linen as nn
 from flax.training import train_state
 from ott.neural.networks.layers import time_encoder
 
-from cfp.networks import SetEncoder
 from cfp.networks.modules import MLPBlock
+from cfp.networks.set_encoders import SetEncoder
 
 __all__ = ["ConditionalVelocityField"]
 
@@ -41,7 +41,7 @@ class ConditionalVelocityField(nn.Module):
     condition_encoder: Callable[[Any], jnp.ndarray] | None = None
     condition_embedding_dim: int = 32
     max_set_size: int = 2
-    condition_encoder_kwargs: dict = dc_field(default_factory=dict)
+    condition_encoder_kwargs: dict[str, Any] = dc_field(default_factory=dict)
     act_fn: Callable[[jnp.ndarray], jnp.ndarray] = nn.silu
     time_embedding_dims: Sequence[int] = (1024, 1024, 1024)
     time_dropout: float = 0.0
@@ -141,9 +141,11 @@ class ConditionalVelocityField(nn.Module):
         t, x = jnp.ones((1, 1)), jnp.ones((1, input_dim))
         cond = jnp.ones((1, self.max_set_size, self.condition_dim))
         params = self.init(rng, t, x, cond, train=False)["params"]
-        return train_state.TrainState.create(apply_fn=self.apply, params=params, tx=optimizer)
+        return train_state.TrainState.create(
+            apply_fn=self.apply, params=params, tx=optimizer
+        )
 
     @property
     def output_dims(self):
         """Dimonsions of the output layers."""
-        return self.decoder_dims + (self.output_dim,)
+        return tuple(self.decoder_dims) + (self.output_dim,)

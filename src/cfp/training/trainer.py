@@ -1,11 +1,14 @@
-from collections.abc import Callable, Iterable
+from collections.abc import Callable
 from typing import Any
 
 import jax
 import numpy as np
+from numpy.typing import ArrayLike
 from ott.neural.methods.flows import genot, otfm
 from ott.solvers import utils as solver_utils
 from tqdm import tqdm
+
+from cfp.data.dataloader import JaxSampler
 
 
 class CellFlowTrainer:
@@ -13,7 +16,7 @@ class CellFlowTrainer:
 
     def __init__(
         self,
-        dataloader: Iterable,
+        dataloader: JaxSampler,
         model: otfm.OTFlowMatching | genot.GENOT,
     ):
         self.model = model
@@ -23,7 +26,9 @@ class CellFlowTrainer:
         self,
         num_iterations: int,
         valid_freq: int,
-        callback_fn: Callable[[otfm.OTFlowMatching | genot.GENOT], Any],
+        callback_fn: (
+            Callable[[otfm.OTFlowMatching | genot.GENOT, dict[str, Any]], Any] | None
+        ) = None,
     ) -> None:
         """Trains the model.
 
@@ -36,7 +41,7 @@ class CellFlowTrainer:
         -------
             None
         """
-        training_logs = {"loss": []}
+        training_logs: dict[str, Any] = {"loss": []}
         rng = jax.random.PRNGKey(0)
 
         pbar = tqdm(range(num_iterations))
@@ -78,7 +83,7 @@ class CellFlowTrainer:
                         log_metrics,
                     )
 
-    def encode_conditions(self, condition: np.ndarray) -> np.ndarray:
+    def get_condition_embedding(self, condition: ArrayLike) -> ArrayLike:
         """Encode conditions
 
         Args:
@@ -88,13 +93,14 @@ class CellFlowTrainer:
         -------
             Encoded conditions
         """
-        return self.model.vf.apply(
+        cond_embed = self.model.vf.apply(
             {"params": self.model.vf_state.params},
             condition,
             method="encode_conditions",
         )
+        return np.array(cond_embed)
 
-    def predict(self, x: np.ndarray, condition: np.ndarray) -> np.ndarray:
+    def predict(self, x: ArrayLike, condition: ArrayLike) -> ArrayLike:
         """Predict
 
         Args:
@@ -105,4 +111,5 @@ class CellFlowTrainer:
         -------
             Predicted output
         """
-        return self.model.transport(x, condition)
+        x_pred = self.model.transport(x, condition)
+        return np.array(x_pred)

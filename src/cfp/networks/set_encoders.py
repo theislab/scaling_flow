@@ -44,7 +44,9 @@ class MultiHeadAttention(nn.Module):
     def __call__(self, condition: jnp.ndarray, training: bool = True) -> jnp.ndarray:
         """Call the module."""
         token_shape = (len(condition), 1) if condition.ndim > 2 else (1,)
-        class_token = nn.Embed(num_embeddings=1, features=condition.shape[-1])(jnp.int32(jnp.zeros(token_shape)))
+        class_token = nn.Embed(num_embeddings=1, features=condition.shape[-1])(
+            jnp.int32(jnp.zeros(token_shape))
+        )
 
         condition = jnp.concatenate((class_token, condition), axis=-2)
         mask = self.get_masks(condition)
@@ -60,7 +62,9 @@ class MultiHeadAttention(nn.Module):
 
         for cond_dim in self.condition_dims:
             condition = self.act_fn(nn.Dense(cond_dim)(condition))
-            condition = nn.Dropout(rate=self.dropout_rate, deterministic=not training)(condition)
+            condition = nn.Dropout(rate=self.dropout_rate, deterministic=not training)(
+                condition
+            )
         return condition
 
 
@@ -214,7 +218,9 @@ class DeepSetEncoder(nn.Module):
             for _ in range(self.n_layers_before_pool):
                 Wx = DeepSet(z.shape[1], self.hidden_dim_before_pool)
                 z = self.act_fn(Wx(z))
-                z = nn.Dropout(rate=self.dropout_rate_before_pool)(z, deterministic=not training)
+                z = nn.Dropout(rate=self.dropout_rate_before_pool)(
+                    z, deterministic=not training
+                )
             axis_pool = 2
             mask = jnp.expand_dims(mask, 1)
         elif self.equivar_transform == "mlp":
@@ -222,7 +228,9 @@ class DeepSetEncoder(nn.Module):
                 Wx = nn.Dense(self.hidden_dim_before_pool, use_bias=True)
                 z = Wx(z)
                 z = self.act_fn(z)
-                z = nn.Dropout(rate=self.dropout_rate_before_pool)(z, deterministic=not training)
+                z = nn.Dropout(rate=self.dropout_rate_before_pool)(
+                    z, deterministic=not training
+                )
             axis_pool = 1
             mask = jnp.expand_dims(mask, -1)
         else:
@@ -244,7 +252,9 @@ class DeepSetEncoder(nn.Module):
             Wx = nn.Dense(self.hidden_dim_after_pool, use_bias=True)
             z = Wx(z)
             z = self.act_fn(z)
-            z = nn.Dropout(rate=self.dropout_rate_after_pool)(z, deterministic=not training)
+            z = nn.Dropout(rate=self.dropout_rate_after_pool)(
+                z, deterministic=not training
+            )
         Wx = nn.Dense(self.output_dim, use_bias=True)
         z = Wx(z)
 
@@ -284,7 +294,9 @@ class MAB(nn.Module):
             A = jnp.where(mask, A, -1e9)
         A = nn.softmax(A)
 
-        O = jnp.concatenate(jnp.split(Q_ + jnp.matmul(A, V_), self.num_heads, axis=0), axis=2)
+        O = jnp.concatenate(
+            jnp.split(Q_ + jnp.matmul(A, V_), self.num_heads, axis=0), axis=2
+        )
 
         O = nn.Dropout(rate=self.dropout_rate)(O, deterministic=is_eval)
         if self.ln:
@@ -311,7 +323,9 @@ class SAB(nn.Module):
     def __call__(self, X, mask=None, training: bool | None = None):
         """Call the module."""
         training = nn.merge_param("training", self.training, training)
-        return MAB(self.dim_out, self.num_heads, self.ln, self.dropout_rate, training)(X, X, mask)
+        return MAB(self.dim_out, self.num_heads, self.ln, self.dropout_rate, training)(
+            X, X, mask
+        )
 
 
 class PMA(nn.Module):
@@ -328,9 +342,13 @@ class PMA(nn.Module):
     def __call__(self, X, mask=None, training: bool | None = None):
         """Call the module."""
         training = nn.merge_param("training", self.training, training)
-        S = self.param("S", initializers.xavier_uniform(), (1, self.num_seeds, self.dim))
+        S = self.param(
+            "S", initializers.xavier_uniform(), (1, self.num_seeds, self.dim)
+        )
         S = jnp.tile(S, (X.shape[0], 1, 1))
-        return MAB(self.dim, self.num_heads, self.ln, self.dropout_rate, training)(S, X, mask)
+        return MAB(self.dim, self.num_heads, self.ln, self.dropout_rate, training)(
+            S, X, mask
+        )
 
 
 class SetTransformer(nn.Module):
@@ -484,7 +502,7 @@ class SetEncoder(nn.Module):
     dropout_rate_before_pool: float = 0.0
     dropout_rate_after_pool: float = 0.0
     set_encoder: Literal["deepset", "transformer"] = "deepset"
-    set_encoder_kwargs: dict = dc_field(default_factory=lambda: {})
+    set_encoder_kwargs: dict[str, Any] = dc_field(default_factory=lambda: {})
     equivar_transform: Literal["deepset", "mlp"] = "mlp"
     training: bool | None = None
 
@@ -594,7 +612,7 @@ class ConditionSetEncoder(nn.Module):
     dropout_rate_before_pool: float = 0.0
     dropout_rate_after_pool: float = 0.0
     set_encoder: Literal["deepset", "transformer"] = "deepset"
-    set_encoder_kwargs: dict = dc_field(default_factory=lambda: {})
+    set_encoder_kwargs: dict[str, Any] = dc_field(default_factory=lambda: {})
     equivar_transform: Literal["deepset", "mlp"] = "mlp"
     training: bool | None = None
 
@@ -638,7 +656,7 @@ class ConditionSetEncoder(nn.Module):
         self,
         rng: jax.Array,
         optimizer: optax.OptState,
-        input_dim: int | tuple[int, ...],
+        input_dim: tuple[int, ...],
         **kwargs: Any,
     ):
         """Create initial training state."""
