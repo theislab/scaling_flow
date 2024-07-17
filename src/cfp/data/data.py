@@ -14,6 +14,8 @@ from tqdm import tqdm
 from cfp._constants import CONTROL_HELPER, UNS_KEY_CONDITIONS
 from cfp._types import ArrayLike
 
+from .utils import to_list
+
 __all__ = ["PerturbationData"]
 
 
@@ -71,20 +73,32 @@ class PerturbationData:
             else:
                 cell_data = jnp.asarray(cell_data)
         else:
-            assert isinstance(cell_data, dict)
-            assert "attr" in cell_data
-            assert "key" in cell_data
-            cell_data = jnp.asarray(getattr(adata, cell_data["attr"])[cell_data["key"]])
+            assert isinstance(
+                cell_data, dict
+            ), f"`cell_data` should be either 'X' or a dictionary, got {cell_data}."
+            attr = list(cell_data.keys())[0]
+            key = list(cell_data.values())[0]
+            cell_data = jnp.asarray(getattr(adata, attr)[key])
         return cell_data
 
     @staticmethod
     def _verify_control_data(adata: anndata.AnnData, data: tuple[str, Any]):
-        assert isinstance(data, tuple)
-        assert len(data) == 2
+        assert isinstance(
+            data, (tuple, list)
+        ), f"Control data should be a tuple of length 2, got {data}."
+        assert (
+            len(data) == 2
+        ), f"Control data should be a tuple of length 2, got {data}."
         if data[0] not in adata.obs:
             raise ValueError(f"Control column {data[0]} not found in adata.obs.")
-        assert data[0] in adata.obs
-        assert isinstance(adata.obs[data[0]].dtype, pd.CategoricalDtype)
+        assert data[0] in adata.obs, f"Control column {data[0]} not found in adata.obs."
+        if not isinstance(adata.obs[data[0]].dtype, pd.CategoricalDtype):
+            try:
+                adata.obs[data[0]] = adata.obs[data[0]].astype("category")
+            except ValueError:
+                raise ValueError(
+                    f"Control column {data[0]} could not be converted to categorical."
+                )
         if data[1] not in adata.obs[data[0]].cat.categories:
             raise ValueError(f"Control value {data[1]} not found in {data[0]}.")
 
@@ -131,6 +145,7 @@ class PerturbationData:
                 embeddings_combinations.append(jnp.concatenate(obs_group_emb, axis=0))
 
         for uns_key, uns_group in uns_perturbation_covariates.items():
+            uns_group = to_list(uns_group)
             uns_group_emb = []
             for obs_col in uns_group:
                 values = list(adata.obs[obs_col].unique())
@@ -164,10 +179,10 @@ class PerturbationData:
         cls,
         adata: anndata.AnnData,
         cell_data: Literal["X"] | dict[str, str],
-        control_data: tuple[str, Any],
+        control_data: Sequence[str, Any],
         split_covariates: Sequence[str],
         obs_perturbation_covariates: Sequence[tuple[str, ...]],
-        uns_perturbation_covariates: Sequence[dict[str, tuple[str, ...]]],
+        uns_perturbation_covariates: Sequence[dict[str, Sequence[str, ...] | str]],
     ) -> "PerturbationData":
         """Load cell data from an AnnData object.
 
@@ -230,7 +245,7 @@ class PerturbationData:
         }
         tgt_dist_uns = {
             covariate: adata.obs[covariate].cat.categories
-            for emb_covariates in uns_perturbation_covariates.values()  # type: ignore[attr-defined]
+            for emb_covariates in to_list(uns_perturbation_covariates.values())  # type: ignore[attr-defined]
             for covariate in emb_covariates
         }
         tgt_dist_obs.update(tgt_dist_uns)

@@ -74,7 +74,9 @@ def load_from_adata(
         return cell_data
 
     src_data = {}
-    tgt_data = {}  # this has as keys the values of src_data, and as values further conditions
+    tgt_data = (
+        {}
+    )  # this has as keys the values of src_data, and as values further conditions
     d_idx_to_src = {}  # dict of dict mapping source ids to strings
     d_idx_to_tgt = {}  # dict of dict mapping target ids to strings
     covariate_dict = {}
@@ -82,7 +84,10 @@ def load_from_adata(
         assert covariate in adata.obs
         assert adata.obs[covariate].dtype.name == "category"
 
-    src_dist = {covariate: adata.obs[covariate].cat.categories for covariate in source_covariates}
+    src_dist = {
+        covariate: adata.obs[covariate].cat.categories
+        for covariate in source_covariates
+    }
     src_counter = 0
     for src_combination in itertools.product(*src_dist.values()):
         filter_dict = dict(zip(source_covariates, src_combination, strict=False))
@@ -97,18 +102,25 @@ def load_from_adata(
         d_idx_to_tgt[src_counter] = {}
 
         adata_filtered_target = adata_filtered[~adata_filtered.obs[control_obs]]
-        tgt_dist = {covariate: adata.obs[covariate].cat.categories for covariate in conditions_obs.keys()}
+        tgt_dist = {
+            covariate: adata.obs[covariate].cat.categories
+            for covariate in conditions_obs.keys()
+        }
         tgt_counter = 0
         tgt_data[src_counter] = {}
         for tgt_combination in itertools.product(*tgt_dist.values()):
-            filter_dict_tgt = dict(zip(source_covariates, tgt_combination, strict=False))
+            filter_dict_tgt = dict(
+                zip(source_covariates, tgt_combination, strict=False)
+            )
 
             adata_filtered_tmp = filter_adata(adata_filtered_target, filter_dict_tgt)
             if len(adata_filtered_tmp) == 0:
                 print(f"No cells found for filter {filter_dict}.")
                 continue
 
-            tgt_data[src_counter][tgt_counter]["cell_data"] = get_cell_data(adata_filtered_tmp)
+            tgt_data[src_counter][tgt_counter]["cell_data"] = get_cell_data(
+                adata_filtered_tmp
+            )
             d_idx_to_tgt[src_counter][tgt_counter] = tgt_combination
             for obs_col in tgt_combination:
                 if covariate_dict[obs_col] is None:
@@ -125,8 +137,17 @@ def load_from_adata(
                     vals = adata_filtered.obs[obs_col].values
                     assert len(np.unique(vals)) == 1
                     assert vals[0] in adata.uns[uns_key].keys()
-                    tgt_data[src_counter][tgt_counter][f"obs_{obs_col}"] = jnp.asarray(adata.uns[uns_key][vals[0]])
+                    tgt_data[src_counter][tgt_counter][f"obs_{obs_col}"] = jnp.asarray(
+                        adata.uns[uns_key][vals[0]]
+                    )
 
             tgt_counter += 1
         src_counter += 1
     return PerturbationData(src_data, tgt_data, d_idx_to_src, d_idx_to_tgt)
+
+
+def to_list(x):
+    """Converts x to a list if it is not already a list or tuple."""
+    if isinstance(x, (list, tuple)):
+        return x
+    return [x]
