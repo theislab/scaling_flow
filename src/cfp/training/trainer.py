@@ -23,7 +23,7 @@ class CellFlowTrainer:
         self,
         num_iterations: int,
         valid_freq: int,
-        callback_fn: Callable[[otfm.OTFlowMatching | genot.GENOT], Any] | None = None,
+        callback_fn: Callable[[otfm.OTFlowMatching | genot.GENOT], Any],
     ) -> None:
         """Trains the model.
 
@@ -42,7 +42,11 @@ class CellFlowTrainer:
         pbar = tqdm(range(num_iterations))
         for it in pbar:
             rng, rng_resample, rng_step_fn = jax.random.split(rng, 3)
-            idx = int(jax.random.randint(rng, shape=[], minval=0, maxval=self.dataloader.n_conditions))
+            idx = int(
+                jax.random.randint(
+                    rng, shape=[], minval=0, maxval=self.dataloader.n_conditions
+                )
+            )
             batch = self.dataloader.sample_batch(idx, rng)
             src, tgt = batch["src_lin"], batch["tgt_lin"]
             src_cond = batch.get("src_condition")
