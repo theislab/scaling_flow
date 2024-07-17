@@ -12,23 +12,58 @@ import scipy.sparse as sp
 from tqdm import tqdm
 
 from cfp._constants import CONTROL_HELPER, UNS_KEY_CONDITIONS
+from cfp._types import ArrayLike
 
 __all__ = ["PerturbationData"]
 
 
 @dataclass
 class PerturbationData:
+    """Data container for the perturbation data.
+
+    Parameters
+    ----------
+    cell_data
+        The representation of cell data, e.g. PCA of gene expression data.
+    split_covariates_mask
+        Mask of the split covariates.
+    split_idx_to_covariates
+        Dictionary explaining values in split_covariates_mask.
+    perturbation_covariates_mask
+        Mask of the perturbation covariates.
+    perturbation_idx_to_covariates
+        Dictionary explaining values in perturbation_covariates_mask.
+    condition_data
+        Dictionary with embeddings for conditions.
+    control_to_perturbation
+        Mapping from control index to target distribution indices.
+    max_combination_length
+        Maximum number of covariates in a combination.
+    """
+
     cell_data: jax.Array  # (n_cells, n_features)
-    split_covariates_mask: jax.Array  # (n_cells,), which cell assigned to which source distribution
-    split_covariates_to_idx: dict[str, int]  # (n_sources,) dictionary explaining split_covariates_mask
-    perturbation_covariates_mask: jax.Array  # (n_cells,), which cell assigned to which target distribution
-    perturbation_covariates_to_idx: dict[str, int]  # (n_targets,), dictionary explaining perturbation_covariates_mask
+    split_covariates_mask: (
+        jax.Array
+    )  # (n_cells,), which cell assigned to which source distribution
+    split_idx_to_covariates: dict[
+        int, str
+    ]  # (n_sources,) dictionary explaining split_covariates_mask
+    perturbation_covariates_mask: (
+        jax.Array
+    )  # (n_cells,), which cell assigned to which target distribution
+    perturbation_idx_to_covariates: dict[
+        int, tuple[str, ...]
+    ]  # (n_targets,), dictionary explaining perturbation_covariates_mask
     condition_data: jax.Array | None  # (n_targets,) all embeddings for conditions
-    control_to_perturbation: dict[int, jax.Array]  # mapping from control idx to target distribution idcs
+    control_to_perturbation: dict[
+        int, jax.Array
+    ]  # mapping from control idx to target distribution idcs
     max_combination_length: int
 
     @staticmethod
-    def _get_cell_data(adata: anndata.AnnData, cell_data: Literal["X"] | dict[str, str]) -> jax.Array:
+    def _get_cell_data(
+        adata: anndata.AnnData, cell_data: Literal["X"] | dict[str, str]
+    ) -> jax.Array:
         if cell_data == "X":
             cell_data = adata.X
             if isinstance(cell_data, sp.csr_matrix):
@@ -54,19 +89,18 @@ class PerturbationData:
             raise ValueError(f"Control value {data[1]} not found in {data[0]}.")
 
     @staticmethod
-    def _check_shape(arr: float | np.ndarray) -> np.ndarray:
+    def _check_shape(arr: float | ArrayLike) -> ArrayLike:
         if not hasattr(arr, "shape") or len(arr.shape) == 0:
             return np.ones((1, 1)) * arr
-
-        if arr.ndim == 1:
-            return arr[:, None]
-        elif arr.ndim == 2:
+        if arr.ndim == 1:  # type: ignore[union-attr]
+            return arr[:, None]  # type: ignore[index]
+        elif arr.ndim == 2:  # type: ignore[union-attr]
             if arr.shape[0] == 1:
-                return arr
+                return arr  # type: ignore[return-value]
             if arr.shape[1] == 1:
                 return np.transpose(arr)
             raise ValueError("TODO, wrong shape.")
-        elif arr.ndim > 2:
+        elif arr.ndim > 2:  # type: ignore[union-attr]
             raise ValueError("TODO. Too many dimensions.")
 
         raise ValueError("TODO. wrong data for embedding.")
@@ -75,7 +109,7 @@ class PerturbationData:
     def _get_perturbation_covariates(
         cls,
         adata: anndata.AnnData,
-        embedding_dict: dict[str, dict[str, np.ndarray]],
+        embedding_dict: dict[str, dict[str, ArrayLike]],
         obs_perturbation_covariates: Any,
         uns_perturbation_covariates: Any,
         max_combination_length: int,
@@ -116,7 +150,8 @@ class PerturbationData:
         to_concat = []
         if len(embeddings_no_combination) > 0:
             conds_no_combination = jnp.tile(
-                jnp.concatenate(embeddings_no_combination, axis=-1), (1, max_combination_length, 1)
+                jnp.concatenate(embeddings_no_combination, axis=-1),
+                (1, max_combination_length, 1),
             )
             to_concat.append(conds_no_combination)
         if len(embeddings_combinations) > 0:
@@ -166,10 +201,14 @@ class PerturbationData:
         cls._verify_control_data(adata, control_data)
 
         obs_combination_length = (
-            max(len(comb) for comb in obs_perturbation_covariates) if len(obs_perturbation_covariates) else 0
+            max(len(comb) for comb in obs_perturbation_covariates)
+            if len(obs_perturbation_covariates)
+            else 0
         )
         uns_combination_length = (
-            max(len(comb) for comb in uns_perturbation_covariates.values()) if len(uns_perturbation_covariates) else 0
+            max(len(comb) for comb in uns_perturbation_covariates.values())  # type: ignore[attr-defined]
+            if len(uns_perturbation_covariates)
+            else 0
         )
         max_combination_length = max(obs_combination_length, uns_combination_length)
 
@@ -180,7 +219,10 @@ class PerturbationData:
             assert covariate in adata.obs
             assert adata.obs[covariate].dtype.name == "category"
 
-        src_dist = {covariate: adata.obs[covariate].cat.categories for covariate in split_covariates}
+        src_dist = {
+            covariate: adata.obs[covariate].cat.categories
+            for covariate in split_covariates
+        }
         tgt_dist_obs = {
             covariate: adata.obs[covariate].cat.categories
             for group in obs_perturbation_covariates
@@ -188,7 +230,7 @@ class PerturbationData:
         }
         tgt_dist_uns = {
             covariate: adata.obs[covariate].cat.categories
-            for emb_covariates in uns_perturbation_covariates.values()
+            for emb_covariates in uns_perturbation_covariates.values()  # type: ignore[attr-defined]
             for covariate in emb_covariates
         }
         tgt_dist_obs.update(tgt_dist_uns)
@@ -196,20 +238,27 @@ class PerturbationData:
         tgt_counter = 0
         src_dists = list(itertools.product(*src_dist.values()))
 
-        control_to_perturbation = {}
+        control_to_perturbation: dict[int, int] = {}
         cell_data = cls._get_cell_data(adata, cell_data)
         split_covariates_mask = np.full((adata.n_obs,), -1, dtype=jnp.int32)
         split_covariates_to_idx = {}
         perturbation_covariates_mask = np.full((adata.n_obs,), -1, dtype=jnp.int32)
         perturbation_covariates_to_idx = {}
-        condition_data = (
-            None if (len(obs_perturbation_covariates) == 0 and len(uns_perturbation_covariates) == 0) else []
+        condition_data: list[ArrayLike] | None = (
+            None
+            if (
+                len(obs_perturbation_covariates) == 0
+                and len(uns_perturbation_covariates) == 0
+            )
+            else []
         )
 
         control_mask = (adata.obs[control_data[0]] == control_data[1]) == 1
         for src_combination in tqdm(src_dists):
             filter_dict = dict(zip(split_covariates, src_combination, strict=False))
-            split_cov_mask = (adata.obs[list(filter_dict.keys())] == list(filter_dict.values())).all(axis=1)
+            split_cov_mask = (
+                adata.obs[list(filter_dict.keys())] == list(filter_dict.values())
+            ).all(axis=1)
             mask = split_cov_mask * control_mask
             if mask.sum() == 0:
                 continue
@@ -220,7 +269,9 @@ class PerturbationData:
             conditional_distributions = []
             for tgt_combination in itertools.product(*tgt_dist_obs.values()):
                 mask = (
-                    (adata.obs[list(tgt_dist_obs.keys())] == list(tgt_combination)).all(axis=1)
+                    (adata.obs[list(tgt_dist_obs.keys())] == list(tgt_combination)).all(
+                        axis=1
+                    )
                     * (1 - control_mask)
                     * split_cov_mask
                 ) == 1
@@ -242,15 +293,19 @@ class PerturbationData:
                 tgt_counter += 1
             control_to_perturbation[src_counter] = np.array(conditional_distributions)
             src_counter += 1
-        condition_data = jnp.array(condition_data) if condition_data is not None else None
+        condition_data = (
+            jnp.array(condition_data) if condition_data is not None else None
+        )
 
         return cls(
             cell_data=cell_data,
             split_covariates_mask=jnp.asarray(split_covariates_mask),
-            split_covariates_to_idx=split_covariates_to_idx,
+            split_idx_to_covariates=split_covariates_to_idx,
             perturbation_covariates_mask=jnp.asarray(perturbation_covariates_mask),
-            perturbation_covariates_to_idx=perturbation_covariates_to_idx,
-            condition_data=None if condition_data is None else jnp.asarray(condition_data),
+            perturbation_idx_to_covariates=perturbation_covariates_to_idx,
+            condition_data=(
+                None if condition_data is None else jnp.asarray(condition_data)
+            ),
             control_to_perturbation=control_to_perturbation,
             max_combination_length=max_combination_length,
         )
@@ -258,15 +313,18 @@ class PerturbationData:
     @property
     def n_controls(self) -> int:
         """Returns the number of control covariate values."""
-        return len(self.split_covariates_to_idx)
+        return len(self.split_idx_to_covariates)
 
     @property
     def n_perturbations(self) -> int:
         """Returns the number of perturbation covariate combinations."""
-        return len(self.perturbation_covariates_to_idx)
+        return len(self.perturbation_idx_to_covariates)
 
     def _format_params(self, fmt: Callable[[Any], str]) -> str:
-        params = {"n_controls": self.n_controls, "n_perturbed": self.n_perturbed}
+        params = {
+            "n_controls": self.n_controls,
+            "n_perturbations": self.n_perturbations,
+        }
         return ", ".join(f"{name}={fmt(val)}" for name, val in params.items())
 
     def __repr__(self) -> str:
