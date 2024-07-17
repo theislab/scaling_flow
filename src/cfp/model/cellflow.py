@@ -1,4 +1,5 @@
-from typing import Literal
+from typing import Literal, Any, Sequence, Callable
+from dataclasses import field as dc_field
 
 import optax
 import anndata as ad
@@ -7,7 +8,7 @@ from ott.neural.methods.flows import genot, otfm
 
 from cfp.training.trainer import CellFlowTrainer
 from cfp.networks.velocity_field import ConditionalVelocityField
-from cfp.data.dataloader import JaxSampler
+from cfp.data.dataloader import CFSampler
 
 
 class CellFlow:
@@ -35,7 +36,7 @@ class CellFlow:
     ) -> None:
         """Prepare dataloader for training from anndata object.
 
-        **kwargs: Keyword arguments for JaxSampler.
+        **kwargs: Keyword arguments for CFSampler.
         """
         # TODO: Adapt to new PerturbationData
         # Should also set attributes for the model such as
@@ -43,7 +44,7 @@ class CellFlow:
         # * condition_dim
         self._max_set_size = max_set_size
         self._condition_dim = condition_dim
-        self.dataloader = JaxSampler(**kwargs)
+        self.dataloader = CFSampler(**kwargs)
 
     def prepare_model(
         self,

@@ -8,7 +8,7 @@ from ott.neural.methods.flows import genot, otfm
 from ott.solvers import utils as solver_utils
 from tqdm import tqdm
 
-from cfp.data.dataloader import JaxSampler
+from cfp.data.dataloader import CFSampler
 
 
 class CellFlowTrainer:
@@ -26,7 +26,7 @@ class CellFlowTrainer:
 
     def __init__(
         self,
-        dataloader: JaxSampler,
+        dataloader: CFSampler,
         model: otfm.OTFlowMatching | genot.GENOT,
     ):
         self.model = model
