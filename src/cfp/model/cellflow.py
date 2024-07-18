@@ -13,6 +13,8 @@ from cfp.data.dataloader import CFSampler
 from cfp.networks.velocity_field import ConditionalVelocityField
 from cfp.training.trainer import CellFlowTrainer
 
+__all__ = ["CellFlow"]
+
 
 class CellFlow:
     """CellFlow model for perturbation prediction using Flow Matching.
@@ -24,6 +26,7 @@ class CellFlow:
     """
 
     def __init__(self, adata: ad.AnnData, solver: Literal["otfm", "genot"] = "otfm"):
+
         self.adata = adata
         self.solver = solver
         self.dataloader = None
