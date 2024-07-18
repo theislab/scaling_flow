@@ -14,7 +14,7 @@ from tqdm import tqdm
 from cfp._constants import CONTROL_HELPER, UNS_KEY_CONDITIONS
 from cfp._types import ArrayLike
 
-from .utils import to_list
+from .utils import _to_list
 
 __all__ = ["PerturbationData"]
 
