@@ -81,7 +81,7 @@ class CellFlow:
 
     def prepare_model(
         self,
-        condition_encoder: Literal["transformer", "deepset"] = "transformer",
+        encode_conditions: bool = True,
         condition_embedding_dim: int = 32,
         condition_encoder_kwargs: dict[str, Any] | None = None,
         time_encoder_dims: Sequence[int] = (1024, 1024, 1024),
@@ -99,7 +99,7 @@ class CellFlow:
         """Prepare model for training.
 
         Args:
-            condition_encoder: Encoder for the condition.
+            encode_conditions: Whether to encode conditions.
             condition_embedding_dim: Dimensions of the condition embedding.
             condition_encoder_kwargs: Keyword arguments for the condition encoder.
             time_encoder_dims: Dimensions of the time embedding.
@@ -124,10 +124,10 @@ class CellFlow:
 
         vf = ConditionalVelocityField(
             output_dim=self._data_dim,
-            condition_encoder=condition_encoder,
+            max_combination_length=self.pdata.max_combination_length,
+            encode_conditions=encode_conditions,
             condition_dim=self._condition_dim,
             condition_embedding_dim=condition_embedding_dim,
-            max_set_size=self.pdata.max_combination_length,
             condition_encoder_kwargs=condition_encoder_kwargs,
             time_encoder_dims=time_encoder_dims,
             time_encoder_dropout=time_encoder_dropout,

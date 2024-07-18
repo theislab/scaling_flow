@@ -27,7 +27,6 @@ class TestCellFlow:
         assert hasattr(cf, "_data_dim")
 
         cf.prepare_model(
-            condition_encoder="transformer",
             condition_embedding_dim=32,
             hidden_dims=(32, 32),
             decoder_dims=(32, 32),
