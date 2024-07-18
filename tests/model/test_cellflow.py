@@ -32,7 +32,7 @@ class TestCellFlow:
             hidden_dims=(32, 32),
             decoder_dims=(32, 32),
         )
-        assert cf.model is not None
+        assert cf.trainer is not None
 
         cf.train(num_iterations=1)
         assert cf.dataloader is not None

@@ -27,7 +27,7 @@ class CellFlow:
         self.adata = adata
         self.solver = solver
         self.dataloader = None
-        self.model = None
+        self.trainer = None
         self._solver = None
 
     def prepare_data(
@@ -78,7 +78,6 @@ class CellFlow:
 
     def prepare_model(
         self,
-        flow: dict[Literal["constant_noise", "schroedinger_bridge"], float] = {"constant_noise": 0.0},
         condition_encoder: Literal["transformer", "deepset"] = "transformer",
         condition_embedding_dim: int = 32,
         condition_encoder_kwargs: dict[str, Any] | None = None,
@@ -88,6 +87,9 @@ class CellFlow:
         hidden_dropout: float = 0.0,
         decoder_dims: Sequence[int] = (1024, 1024, 1024),
         decoder_dropout: float = 0.0,
+        flow: dict[Literal["constant_noise", "schroedinger_bridge"], float] = {
+            "constant_noise": 0.0
+        },
         optimizer: optax.GradientTransformation = optax.adam(1e-4),
         seed=0,
     ) -> None:
@@ -132,18 +134,20 @@ class CellFlow:
             decoder_dropout=decoder_dropout,
         )
 
-        flow, noise = next(flow.items())
+        flow, noise = list(flow.items())[0]
         if flow == "constant_noise":
-            flow=dynamics.ConstantNoiseFlow(noise)
+            flow = dynamics.ConstantNoiseFlow(noise)
         elif flow == "bridge":
             flow = dynamics.BrownianBridge(noise)
         else:
-            raise NotImplementedError(f"The key of `flow` must be `constant_noise` or `bridge` but found {flow.keys()[0]}.")
+            raise NotImplementedError(
+                f"The key of `flow` must be `constant_noise` or `bridge` but found {flow.keys()[0]}."
+            )
         if self.solver == "otfm":
             self._solver = otfm.OTFlowMatching(
                 vf=vf,
                 match_fn=solver_utils.match_linear,
-                flow=dynamics.ConstantNoiseFlow(0.0),
+                flow=flow,
                 optimizer=optimizer,
                 rng=jax.random.PRNGKey(seed),
             )
@@ -151,15 +155,13 @@ class CellFlow:
             self._solver = genot.GENOT(
                 vf=vf,
                 data_match_fn=solver_utils.match_linear,
-                flow=dynamics.ConstantNoiseFlow(0.0),
+                flow=flow,
                 source_dim=self._data_dim,
                 target_dim=self._data_dim,
                 optimizer=optimizer,
                 rng=jax.random.PRNGKey(seed),
             )
-        # NOTE: The use of "model" is a bit confusing here, maybe we can harmonize the
-        # naming a bit better
-        self.model = CellFlowTrainer(model=self._solver)
+        self.trainer = CellFlowTrainer(model=self._solver)
 
     def train(
         self,
@@ -184,12 +186,12 @@ class CellFlow:
         if self.pdata is None:
             raise ValueError("Data not initialized. Please call prepare_data first.")
 
-        if self.model is None:
+        if self.trainer is None:
             raise ValueError("Model not initialized. Please call prepare_model first.")
 
         self.dataloader = CFSampler(data=self.pdata, batch_size=batch_size)
 
-        self.model.train(
+        self.trainer.train(
             dataloader=self.dataloader,
             num_iterations=num_iterations,
             valid_freq=valid_freq,
