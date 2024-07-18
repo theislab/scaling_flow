@@ -29,10 +29,8 @@ class TestCellFlow:
         cf.prepare_model(
             condition_encoder="transformer",
             condition_embedding_dim=32,
-            velocity_field_kwargs={
-                "hidden_dims": (32, 32),
-                "decoder_dims": (32, 32),
-            },
+            hidden_dims=(32, 32),
+            decoder_dims=(32, 32),
         )
         assert cf.trainer is not None
 
