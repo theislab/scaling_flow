@@ -27,11 +27,10 @@ class CellFlowTrainer:
     def __init__(
         self,
         model: otfm.OTFlowMatching | genot.GENOT,
+        match_fn: Callable[[ArrayLike, ArrayLike], Any] | None = None,
     ):
         self.model = model
-        self._match_fn_name = (
-            "data_match_fn" if isinstance(model, genot.GENOT) else "match_fn"
-        )
+        self.match_fn = match_fn
 
     def train(
         self,
@@ -64,9 +63,8 @@ class CellFlowTrainer:
             src, tgt = batch["src_lin"], batch["tgt_lin"]
             src_cond = batch.get("src_condition")
 
-            match_fn = getattr(self.model, self._match_fn_name)
-            if match_fn is not None:
-                tmat = match_fn(src, tgt)
+            if self.match_fn is not None:
+                tmat = self.match_fn(src, tgt)
                 src_ixs, tgt_ixs = solver_utils.sample_joint(rng_resample, tmat)
                 src, tgt = src[src_ixs], tgt[tgt_ixs]
                 src_cond = None if src_cond is None else src_cond[src_ixs]

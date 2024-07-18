@@ -1,6 +1,6 @@
 import itertools
 from collections.abc import Sequence
-from typing import Literal, NamedTuple
+from typing import Literal, NamedTuple, Any, List, Tuple
 
 import anndata
 import jax

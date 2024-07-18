@@ -81,9 +81,6 @@ class CellFlow:
 
     def prepare_model(
         self,
-        flow: dict[Literal["constant_noise", "schroedinger_bridge"], float] = {
-            "constant_noise": 0.0
-        },
         condition_encoder: Literal["transformer", "deepset"] = "transformer",
         condition_embedding_dim: int = 32,
         condition_encoder_kwargs: dict[str, Any] | None = None,
@@ -93,6 +90,12 @@ class CellFlow:
         hidden_dropout: float = 0.0,
         decoder_dims: Sequence[int] = (1024, 1024, 1024),
         decoder_dropout: float = 0.0,
+        flow: dict[Literal["constant_noise", "schroedinger_bridge"], float] = {
+            "constant_noise": 0.0
+        },
+        match_fn: Callable[
+            [ArrayLike, ArrayLike], ArrayLike
+        ] = solver_utils.match_linear,
         optimizer: optax.GradientTransformation = optax.adam(1e-4),
         seed=0,
     ) -> None:
@@ -108,6 +111,8 @@ class CellFlow:
             hidden_dropout: Dropout rate for the hidden layers.
             decoder_dims: Dimensions of the output layers.
             decoder_dropout: Dropout rate for the output layers.
+            flow: Flow to use for training. Shoudl be a dict with the form {"constant_noise": noise_val} or {"schroedinger_bridge": noise_val}.
+            match_fn: Matching function.
             optimizer: Optimizer for training.
             seed: Random seed.
 
@@ -137,7 +142,7 @@ class CellFlow:
             decoder_dropout=decoder_dropout,
         )
 
-        flow, noise = next(flow.items())
+        flow, noise = list(flow.items())[0]
         if flow == "constant_noise":
             flow = dynamics.ConstantNoiseFlow(noise)
         elif flow == "bridge":
@@ -149,7 +154,7 @@ class CellFlow:
         if self.solver == "otfm":
             self._solver = otfm.OTFlowMatching(
                 vf=vf,
-                match_fn=solver_utils.match_linear,
+                match_fn=match_fn,
                 flow=dynamics.ConstantNoiseFlow(0.0),
                 optimizer=optimizer,
                 rng=jax.random.PRNGKey(seed),
@@ -157,16 +162,14 @@ class CellFlow:
         elif self.solver == "genot":
             self._solver = genot.GENOT(
                 vf=vf,
-                data_match_fn=solver_utils.match_linear,
+                data_match_fn=match_fn,
                 flow=dynamics.ConstantNoiseFlow(0.0),
                 source_dim=self._data_dim,
                 target_dim=self._data_dim,
                 optimizer=optimizer,
                 rng=jax.random.PRNGKey(seed),
             )
-        self.trainer = CellFlowTrainer(
-            model=self._solver, match_fn=solver_utils.match_linear
-        )
+        self.trainer = CellFlowTrainer(model=self._solver, match_fn=match_fn)
 
     def train(
         self,
@@ -237,7 +240,7 @@ class CellFlow:
     def save(
         self,
         dir_path: str,
-        file_prefix: Optional[str] = None,
+        file_prefix: str | None = None,
         overwrite: bool = False,
     ) -> None:
         """
