@@ -26,6 +26,7 @@ class ConditionalVelocityField(nn.Module):
         max_set_size: Maximum size of the set.
         condition_encoder_kwargs: Keyword arguments for the condition encoder.
         act_fn: Activation function.
+        time_freqs: Frequency of the cyclical time encoding.
         time_encoder_dims: Dimensions of the time embedding.
         time_encoder_dropout: Dropout rate for the time embedding.
         hidden_dims: Dimensions of the hidden layers.
@@ -45,6 +46,7 @@ class ConditionalVelocityField(nn.Module):
     max_set_size: int = 2
     condition_encoder_kwargs: dict[str, Any] = dc_field(default_factory=dict)
     act_fn: Callable[[jnp.ndarray], jnp.ndarray] = nn.silu
+    time_freqs: int = 1024
     time_encoder_dims: Sequence[int] = (1024, 1024, 1024)
     time_encoder_dropout: float = 0.0
     hidden_dims: Sequence[int] = (1024, 1024, 1024)
@@ -103,7 +105,7 @@ class ConditionalVelocityField(nn.Module):
         """
         if self.condition_encoder is not None:
             condition = self.set_encoder(condition, training=train)
-        t = time_encoder.cyclical_time_encoder(t, n_freqs=1024)
+        t = time_encoder.cyclical_time_encoder(t, n_freqs=self.time_freqs)
         t = self.time_encoder(t, training=train)
         x = self.x_encoder(x, training=train)
         concatenated = jnp.concatenate((t, x, condition), axis=-1)

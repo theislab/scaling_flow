@@ -27,10 +27,71 @@ class CellFlowTrainer:
     def __init__(
         self,
         model: otfm.OTFlowMatching | genot.GENOT,
-        match_fn: Callable[[ArrayLike, ArrayLike], Any] | None = None,
     ):
+        if not isinstance(model, (otfm.OTFlowMatching | genot.GENOT)):
+            raise NotImplementedError(
+                f"Model must be an instance of OTFlowMatching or GENOT, got {type(model)}"
+            )
+
         self.model = model
-        self.match_fn = match_fn
+
+    def _genot_step_fn(self, rng, src, tgt, src_cond):
+        """Step function for GENOT solver."""
+        rng, rng_resample, rng_noise, rng_time, rng_step_fn = jax.random.split(rng, 5)
+
+        matching_data = (src, tgt)
+        n = src.shape[0]
+
+        time = self.model.time_sampler(rng_time, n * self.model.n_samples_per_src)
+        latent = self.model.latent_noise_fn(
+            rng_noise, (n, self.model.n_samples_per_src)
+        )
+
+        tmat = self.model.data_match_fn(*matching_data)  # (n, m)
+
+        src_ixs, tgt_ixs = solver_utils.sample_conditional(  # (n, k), (m, k)
+            rng_resample,
+            tmat,
+            k=self.model.n_samples_per_src,
+        )
+
+        src, tgt = src[src_ixs], tgt[tgt_ixs]  # (n, k, ...),  # (m, k, ...)
+        if src_cond is not None:
+            src_cond = src_cond[src_ixs]
+
+        if self.model.latent_match_fn is not None:
+            src, src_cond, tgt = self.model._match_latent(
+                rng, src, src_cond, latent, tgt
+            )
+
+        src = src.reshape(-1, *src.shape[2:])  # (n * k, ...)
+        tgt = tgt.reshape(-1, *tgt.shape[2:])  # (m * k, ...)
+        latent = latent.reshape(-1, *latent.shape[2:])
+        if src_cond is not None:
+            src_cond = src_cond.reshape(-1, *src_cond.shape[2:])
+
+        loss, self.model.vf_state = self.model.step_fn(
+            rng_step_fn, self.model.vf_state, time, src, tgt, latent, src_cond
+        )
+        return loss
+
+    def _otfm_step_fn(self, rng, src, tgt, src_cond):
+        """Step function for OTFM solver."""
+        rng_resample, rng_step_fn = jax.random.split(rng, 2)
+        if self.model.match_fn is not None:
+            tmat = self.model.match_fn(src, tgt)
+            src_ixs, tgt_ixs = solver_utils.sample_joint(rng_resample, tmat)
+            src, tgt = src[src_ixs], tgt[tgt_ixs]
+            src_cond = None if src_cond is None else src_cond[src_ixs]
+
+        self.model.vf_state, loss = self.model.step_fn(
+            rng_step_fn,
+            self.model.vf_state,
+            src,
+            tgt,
+            src_cond,
+        )
+        return loss
 
     def train(
         self,
@@ -57,25 +118,16 @@ class CellFlowTrainer:
 
         pbar = tqdm(range(num_iterations))
         for it in pbar:
-            rng, rng_resample, rng_step_fn = jax.random.split(rng, 3)
+            rng, rng_step_fn = jax.random.split(rng, 2)
             batch = dataloader.sample(rng)
 
             src, tgt = batch["src_lin"], batch["tgt_lin"]
             src_cond = batch.get("src_condition")
 
-            if self.match_fn is not None:
-                tmat = self.match_fn(src, tgt)
-                src_ixs, tgt_ixs = solver_utils.sample_joint(rng_resample, tmat)
-                src, tgt = src[src_ixs], tgt[tgt_ixs]
-                src_cond = None if src_cond is None else src_cond[src_ixs]
-
-            self.model.vf_state, loss = self.model.step_fn(
-                rng_step_fn,
-                self.model.vf_state,
-                src,
-                tgt,
-                src_cond,
-            )
+            if isinstance(self.model, genot.GENOT):
+                loss = self._genot_step_fn(rng_step_fn, src, tgt, src_cond)
+            else:
+                loss = self._otfm_step_fn(rng_step_fn, src, tgt, src_cond)
 
             training_logs["loss"].append(float(loss))
             if ((it - 1) % valid_freq == 0) and (it > 1):

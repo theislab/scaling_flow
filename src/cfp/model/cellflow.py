@@ -1,7 +1,9 @@
+import os
 from collections.abc import Callable, Sequence
 from typing import Any, Literal
 
 import anndata as ad
+import cloudpickle
 import jax
 import optax
 from numpy.typing import ArrayLike
@@ -84,15 +86,11 @@ class CellFlow:
         condition_encoder: Literal["transformer", "deepset"] = "transformer",
         condition_embedding_dim: int = 32,
         condition_encoder_kwargs: dict[str, Any] | None = None,
-        time_encoder_dims: Sequence[int] = (1024, 1024, 1024),
-        time_encoder_dropout: float = 0.0,
-        hidden_dims: Sequence[int] = (1024, 1024, 1024),
-        hidden_dropout: float = 0.0,
-        decoder_dims: Sequence[int] = (1024, 1024, 1024),
-        decoder_dropout: float = 0.0,
-        flow: dict[Literal["constant_noise", "schroedinger_bridge"], float] = {
-            "constant_noise": 0.0
-        },
+        velocity_field_kwargs: dict[str, Any] | None = None,
+        solver_kwargs: dict[str, Any] | None = None,
+        flow: (
+            dict[Literal["constant_noise", "schroedinger_bridge"], float] | None
+        ) = None,
         match_fn: Callable[
             [ArrayLike, ArrayLike], ArrayLike
         ] = solver_utils.match_linear,
@@ -126,6 +124,9 @@ class CellFlow:
             )
 
         condition_encoder_kwargs = condition_encoder_kwargs or {}
+        velocity_field_kwargs = velocity_field_kwargs or {}
+        solver_kwargs = solver_kwargs or {}
+        flow = flow or {"constant_noise": 0.0}
 
         vf = ConditionalVelocityField(
             output_dim=self._data_dim,
@@ -134,12 +135,7 @@ class CellFlow:
             condition_embedding_dim=condition_embedding_dim,
             max_set_size=self.pdata.max_combination_length,
             condition_encoder_kwargs=condition_encoder_kwargs,
-            time_encoder_dims=time_encoder_dims,
-            time_encoder_dropout=time_encoder_dropout,
-            hidden_dims=hidden_dims,
-            hidden_dropout=hidden_dropout,
-            decoder_dims=decoder_dims,
-            decoder_dropout=decoder_dropout,
+            **velocity_field_kwargs,
         )
 
         flow, noise = list(flow.items())[0]
@@ -158,6 +154,7 @@ class CellFlow:
                 flow=dynamics.ConstantNoiseFlow(0.0),
                 optimizer=optimizer,
                 rng=jax.random.PRNGKey(seed),
+                **solver_kwargs,
             )
         elif self.solver == "genot":
             self._solver = genot.GENOT(
@@ -168,8 +165,9 @@ class CellFlow:
                 target_dim=self._data_dim,
                 optimizer=optimizer,
                 rng=jax.random.PRNGKey(seed),
+                **solver_kwargs,
             )
-        self.trainer = CellFlowTrainer(model=self._solver, match_fn=match_fn)
+        self.trainer = CellFlowTrainer(model=self._solver)
 
     def train(
         self,
