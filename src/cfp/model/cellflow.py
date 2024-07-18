@@ -3,9 +3,13 @@ from ott.neural.methods.flows import genot, otfm
 
 from cfp.training.trainer import CellFlowTrainer
 
+__all__ = ["CellFlow"]
+
 
 class CellFlow:
-    def __init__(self, adata: ad.AnnData, solver: str, condition_encoder: str, **kwargs):
+    def __init__(
+        self, adata: ad.AnnData, solver: str, condition_encoder: str, **kwargs
+    ):
         self.adata = adata
         self.solver = solver
         self.condition_encoder = condition_encoder
