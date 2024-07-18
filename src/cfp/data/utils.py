@@ -146,7 +146,7 @@ def load_from_adata(
     return PerturbationData(src_data, tgt_data, d_idx_to_src, d_idx_to_tgt)
 
 
-def to_list(x):
+def _to_list(x: Any) -> List | Tuple:
     """Converts x to a list if it is not already a list or tuple."""
     if isinstance(x, (list, tuple)):
         return x

@@ -66,7 +66,7 @@ class PerturbationData:
     def _get_cell_data(
         adata: anndata.AnnData, cell_data: Literal["X"] | dict[str, str]
     ) -> jax.Array:
-        error_message = "Cell data should be either 'X', a key in adata.obsm or a dictionary of the form {attr: key}."
+        error_message = "`cell_data` should be either `X`, a key in `adata.obsm` or a dictionary of the form {`attr`: `key`}."
         if cell_data == "X":
             cell_data = adata.X
             if isinstance(cell_data, sp.csr_matrix):
@@ -145,7 +145,7 @@ class PerturbationData:
                 embeddings_combinations.append(jnp.concatenate(obs_group_emb, axis=0))
 
         for uns_key, uns_group in uns_perturbation_covariates.items():
-            uns_group = to_list(uns_group)
+            uns_group = _to_list(uns_group)
             uns_group_emb = []
             for obs_col in uns_group:
                 values = list(adata.obs[obs_col].unique())
@@ -237,7 +237,7 @@ class PerturbationData:
         tgt_dist_uns = {
             covariate: adata.obs[covariate].cat.categories
             for emb_covariates in uns_perturbation_covariates.values()  # type: ignore[attr-defined]
-            for covariate in to_list(emb_covariates)
+            for covariate in _to_list(emb_covariates)
         }
         tgt_dist_obs.update(tgt_dist_uns)
         src_counter = 0

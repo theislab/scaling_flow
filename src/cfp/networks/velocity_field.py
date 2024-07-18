@@ -138,7 +138,7 @@ class ConditionalVelocityField(nn.Module):
 
         Returns
         -------
-            The training state.x
+            The training state.
         """
         condition_dim = condition_dim or self.condition_dim
         t, x = jnp.ones((1, 1)), jnp.ones((1, input_dim))

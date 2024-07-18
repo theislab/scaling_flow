@@ -15,7 +15,7 @@ from cfp.training.trainer import CellFlowTrainer
 
 
 class CellFlow:
-    """CellFlow model for perturbation preduction using FlowMatching.
+    """CellFlow model for perturbation prediction using Flow Matching.
 
     Args:
         adata: Anndata object.
@@ -78,6 +78,7 @@ class CellFlow:
 
     def prepare_model(
         self,
+        flow: dict[Literal["constant_noise", "schroedinger_bridge"], float] = {"constant_noise": 0.0},
         condition_encoder: Literal["transformer", "deepset"] = "transformer",
         condition_embedding_dim: int = 32,
         condition_encoder_kwargs: dict[str, Any] | None = None,
@@ -87,7 +88,7 @@ class CellFlow:
         hidden_dropout: float = 0.0,
         decoder_dims: Sequence[int] = (1024, 1024, 1024),
         decoder_dropout: float = 0.0,
-        optimizer: optax.GradientTransformation = optax.adam(1e-3),
+        optimizer: optax.GradientTransformation = optax.adam(1e-4),
         seed=0,
     ) -> None:
         """Prepare model for training.
@@ -131,6 +132,13 @@ class CellFlow:
             decoder_dropout=decoder_dropout,
         )
 
+        flow, noise = next(flow.items())
+        if flow == "constant_noise":
+            flow=dynamics.ConstantNoiseFlow(noise)
+        elif flow == "bridge":
+            flow = dynamics.BrownianBridge(noise)
+        else:
+            raise NotImplementedError(f"The key of `flow` must be `constant_noise` or `bridge` but found {flow.keys()[0]}.")
         if self.solver == "otfm":
             self._solver = otfm.OTFlowMatching(
                 vf=vf,
