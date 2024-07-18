@@ -81,7 +81,9 @@ class CellFlow:
 
     def prepare_model(
         self,
-        flow: dict[Literal["constant_noise", "schroedinger_bridge"], float] = {"constant_noise": 0.0},
+        flow: dict[Literal["constant_noise", "schroedinger_bridge"], float] = {
+            "constant_noise": 0.0
+        },
         condition_encoder: Literal["transformer", "deepset"] = "transformer",
         condition_embedding_dim: int = 32,
         condition_encoder_kwargs: dict[str, Any] | None = None,
@@ -137,11 +139,13 @@ class CellFlow:
 
         flow, noise = next(flow.items())
         if flow == "constant_noise":
-            flow=dynamics.ConstantNoiseFlow(noise)
+            flow = dynamics.ConstantNoiseFlow(noise)
         elif flow == "bridge":
             flow = dynamics.BrownianBridge(noise)
         else:
-            raise NotImplementedError(f"The key of `flow` must be `constant_noise` or `bridge` but found {flow.keys()[0]}.")
+            raise NotImplementedError(
+                f"The key of `flow` must be `constant_noise` or `bridge` but found {flow.keys()[0]}."
+            )
         if self.solver == "otfm":
             self._solver = otfm.OTFlowMatching(
                 vf=vf,
@@ -229,3 +233,37 @@ class CellFlow:
             Condition embedding.
         """
         pass
+
+    def save(
+        self,
+        dir_path: str,
+        file_prefix: Optional[str] = None,
+        overwrite: bool = False,
+    ) -> None:
+        """
+        Save the model. Pickles the CellFlow class instance.
+
+        Args:
+        dir_path: Path to a directory, defaults to current directory
+        file_prefix: Prefix to prepend to the file name.
+        overwrite: Overwrite existing data or not.
+
+        Returns
+        -------
+        None
+        """
+        file_name = (
+            f"{file_prefix}_{self.__class__.__name__}.pkl"
+            if file_prefix is not None
+            else f"{self.__class__.__name__}.pkl"
+        )
+        file_dir = (
+            os.path.join(dir_path, file_name) if dir_path is not None else file_name
+        )
+
+        if not overwrite and os.path.exists(file_dir):
+            raise RuntimeError(
+                f"Unable to save to an existing file `{file_dir}` use `overwrite=True` to overwrite it."
+            )
+        with open(file_dir, "wb") as f:
+            cloudpickle.dump(self, f)
