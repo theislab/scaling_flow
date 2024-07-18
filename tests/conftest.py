@@ -1,10 +1,26 @@
 import anndata as ad
+import jax.numpy as jnp
 import numpy as np
 import pandas as pd
 import pytest
 
 from cfp._constants import UNS_KEY_CONDITIONS
 from cfp.data.data import PerturbationData
+
+
+@pytest.fixture
+def dataloader():
+    class DataLoader:
+        n_conditions = 10
+
+        def sample(self, rng):
+            return {
+                "src_lin": jnp.ones((10, 5)) * 10,
+                "tgt_lin": jnp.ones((10, 5)),
+                "src_condition": jnp.ones((10, 2, 3)),
+            }
+
+    return DataLoader()
 
 
 @pytest.fixture()

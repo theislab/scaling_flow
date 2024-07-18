@@ -1,40 +1,72 @@
-from collections.abc import Callable, Iterable
+from collections.abc import Callable
 from typing import Any
 
 import jax
 import numpy as np
+from numpy.typing import ArrayLike
 from ott.neural.methods.flows import genot, otfm
 from ott.solvers import utils as solver_utils
 from tqdm import tqdm
 
+from cfp.data.dataloader import CFSampler
+
 
 class CellFlowTrainer:
+    """Trainer for the OTFM/GENOT model with a conditional velocity field.
+
+    Args:
+        dataloader: Data sampler.
+        model: OTFM/GENOT model with a conditional velocity field.
+
+
+    Returns
+    -------
+        None
+    """
+
     def __init__(
         self,
-        dataloader: Iterable,
         model: otfm.OTFlowMatching | genot.GENOT,
     ):
         self.model = model
-        self.dataloader = dataloader
-        self.vector_field = ConditionalVelocityField()
+        self._match_fn_name = (
+            "data_match_fn" if isinstance(model, genot.GENOT) else "match_fn"
+        )
 
     def train(
         self,
+        dataloader: CFSampler,
         num_iterations: int,
         valid_freq: int,
-        callback_fn: Callable[[otfm.OTFlowMatching | genot.GENOT], Any],
+        callback_fn: (
+            Callable[[otfm.OTFlowMatching | genot.GENOT, dict[str, Any]], Any] | None
+        ) = None,
     ) -> None:
-        training_logs = {"loss": []}
+        """Trains the model.
+
+        Args:
+            num_iterations: Number of iterations to train the model.
+            valid_freq: Frequency of validation.
+            callback_fn: Callback
+
+        Returns
+        -------
+            None
+        """
+        training_logs: dict[str, Any] = {"loss": []}
         rng = jax.random.PRNGKey(0)
-        for it in tqdm(range(num_iterations)):
+
+        pbar = tqdm(range(num_iterations))
+        for it in pbar:
             rng, rng_resample, rng_step_fn = jax.random.split(rng, 3)
-            idx = int(jax.random.randint(rng, shape=[], minval=0, maxval=self.dataloader.n_conditions))
-            batch = self.dataloader.sample_batch(idx, rng)
+            batch = dataloader.sample(rng)
+
             src, tgt = batch["src_lin"], batch["tgt_lin"]
             src_cond = batch.get("src_condition")
 
-            if self.model.match_fn is not None:
-                tmat = self.model.match_fn(src, tgt)
+            match_fn = getattr(self.model, self._match_fn_name)
+            if match_fn is not None:
+                tmat = match_fn(src, tgt)
                 src_ixs, tgt_ixs = solver_utils.sample_joint(rng_resample, tmat)
                 src, tgt = src[src_ixs], tgt[tgt_ixs]
                 src_cond = None if src_cond is None else src_cond[src_ixs]
@@ -52,7 +84,41 @@ class CellFlowTrainer:
                 train_loss = np.mean(training_logs["loss"][valid_freq:])
                 log_metrics = {"train_loss": train_loss}
 
-                callback_fn(
-                    self.model,
-                    log_metrics,
-                )
+                pbar.set_postfix({"loss": float(loss.mean().round(2))})
+
+                if callback_fn is not None:
+                    callback_fn(
+                        self.model,
+                        log_metrics,
+                    )
+
+    def get_condition_embedding(self, condition: ArrayLike) -> ArrayLike:
+        """Encode conditions
+
+        Args:
+            condition: Conditions to encode
+
+        Returns
+        -------
+            Encoded conditions
+        """
+        cond_embed = self.model.vf.apply(
+            {"params": self.model.vf_state.params},
+            condition,
+            method="encode_conditions",
+        )
+        return np.array(cond_embed)
+
+    def predict(self, x: ArrayLike, condition: ArrayLike) -> ArrayLike:
+        """Predict
+
+        Args:
+            x: Input data
+            condition: Condition
+
+        Returns
+        -------
+            Predicted output
+        """
+        x_pred = self.model.transport(x, condition)
+        return np.array(x_pred)

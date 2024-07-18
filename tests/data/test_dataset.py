@@ -6,7 +6,7 @@ import pytest
 class TestPerturbationData:
     @pytest.mark.parametrize(
         "cell_data",
-        ["X", {"attr": "obsm", "key": "X_pca"}, {"attr": "layers", "key": "my_counts"}],
+        ["X", "X_pca", {"obsm": "X_pca"}, {"layers": "my_counts"}],
     )
     @pytest.mark.parametrize("split_covariates", [[], ["cell_type"]])
     @pytest.mark.parametrize("control_data", [("drug1", "control")])

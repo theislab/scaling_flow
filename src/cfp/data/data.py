@@ -14,6 +14,8 @@ from tqdm import tqdm
 from cfp._constants import CONTROL_HELPER, UNS_KEY_CONDITIONS
 from cfp._types import ArrayLike
 
+from .utils import _to_list
+
 __all__ = ["PerturbationData"]
 
 
@@ -64,27 +66,39 @@ class PerturbationData:
     def _get_cell_data(
         adata: anndata.AnnData, cell_data: Literal["X"] | dict[str, str]
     ) -> jax.Array:
+        error_message = "`cell_data` should be either `X`, a key in `adata.obsm` or a dictionary of the form {`attr`: `key`}."
         if cell_data == "X":
             cell_data = adata.X
             if isinstance(cell_data, sp.csr_matrix):
-                cell_data = jnp.asarray(cell_data.toarray())
+                return jnp.asarray(cell_data.toarray())
             else:
-                cell_data = jnp.asarray(cell_data)
-        else:
-            assert isinstance(cell_data, dict)
-            assert "attr" in cell_data
-            assert "key" in cell_data
-            cell_data = jnp.asarray(getattr(adata, cell_data["attr"])[cell_data["key"]])
-        return cell_data
+                return jnp.asarray(cell_data)
+        if isinstance(cell_data, str):
+            if cell_data not in adata.obsm:
+                raise error_message
+            return jnp.asarray(adata.obsm[cell_data])
+        if not isinstance(cell_data, dict):
+            raise error_message
+        attr = list(cell_data.keys())[0]
+        key = list(cell_data.values())[0]
+        return jnp.asarray(getattr(adata, attr)[key])
 
     @staticmethod
     def _verify_control_data(adata: anndata.AnnData, data: tuple[str, Any]):
-        assert isinstance(data, tuple)
-        assert len(data) == 2
+        if not isinstance(data, tuple | list):
+            raise ValueError(f"Control data should be a tuple of length 2, got {data}.")
+        if len(data) != 2:
+            raise ValueError(f"Control data should be a tuple of length 2, got {data}.")
         if data[0] not in adata.obs:
             raise ValueError(f"Control column {data[0]} not found in adata.obs.")
-        assert data[0] in adata.obs
-        assert isinstance(adata.obs[data[0]].dtype, pd.CategoricalDtype)
+        assert data[0] in adata.obs, f"Control column {data[0]} not found in adata.obs."
+        if not isinstance(adata.obs[data[0]].dtype, pd.CategoricalDtype):
+            try:
+                adata.obs[data[0]] = adata.obs[data[0]].astype("category")
+            except ValueError:
+                raise ValueError(
+                    f"Control column {data[0]} could not be converted to categorical."
+                ) from None
         if data[1] not in adata.obs[data[0]].cat.categories:
             raise ValueError(f"Control value {data[1]} not found in {data[0]}.")
 
@@ -131,6 +145,7 @@ class PerturbationData:
                 embeddings_combinations.append(jnp.concatenate(obs_group_emb, axis=0))
 
         for uns_key, uns_group in uns_perturbation_covariates.items():
+            uns_group = _to_list(uns_group)
             uns_group_emb = []
             for obs_col in uns_group:
                 values = list(adata.obs[obs_col].unique())
@@ -164,30 +179,21 @@ class PerturbationData:
         cls,
         adata: anndata.AnnData,
         cell_data: Literal["X"] | dict[str, str],
-        control_data: tuple[str, Any],
+        control_data: Sequence[str, Any],
         split_covariates: Sequence[str],
         obs_perturbation_covariates: Sequence[tuple[str, ...]],
-        uns_perturbation_covariates: Sequence[dict[str, tuple[str, ...]]],
+        uns_perturbation_covariates: Sequence[dict[str, Sequence[str, ...] | str]],
     ) -> "PerturbationData":
         """Load cell data from an AnnData object.
 
         Args:
             adata: An :class:`~anndata.AnnData` object.
-            cell_data: Where to read the cell data from. If of type :class:`dict`, the key
-                "attr" should be present and the value should be an attribute of :class:`~anndata.AnnData`.
-                The key `key` should be present and the value should be the key in the respective attribute
-            control_data: Tuple of length 2 with first element defining the column in :class:`~anndata.AnnData`
-            and second element defining the value in `adata.obs[control_data[0]]` used to define all control cells.
-            split_covariates: Covariates in adata.obs to split all control cells into different control populations.
-            The perturbed cells are also split according to these columns, but if an embedding for these covariates
-            should be encoded in the model, the corresponding column should also be used in `obs_perturbation_covariates`
-            or `uns_perturbation_covariates`.
-            obs_perturbation_covariates: Tuples of covariates in adata.obs characterizing the perturbed cells (together
-            with `split_covariates` and `uns_perturbation_covariates`) and encoded by the values as found in `adata.obs`. If a tuple contains more than
+            cell_data: Where to read the cell data from. Either 'X', a key in adata.obsm or a dictionary of the form {attr: key}, where 'attr' is an attribute of the :class:`~anndata.AnnData` object and key is the 'key' in the corresponding key.
+            control_data: Tuple of length 2 with first element defining the column in :class:`~anndata.AnnData` and second element defining the value in `adata.obs[control_data[0]]` used to define all control cells.
+            split_covariates: Covariates in adata.obs to split all control cells into different control populations. The perturbed cells are also split according to these columns, but if an embedding for these covariates should be encoded in the model, the corresponding column should also be used in `obs_perturbation_covariates` or `uns_perturbation_covariates`.
+            obs_perturbation_covariates: Tuples of covariates in adata.obs characterizing the perturbed cells (together with `split_covariates` and `uns_perturbation_covariates`) and encoded by the values as found in `adata.obs`. If a tuple contains more than
             one element, this is interpreted as a combination of covariates that should be treated as an unordered set.
-            uns_perturbation_covariates: Dictionaries with keys in adata.uns[`UNS_KEY_CONDITION`] and values columns in adata.obs which characterize the perturbed cells (together
-                with `split_covariates` and `obs_perturbation_covariates`) and encoded by the values as found in `adata.uns[`UNS_KEY_CONDITION`][uns_perturbation_covariates.keys()]`.
-                If a value of the dictionary is a tuple with more than one element, this is interpreted as a combination of covariates that should be treated as an unordered set.
+            uns_perturbation_covariates: Dictionaries with keys in adata.uns[`UNS_KEY_CONDITION`] and values columns in adata.obs which characterize the perturbed cells (together with `split_covariates` and `obs_perturbation_covariates`) and encoded by the values as found in `adata.uns[`UNS_KEY_CONDITION`][uns_perturbation_covariates.keys()]`. If a value of the dictionary is a tuple with more than one element, this is interpreted as a combination of covariates that should be treated as an unordered set.
 
         Returns
         -------
@@ -231,7 +237,7 @@ class PerturbationData:
         tgt_dist_uns = {
             covariate: adata.obs[covariate].cat.categories
             for emb_covariates in uns_perturbation_covariates.values()  # type: ignore[attr-defined]
-            for covariate in emb_covariates
+            for covariate in _to_list(emb_covariates)
         }
         tgt_dist_obs.update(tgt_dist_uns)
         src_counter = 0
