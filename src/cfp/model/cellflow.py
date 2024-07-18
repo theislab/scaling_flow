@@ -30,7 +30,7 @@ class CellFlow:
         self.adata = adata
         self.solver = solver
         self.dataloader = None
-        self.model = None
+        self.trainer = None
         self._solver = None
 
     def prepare_data(
@@ -164,9 +164,9 @@ class CellFlow:
                 optimizer=optimizer,
                 rng=jax.random.PRNGKey(seed),
             )
-        # NOTE: The use of "model" is a bit confusing here, maybe we can harmonize the
-        # naming a bit better
-        self.model = CellFlowTrainer(model=self._solver)
+        self.trainer = CellFlowTrainer(
+            model=self._solver, match_fn=solver_utils.match_linear
+        )
 
     def train(
         self,
@@ -191,12 +191,12 @@ class CellFlow:
         if self.pdata is None:
             raise ValueError("Data not initialized. Please call prepare_data first.")
 
-        if self.model is None:
+        if self.trainer is None:
             raise ValueError("Model not initialized. Please call prepare_model first.")
 
         self.dataloader = CFSampler(data=self.pdata, batch_size=batch_size)
 
-        self.model.train(
+        self.trainer.train(
             dataloader=self.dataloader,
             num_iterations=num_iterations,
             valid_freq=valid_freq,
