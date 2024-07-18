@@ -85,6 +85,12 @@ class CellFlow:
         self,
         condition_encoder: Literal["transformer", "deepset"] = "transformer",
         condition_embedding_dim: int = 32,
+        time_encoder_dims: Sequence[int] = (1024, 1024, 1024),
+        time_encoder_dropout: float = 0.0,
+        hidden_dims: Sequence[int] = (1024, 1024, 1024),
+        hidden_dropout: float = 0.0,
+        decoder_dims: Sequence[int] = (1024, 1024, 1024),
+        decoder_dropout: float = 0.0,
         condition_encoder_kwargs: dict[str, Any] | None = None,
         velocity_field_kwargs: dict[str, Any] | None = None,
         solver_kwargs: dict[str, Any] | None = None,
@@ -108,6 +114,9 @@ class CellFlow:
             hidden_dims: Dimensions of the hidden layers.
             hidden_dropout: Dropout rate for the hidden layers.
             decoder_dims: Dimensions of the output layers.
+            condition_encoder_kwargs: Keyword arguments for the condition encoder.
+            velocity_field_kwargs: Keyword arguments for the velocity field.
+            solver_kwargs: Keyword arguments for the solver.
             decoder_dropout: Dropout rate for the output layers.
             flow: Flow to use for training. Shoudl be a dict with the form {"constant_noise": noise_val} or {"schroedinger_bridge": noise_val}.
             match_fn: Matching function.
@@ -135,6 +144,12 @@ class CellFlow:
             condition_embedding_dim=condition_embedding_dim,
             max_set_size=self.pdata.max_combination_length,
             condition_encoder_kwargs=condition_encoder_kwargs,
+            time_encoder_dims=time_encoder_dims,
+            time_encoder_dropout=time_encoder_dropout,
+            hidden_dims=hidden_dims,
+            hidden_dropout=hidden_dropout,
+            decoder_dims=decoder_dims,
+            decoder_dropout=decoder_dropout,
             **velocity_field_kwargs,
         )
 
