@@ -151,7 +151,7 @@ class CellFlow:
             self._solver = otfm.OTFlowMatching(
                 vf=vf,
                 match_fn=match_fn,
-                flow=dynamics.ConstantNoiseFlow(0.0),
+                flow=flow,
                 optimizer=optimizer,
                 rng=jax.random.PRNGKey(seed),
                 **solver_kwargs,
@@ -160,7 +160,7 @@ class CellFlow:
             self._solver = genot.GENOT(
                 vf=vf,
                 data_match_fn=match_fn,
-                flow=dynamics.ConstantNoiseFlow(0.0),
+                flow=flow,
                 source_dim=self._data_dim,
                 target_dim=self._data_dim,
                 optimizer=optimizer,
