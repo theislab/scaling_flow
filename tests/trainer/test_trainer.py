@@ -17,7 +17,7 @@ class TestTrainer:
         opt = optax.adam(1e-3)
         vf = cfp.networks.ConditionalVelocityField(
             output_dim=5,
-            condition_encoder="transformer",
+            max_combination_length=2,
             condition_dim=3,
             condition_embedding_dim=12,
             hidden_dims=(32, 32),
@@ -41,7 +41,7 @@ class TestTrainer:
         opt = optax.adam(1e-3)
         vf = cfp.networks.ConditionalVelocityField(
             output_dim=5,
-            condition_encoder="transformer",
+            max_combination_length=2,
             condition_embedding_dim=12,
             condition_dim=3,
             hidden_dims=(32, 32),

@@ -13,11 +13,10 @@ cond = jnp.ones((10, 2, 3))
 class TestVelocityField:
     @pytest.mark.parametrize("decoder_dims", [(32, 32), ()])
     @pytest.mark.parametrize("hidden_dims", [(32, 32), ()])
-    @pytest.mark.parametrize("condition_encoder", ["transformer", "deepset"])
-    def test_velocity_field_init(self, condition_encoder, hidden_dims, decoder_dims):
+    def test_velocity_field_init(self, hidden_dims, decoder_dims):
         vf = cfp.networks.ConditionalVelocityField(
-            condition_encoder=condition_encoder,
             output_dim=5,
+            max_combination_length=2,
             condition_dim=3,
             condition_embedding_dim=12,
             hidden_dims=hidden_dims,
@@ -34,8 +33,6 @@ class TestVelocityField:
         assert x_out.shape == (10, 5)
 
         cond_embed = vf.apply(
-            {"params": vf_state.params},
-            cond,
-            method="encode_conditions",
+            {"params": vf_state.params}, cond, method="get_condition_embedding"
         )
         assert cond_embed.shape == (10, 12)

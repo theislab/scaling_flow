@@ -1,3 +1,4 @@
+import warnings
 from collections.abc import Callable, Sequence
 from dataclasses import field as dc_field
 from typing import Any
@@ -10,7 +11,7 @@ from flax.training import train_state
 from ott.neural.networks.layers import time_encoder
 
 from cfp.networks.modules import MLPBlock
-from cfp.networks.set_encoders import SetEncoder
+from cfp.networks.set_encoders import ConditionEncoder
 
 __all__ = ["ConditionalVelocityField"]
 
@@ -40,10 +41,10 @@ class ConditionalVelocityField(nn.Module):
     """
 
     output_dim: int
+    max_combination_length: int
+    encode_conditions: bool = True
     condition_dim: int = 0
-    condition_encoder: Callable[[Any], jnp.ndarray] | None = None
     condition_embedding_dim: int = 32
-    max_set_size: int = 2
     condition_encoder_kwargs: dict[str, Any] = dc_field(default_factory=dict)
     act_fn: Callable[[jnp.ndarray], jnp.ndarray] = nn.silu
     time_freqs: int = 1024
@@ -56,11 +57,8 @@ class ConditionalVelocityField(nn.Module):
 
     def setup(self):
         """Initialize the network."""
-        if self.condition_encoder is not None:
-            self.set_encoder = SetEncoder(
-                set_encoder=self.condition_encoder,
-                max_set_size=self.max_set_size,
-                act_fn=self.act_fn,
+        if self.encode_conditions:
+            self.condition_encoder = ConditionEncoder(
                 output_dim=self.condition_embedding_dim,
                 **self.condition_encoder_kwargs,
             )
@@ -103,16 +101,16 @@ class ConditionalVelocityField(nn.Module):
         -------
             Output of the neural vector field of shape ``[batch, output_dim]``.
         """
-        if self.condition_encoder is not None:
-            condition = self.set_encoder(condition, training=train)
-        t = time_encoder.cyclical_time_encoder(t, n_freqs=self.time_freqs)
+        if self.encode_conditions:
+            condition = self.condition_encoder(condition, training=train)
+        t = time_encoder.cyclical_time_encoder(t, n_freqs=1024)
         t = self.time_encoder(t, training=train)
         x = self.x_encoder(x, training=train)
         concatenated = jnp.concatenate((t, x, condition), axis=-1)
         out = self.decoder(concatenated, training=train)
         return self.output_layer(out)
 
-    def encode_conditions(self, condition: jnp.ndarray) -> jnp.ndarray:
+    def get_condition_embedding(self, condition: jnp.ndarray) -> jnp.ndarray:
         """Get the embedding of the condition.
 
         Args:
@@ -122,7 +120,15 @@ class ConditionalVelocityField(nn.Module):
         -------
             Embedding of the condition.
         """
-        return self.set_encoder(condition, training=False)
+        if self.encode_conditions:
+            return self.condition_encoder(condition, training=False)
+
+        warnings.warn(
+            "Condition encoder is not defined. Returning the input as the embedding.",
+            UserWarning,
+            stacklevel=2,
+        )
+        return condition
 
     def create_train_state(
         self,
@@ -144,7 +150,7 @@ class ConditionalVelocityField(nn.Module):
         """
         condition_dim = condition_dim or self.condition_dim
         t, x = jnp.ones((1, 1)), jnp.ones((1, input_dim))
-        cond = jnp.ones((1, self.max_set_size, condition_dim))
+        cond = jnp.ones((1, self.max_combination_length, condition_dim))
         params = self.init(rng, t, x, cond, train=False)["params"]
         return train_state.TrainState.create(
             apply_fn=self.apply, params=params, tx=optimizer
