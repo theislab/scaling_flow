@@ -1,6 +1,6 @@
 import itertools
 from collections.abc import Sequence
-from typing import Literal, NamedTuple
+from typing import Literal, NamedTuple, Any, List, Tuple
 
 import anndata
 import jax
@@ -148,6 +148,6 @@ def load_from_adata(
 
 def _to_list(x: Any) -> List | Tuple:
     """Converts x to a list if it is not already a list or tuple."""
-    if isinstance(x, (list, tuple)):
+    if isinstance(x, (list | tuple)):
         return x
     return [x]
