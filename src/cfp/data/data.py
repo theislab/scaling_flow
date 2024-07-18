@@ -37,6 +37,8 @@ class PerturbationData:
         Dictionary explaining values in perturbation_covariates_mask.
     condition_data
         Dictionary with embeddings for conditions.
+    pert_embedding_idx_to_covariates
+        Dictionary explaining values in condition_data.
     control_to_perturbation
         Mapping from control index to target distribution indices.
     max_combination_length
@@ -57,6 +59,9 @@ class PerturbationData:
         int, tuple[str, ...]
     ]  # (n_targets,), dictionary explaining perturbation_covariates_mask
     condition_data: jax.Array | None  # (n_targets,) all embeddings for conditions
+    pert_embedding_idx_to_covariates: dict[
+        int, str
+    ]  # (n_targets,) dictionary explaining condition_data
     control_to_perturbation: dict[
         int, jax.Array
     ]  # mapping from control idx to target distribution idcs
@@ -119,6 +124,25 @@ class PerturbationData:
 
         raise ValueError("TODO. wrong data for embedding.")
 
+    @staticmethod
+    def _get_pert_emb_idx_to_covariate(
+        adata: anndata.AnnData,
+        obs_perturbation_covariates: Any,
+        uns_perturbation_covariates: Any,
+    ) -> dict[int, str]:
+        pert_emb_idx_to_covariate = {}
+        counter = 0
+        for obs_group in obs_perturbation_covariates:
+            for obs_col in obs_group:
+                pert_emb_idx_to_covariate[counter] = obs_col
+                counter += 1
+        if len(uns_perturbation_covariates):
+            for uns_group in uns_perturbation_covariates.values():
+                for obs_col in uns_group:
+                    pert_emb_idx_to_covariate[counter] = obs_col
+                    counter += 1
+        return pert_emb_idx_to_covariate
+
     @classmethod
     def _get_perturbation_covariates(
         cls,
@@ -127,9 +151,9 @@ class PerturbationData:
         obs_perturbation_covariates: Any,
         uns_perturbation_covariates: Any,
         max_combination_length: int,
-    ) -> jax.Array:
-        embeddings_no_combination = []
-        embeddings_combinations = []
+        pert_embedding_idx_to_covariates_reversed: dict[int, str],
+    ) -> dict[int, jax.Array]:
+        embeddings = {}
         for obs_group in obs_perturbation_covariates:
             obs_group_emb = []
             for obs_col in obs_group:
@@ -140,9 +164,13 @@ class PerturbationData:
                 arr = cls._check_shape(arr)
                 obs_group_emb.append(arr)
             if len(obs_group) == 1:
-                embeddings_no_combination.append(obs_group_emb[0])
+                embeddings[pert_embedding_idx_to_covariates_reversed[obs_group]] = (
+                    jnp.tile(obs_group_emb[0], (max_combination_length, 1))
+                )
             else:
-                embeddings_combinations.append(jnp.concatenate(obs_group_emb, axis=0))
+                embeddings[pert_embedding_idx_to_covariates_reversed[obs_group]] = (
+                    jnp.concatenate(obs_group_emb, axis=0)
+                )
 
         for uns_key, uns_group in uns_perturbation_covariates.items():
             uns_group = _to_list(uns_group)
@@ -158,21 +186,15 @@ class PerturbationData:
                 arr = cls._check_shape(arr)
                 uns_group_emb.append(arr)
             if len(uns_group) == 1:
-                embeddings_no_combination.append(uns_group_emb[0])
+                embeddings[pert_embedding_idx_to_covariates_reversed[obs_group]] = (
+                    jnp.tile(uns_group_emb[0], (max_combination_length, 1))
+                )
             else:
-                embeddings_combinations.append(jnp.concatenate(uns_group_emb, axis=0))
+                embeddings[pert_embedding_idx_to_covariates_reversed[obs_group]] = (
+                    jnp.concatenate(uns_group_emb, axis=0)
+                )
 
-        to_concat = []
-        if len(embeddings_no_combination) > 0:
-            conds_no_combination = jnp.tile(
-                jnp.concatenate(embeddings_no_combination, axis=-1),
-                (1, max_combination_length, 1),
-            )
-            to_concat.append(conds_no_combination)
-        if len(embeddings_combinations) > 0:
-            to_concat.append(jnp.array(embeddings_combinations))
-        conds = jnp.concatenate(to_concat, axis=-1)
-        return conds
+        return embeddings
 
     @classmethod
     def load_from_adata(
@@ -224,6 +246,13 @@ class PerturbationData:
         for covariate in split_covariates:
             assert covariate in adata.obs
             assert adata.obs[covariate].dtype.name == "category"
+
+        pert_embedding_idx_to_covariates = cls._get_pert_emb_idx_to_covariate(
+            adata, obs_perturbation_covariates, uns_perturbation_covariates
+        )
+        pert_embedding_idx_to_covariates_reversed = {
+            v: k for k, v in pert_embedding_idx_to_covariates.items()
+        }
 
         src_dist = {
             covariate: adata.obs[covariate].cat.categories
@@ -294,6 +323,7 @@ class PerturbationData:
                         obs_perturbation_covariates=obs_perturbation_covariates,
                         uns_perturbation_covariates=uns_perturbation_covariates,
                         max_combination_length=max_combination_length,
+                        pert_embedding_idx_to_covariates_reversed=pert_embedding_idx_to_covariates_reversed,
                     )
                     condition_data.append(embedding)
                 tgt_counter += 1
@@ -312,6 +342,7 @@ class PerturbationData:
             condition_data=(
                 None if condition_data is None else jnp.asarray(condition_data)
             ),
+            pert_embedding_idx_to_covariates=pert_embedding_idx_to_covariates,
             control_to_perturbation=control_to_perturbation,
             max_combination_length=max_combination_length,
         )
@@ -325,6 +356,11 @@ class PerturbationData:
     def n_perturbations(self) -> int:
         """Returns the number of perturbation covariate combinations."""
         return len(self.perturbation_idx_to_covariates)
+
+    @property
+    def n_perturbation_covariates(self) -> int:
+        """Returns the number of perturbation covariates."""
+        return len(self.pert_embedding_idx_to_covariates)
 
     def _format_params(self, fmt: Callable[[Any], str]) -> str:
         params = {
