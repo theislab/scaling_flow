@@ -30,6 +30,10 @@ class CFSampler:
             )
             for i in range(self.n_source_dists)
         ]
+        self.get_embeddings = lambda idx: {
+            i: jnp.tile(self.data.condition_data[i][idx], (self.batch_size, 1, 1))
+            for i in range(self.data.n_perturbation_covariates)
+        }
 
         @jax.jit
         def _sample(rng: jax.Array) -> Any:
@@ -64,17 +68,7 @@ class CFSampler:
             if self.data.condition_data is None:
                 return {"src_lin": source_batch, "tgt_lin": target_batch}
 
-            def body_fn(i, target_dist_idx):
-                return {
-                    i: jnp.tile(
-                        self.data.condition_data[target_dist_idx][i],
-                        (self.batch_size, 1, 1),
-                    )
-                }
-
-            condition_batch = jax.lax.fori_loop(
-                0, self.data.n_perturbation_covariates, body_fn, target_dist_idx
-            )
+            condition_batch = self.get_embeddings(target_dist_idx)
             return {
                 "src_lin": source_batch,
                 "tgt_lin": target_batch,

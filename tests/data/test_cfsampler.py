@@ -21,5 +21,5 @@ class TestCFSampler:
         assert sample_2["src_lin"].shape[0] == batch_size
         assert sample_1["tgt_lin"].shape[0] == batch_size
         assert sample_2["tgt_lin"].shape[0] == batch_size
-        assert sample_1["src_condition"][0][0].shape[0] == batch_size
-        assert sample_2["src_condition"][0][0].shape[0] == batch_size
+        assert sample_1["src_condition"][0].shape[0] == batch_size
+        assert sample_2["src_condition"][0].shape[0] == batch_size
