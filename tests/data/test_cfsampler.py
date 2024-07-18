@@ -17,6 +17,9 @@ class TestCFSampler:
         assert "src_lin" in sample_1
         assert "tgt_lin" in sample_1
         assert "src_condition" in sample_1
-        for k, v in sample_1.items():
-            assert v.shape[0] == batch_size
-            assert v.shape[1:] == sample_2[k].shape[1:]
+        assert sample_1["src_lin"].shape[0] == batch_size
+        assert sample_2["src_lin"].shape[0] == batch_size
+        assert sample_1["tgt_lin"].shape[0] == batch_size
+        assert sample_2["tgt_lin"].shape[0] == batch_size
+        assert sample_1["src_condition"][0][0].shape[0] == batch_size
+        assert sample_2["src_condition"][0][0].shape[0] == batch_size

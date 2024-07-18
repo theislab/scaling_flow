@@ -1,6 +1,6 @@
 import itertools
 from collections.abc import Sequence
-from typing import Literal, NamedTuple
+from typing import Any, Literal, NamedTuple
 
 import anndata
 import jax
@@ -146,7 +146,7 @@ def load_from_adata(
     return PerturbationData(src_data, tgt_data, d_idx_to_src, d_idx_to_tgt)
 
 
-def _to_list(x: Any) -> List | Tuple:
+def _to_list(x: Any) -> list | tuple:
     """Converts x to a list if it is not already a list or tuple."""
     if isinstance(x, (list, tuple)):
         return x

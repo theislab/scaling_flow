@@ -64,10 +64,17 @@ class CFSampler:
             if self.data.condition_data is None:
                 return {"src_lin": source_batch, "tgt_lin": target_batch}
 
-            condition_batch = jnp.tile(
-                self.data.condition_data[target_dist_idx], (self.batch_size, 1, 1)
-            )
+            def body_fn(i, target_dist_idx):
+                return {
+                    i: jnp.tile(
+                        self.data.condition_data[target_dist_idx][i],
+                        (self.batch_size, 1, 1),
+                    )
+                }
 
+            condition_batch = jax.lax.fori_loop(
+                0, self.data.n_perturbation_covariates, body_fn, target_dist_idx
+            )
             return {
                 "src_lin": source_batch,
                 "tgt_lin": target_batch,

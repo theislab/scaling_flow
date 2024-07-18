@@ -86,7 +86,7 @@ def pdata(adata_perturbation: ad.AnnData) -> PerturbationData:
     cell_data = "X"
     split_covariates = ["cell_type"]
     control_data = ("drug1", "control")
-    obs_perturbation_covariates = [["dosage"]]
+    obs_perturbation_covariates = [("dosage",)]
     uns_perturbation_covariates = {"drug": ("drug1", "drug2")}
 
     pdata = PerturbationData.load_from_adata(

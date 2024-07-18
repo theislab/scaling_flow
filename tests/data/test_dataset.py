@@ -10,7 +10,7 @@ class TestPerturbationData:
     )
     @pytest.mark.parametrize("split_covariates", [[], ["cell_type"]])
     @pytest.mark.parametrize("control_data", [("drug1", "control")])
-    @pytest.mark.parametrize("obs_perturbation_covariates", [[], [["dosage"]]])
+    @pytest.mark.parametrize("obs_perturbation_covariates", [[], [("dosage",)]])
     @pytest.mark.parametrize("uns_perturbation_covariates", [{}, {"drug": ("drug1",)}])
     def test_load_from_adata_no_combinations(
         self,
@@ -43,7 +43,8 @@ class TestPerturbationData:
             assert pdata.condition_data is None
             assert pdata.max_combination_length == 0
         else:
-            assert isinstance(pdata.condition_data, jax.Array)
+            assert isinstance(pdata.condition_data, dict)
+            assert isinstance(pdata.condition_data[0], jax.Array)
             assert pdata.max_combination_length == 1
 
         if (
@@ -70,7 +71,7 @@ class TestPerturbationData:
 
     @pytest.mark.parametrize("split_covariates", [[], ["cell_type"]])
     @pytest.mark.parametrize("control_data", [("drug1", "control")])
-    @pytest.mark.parametrize("obs_perturbation_covariates", [[], [["dosage"]]])
+    @pytest.mark.parametrize("obs_perturbation_covariates", [[], [("dosage",)]])
     @pytest.mark.parametrize(
         "uns_perturbation_covariates", [{"drug": ("drug1", "drug2")}]
     )
@@ -104,7 +105,9 @@ class TestPerturbationData:
             assert pdata.condition_data is None
             assert pdata.max_combination_length == 0
         else:
-            assert isinstance(pdata.condition_data, jax.Array)
+            assert isinstance(pdata.condition_data, dict)
+            assert isinstance(pdata.condition_data[0], jax.Array)
+
             assert pdata.max_combination_length == 2
 
         if (

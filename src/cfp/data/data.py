@@ -107,6 +107,53 @@ class PerturbationData:
         if data[1] not in adata.obs[data[0]].cat.categories:
             raise ValueError(f"Control value {data[1]} not found in {data[0]}.")
 
+    @classmethod
+    def _verify_obs_perturbation_covariates(
+        cls, adata: anndata.AnnData, data: Any
+    ) -> None:
+        if not isinstance(data, Sequence):
+            raise ValueError(
+                f"Data should be a sequence, found {data} to be of type {type(data)}."
+            )
+        for group in data:
+            if not isinstance(group, tuple):
+                raise ValueError(
+                    f"Group should be a tuple, found {group} to be of type {type(group)}."
+                )
+            cls._verify_covariate_data(adata, group)
+
+    @classmethod
+    def _verify_uns_perturbation_covariates(
+        cls, adata: anndata.AnnData, data: Any
+    ) -> None:
+        if not isinstance(data, dict):
+            raise ValueError(
+                f"Data should be a dictionary, found {data} to be of type {type(data)}."
+            )
+        for key, group in data.items():
+            if not isinstance(key, str):
+                raise ValueError(
+                    f"Key should be a string, found {group} to be of type {type(group)}."
+                )
+            if not isinstance(group, tuple):
+                raise ValueError(
+                    f"Group should be a tuple, found {group} to be of type {type(group)}."
+                )
+            cls._verify_covariate_data(adata, group)
+
+    @staticmethod
+    def _verify_covariate_data(adata: anndata.AnnData, group: Any) -> None:
+        for covariate in group:
+            if covariate not in adata.obs:
+                raise ValueError(f"Covariate {covariate} not found in adata.obs.")
+            if not isinstance(adata.obs[covariate].dtype, pd.CategoricalDtype):
+                try:
+                    adata.obs[covariate] = adata.obs[covariate].astype("category")
+                except ValueError:
+                    raise ValueError(
+                        f"Covariate {covariate} could not be converted to categorical."
+                    ) from None
+
     @staticmethod
     def _check_shape(arr: float | ArrayLike) -> ArrayLike:
         if not hasattr(arr, "shape") or len(arr.shape) == 0:
@@ -126,21 +173,19 @@ class PerturbationData:
 
     @staticmethod
     def _get_pert_emb_idx_to_covariate(
-        adata: anndata.AnnData,
         obs_perturbation_covariates: Any,
         uns_perturbation_covariates: Any,
     ) -> dict[int, str]:
         pert_emb_idx_to_covariate = {}
         counter = 0
-        for obs_group in obs_perturbation_covariates:
-            for obs_col in obs_group:
-                pert_emb_idx_to_covariate[counter] = obs_col
+        if len(obs_perturbation_covariates):
+            for obs_group in obs_perturbation_covariates:
+                pert_emb_idx_to_covariate[counter] = obs_group
                 counter += 1
         if len(uns_perturbation_covariates):
-            for uns_group in uns_perturbation_covariates.values():
-                for obs_col in uns_group:
-                    pert_emb_idx_to_covariate[counter] = obs_col
-                    counter += 1
+            for uns_group in uns_perturbation_covariates:
+                pert_emb_idx_to_covariate[counter] = uns_group
+                counter += 1
         return pert_emb_idx_to_covariate
 
     @classmethod
@@ -186,11 +231,11 @@ class PerturbationData:
                 arr = cls._check_shape(arr)
                 uns_group_emb.append(arr)
             if len(uns_group) == 1:
-                embeddings[pert_embedding_idx_to_covariates_reversed[obs_group]] = (
+                embeddings[pert_embedding_idx_to_covariates_reversed[uns_key]] = (
                     jnp.tile(uns_group_emb[0], (max_combination_length, 1))
                 )
             else:
-                embeddings[pert_embedding_idx_to_covariates_reversed[obs_group]] = (
+                embeddings[pert_embedding_idx_to_covariates_reversed[uns_key]] = (
                     jnp.concatenate(uns_group_emb, axis=0)
                 )
 
@@ -204,7 +249,7 @@ class PerturbationData:
         control_data: Sequence[str, Any],
         split_covariates: Sequence[str],
         obs_perturbation_covariates: Sequence[tuple[str, ...]],
-        uns_perturbation_covariates: Sequence[dict[str, Sequence[str, ...] | str]],
+        uns_perturbation_covariates: Sequence[dict[str, tuple[str, ...] | str]],
     ) -> "PerturbationData":
         """Load cell data from an AnnData object.
 
@@ -227,6 +272,8 @@ class PerturbationData:
             adata.obs[CONTROL_HELPER] = adata.obs[CONTROL_HELPER].astype("category")
             split_covariates = [CONTROL_HELPER]
         cls._verify_control_data(adata, control_data)
+        cls._verify_obs_perturbation_covariates(adata, obs_perturbation_covariates)
+        cls._verify_uns_perturbation_covariates(adata, uns_perturbation_covariates)
 
         obs_combination_length = (
             max(len(comb) for comb in obs_perturbation_covariates)
@@ -244,11 +291,12 @@ class PerturbationData:
             adata.uns[UNS_KEY_CONDITIONS] = {}
 
         for covariate in split_covariates:
-            assert covariate in adata.obs
+            if covariate not in adata.obs:
+                raise ValueError(f"Split covariate {covariate} not found in adata.obs.")
             assert adata.obs[covariate].dtype.name == "category"
 
         pert_embedding_idx_to_covariates = cls._get_pert_emb_idx_to_covariate(
-            adata, obs_perturbation_covariates, uns_perturbation_covariates
+            obs_perturbation_covariates, uns_perturbation_covariates
         )
         pert_embedding_idx_to_covariates_reversed = {
             v: k for k, v in pert_embedding_idx_to_covariates.items()
@@ -279,13 +327,13 @@ class PerturbationData:
         split_covariates_to_idx = {}
         perturbation_covariates_mask = np.full((adata.n_obs,), -1, dtype=jnp.int32)
         perturbation_covariates_to_idx = {}
-        condition_data: list[ArrayLike] | None = (
+        condition_data: dict[int, list] | None = (
             None
             if (
                 len(obs_perturbation_covariates) == 0
                 and len(uns_perturbation_covariates) == 0
             )
-            else []
+            else {i: [] for i in range(len(pert_embedding_idx_to_covariates))}
         )
 
         control_mask = (adata.obs[control_data[0]] == control_data[1]) == 1
@@ -325,13 +373,15 @@ class PerturbationData:
                         max_combination_length=max_combination_length,
                         pert_embedding_idx_to_covariates_reversed=pert_embedding_idx_to_covariates_reversed,
                     )
-                    condition_data.append(embedding)
+                    for pert_cov, emb in embedding.items():
+                        condition_data[pert_cov].append(emb)
                 tgt_counter += 1
             control_to_perturbation[src_counter] = np.array(conditional_distributions)
             src_counter += 1
-        condition_data = (
-            jnp.array(condition_data) if condition_data is not None else None
-        )
+
+        if condition_data is not None:
+            for pert_cov, emb in condition_data.items():
+                condition_data[pert_cov] = jnp.array(emb)
 
         return cls(
             cell_data=cell_data,
@@ -339,9 +389,7 @@ class PerturbationData:
             split_idx_to_covariates=split_covariates_to_idx,
             perturbation_covariates_mask=jnp.asarray(perturbation_covariates_mask),
             perturbation_idx_to_covariates=perturbation_covariates_to_idx,
-            condition_data=(
-                None if condition_data is None else jnp.asarray(condition_data)
-            ),
+            condition_data=condition_data,
             pert_embedding_idx_to_covariates=pert_embedding_idx_to_covariates,
             control_to_perturbation=control_to_perturbation,
             max_combination_length=max_combination_length,
