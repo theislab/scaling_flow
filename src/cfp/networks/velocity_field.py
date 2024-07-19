@@ -10,6 +10,7 @@ from flax import linen as nn
 from flax.training import train_state
 from ott.neural.networks.layers import time_encoder
 
+from cfp import logger
 from cfp.networks.modules import MLPBlock
 from cfp.networks.set_encoders import ConditionEncoder
 
@@ -86,7 +87,7 @@ class ConditionalVelocityField(nn.Module):
         self,
         t: jnp.ndarray,
         x: jnp.ndarray,
-        condition: jnp.ndarray,
+        condition: dict[str, jnp.ndarray],
         train: bool = True,
     ) -> jnp.ndarray:
         """Forward pass through the neural vector field.
@@ -94,7 +95,7 @@ class ConditionalVelocityField(nn.Module):
         Args:
             t: Time of shape ``[batch, 1]``.
             x: Data of shape ``[batch, ...]``.
-            condition: Conditioning vector of shape ``[batch, ...]``.
+            condition: Condition dictionary, with condition names as keys and condition representations of shape ``[batch, max_combination_length, condition_dim]`` as values.
             train: If `True`, enables dropout for training.
 
         Returns
@@ -103,6 +104,8 @@ class ConditionalVelocityField(nn.Module):
         """
         if self.encode_conditions:
             condition = self.condition_encoder(condition, training=train)
+        else:
+            condition = jnp.concatenate(list(condition.values()), axis=-1)
         t = time_encoder.cyclical_time_encoder(t, n_freqs=1024)
         t = self.time_encoder(t, training=train)
         x = self.x_encoder(x, training=train)
@@ -110,7 +113,7 @@ class ConditionalVelocityField(nn.Module):
         out = self.decoder(concatenated, training=train)
         return self.output_layer(out)
 
-    def get_condition_embedding(self, condition: jnp.ndarray) -> jnp.ndarray:
+    def get_condition_embedding(self, condition: dict[str, jnp.ndarray]) -> jnp.ndarray:
         """Get the embedding of the condition.
 
         Args:
@@ -121,13 +124,12 @@ class ConditionalVelocityField(nn.Module):
             Embedding of the condition.
         """
         if self.encode_conditions:
-            return self.condition_encoder(condition, training=False)
-
-        warnings.warn(
-            "Condition encoder is not defined. Returning the input as the embedding.",
-            UserWarning,
-            stacklevel=2,
-        )
+            condition = self.condition_encoder(condition, training=False)
+        else:
+            condition = jnp.concatenate(list(condition.values()), axis=-1)
+            logger.warning(
+                "Condition encoder is not defined. Returning concatenated input as the embedding."
+            )
         return condition
 
     def create_train_state(

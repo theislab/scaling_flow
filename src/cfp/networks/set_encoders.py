@@ -1,3 +1,4 @@
+import abc
 from collections.abc import Callable, Sequence
 from dataclasses import field
 from typing import Any, Literal
@@ -18,7 +19,16 @@ __all__ = [
 ]
 
 
-class MLPBlock(nn.Module):
+class BaseModule(abc.ABC, nn.Module):
+    """Base module for condition encoder and its components."""
+
+    @abc.abstractmethod
+    def __call__(self, x: jnp.ndarray, training: bool = True) -> jnp.ndarray:
+        """Forward pass."""
+        pass
+
+
+class MLPBlock(BaseModule):
     """
     MLP block.
 
@@ -65,39 +75,8 @@ class MLPBlock(nn.Module):
         z = nn.Dropout(self.dropout_rate)(z, deterministic=not training)
         return z
 
-    def create_train_state(
-        self,
-        rng: jax.Array,
-        optimizer: optax.OptState,
-        input_dim: int | tuple[int, ...],
-        **kwargs: Any,
-    ):
-        """
-        Create initial training state.
 
-        Parameters
-        ----------
-        rng : jax.Array
-            Random key.
-        optimizer : optax.OptState
-            Optimizer state.
-        input_dim : int
-            Dimensionality of the input.
-
-        Returns
-        -------
-            Initial training state.
-        """
-        params = self.init(rng, x=jnp.empty(input_dim), training=False)["params"]
-        return train_state.TrainState.create(
-            apply_fn=self.apply,
-            params=params,
-            tx=optimizer,
-            **kwargs,
-        )
-
-
-class SelfAttention(nn.Module):
+class SelfAttention(BaseModule):
     """
     Self-attention optionally followed by FC layer with residual connection, making it a transformer block.
 
@@ -167,7 +146,7 @@ class SelfAttention(nn.Module):
         return z
 
 
-class SeedAttentionPooling(nn.Module):
+class SeedAttentionPooling(BaseModule):
     """
     Pooling by multi-head attention with a trainable seed.
 
@@ -257,7 +236,7 @@ class SeedAttentionPooling(nn.Module):
         return O.squeeze(1)
 
 
-class TokenAttentionPooling(nn.Module):
+class TokenAttentionPooling(BaseModule):
     """
     Multi-head attention which aggregates sets by learning a token.
 
@@ -325,7 +304,7 @@ class TokenAttentionPooling(nn.Module):
         return z
 
 
-class ConditionEncoder(nn.Module):
+class ConditionEncoder(BaseModule):
     """
     Encoder for conditions represented as sets of perturbations.
 
@@ -365,12 +344,9 @@ class ConditionEncoder(nn.Module):
         self.separate_inputs = isinstance(self.layers_before_pool, dict)
         if self.separate_inputs:
             # different layers for different inputs
-            self.before_pool_modules = []
-            inputs = sorted(self.layers_before_pool.keys())
-            for i in inputs:
-                self.before_pool_modules.extend(
-                    self._get_layers(self.layers_before_pool[i])
-                )
+            self.before_pool_modules = {}
+            for cond_key, layers in self.layers_before_pool.items():
+                self.before_pool_modules[cond_key] = self._get_layers(layers)
         else:
             self.before_pool_modules = self._get_layers(self.layers_before_pool)
 
@@ -389,7 +365,7 @@ class ConditionEncoder(nn.Module):
 
     def __call__(
         self,
-        conditions: jnp.ndarray | tuple[jnp.ndarray, ...],
+        conditions: dict[str, jnp.ndarray],
         training: bool = True,
     ) -> jnp.ndarray:
         """
@@ -397,28 +373,34 @@ class ConditionEncoder(nn.Module):
 
         Parameters
         ----------
-        x : jnp.ndarray
-            Input tensor of shape (batch_size, set_size, input_dim).
+        conditions : dict[str, jnp.ndarray]
+            Dictionary of batch of conditions of shape ``(batch_size, set_size, condition_dim)``.
         training : bool
             Whether the model is in training mode.
+
+        Returns
+        -------
+        Encoded conditions of shape ``(batch_size, output_dim)``.
         """
         mask, attention_mask = self._get_masks(conditions)
 
         # apply modules before pooling
-        if self.separate_inputs and isinstance(conditions, tuple):
+        if self.separate_inputs:
             processed_inputs = []
-            for i, conditions_i in enumerate(conditions):
+            for cond_key, conditions_i in conditions.items():
                 conditions_i = self._apply_modules(
-                    self.before_pool_modules[i], conditions_i, attention_mask, training
+                    self.before_pool_modules[cond_key],
+                    conditions_i,
+                    attention_mask,
+                    training,
                 )
                 processed_inputs.append(conditions_i)
             conditions = jnp.concatenate(processed_inputs, axis=-1)
-        elif not self.separate_inputs:
+        else:
+            conditions = jnp.concatenate(list(conditions.values()), axis=-1)
             conditions = self._apply_modules(
                 self.before_pool_modules, conditions, attention_mask, training
             )
-        else:
-            raise ValueError("Separate inputs were expected but not provided.")
 
         # pooling
         pool_mask = mask if self.pooling == "mean" else attention_mask
