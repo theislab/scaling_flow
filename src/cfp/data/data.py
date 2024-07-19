@@ -14,7 +14,7 @@ from tqdm import tqdm
 from cfp._constants import CONTROL_HELPER, UNS_KEY_CONDITIONS
 from cfp._types import ArrayLike
 
-__all__ = ["PerturbationData"]
+__all__ = ["PerturbationData", "ValidationData"]
 
 
 @dataclass
@@ -329,3 +329,10 @@ class PerturbationData:
 
     def __repr__(self) -> str:
         return f"{self.__class__.__name__}[{self._format_params(repr)}]"
+
+
+@dataclass
+class ValidationData:
+    """Data for validation."""
+
+    pass

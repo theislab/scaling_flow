@@ -1,12 +1,11 @@
 import abc
 from typing import Any, Literal
 
-import jax
 import jax.tree_util as jtu
 import numpy as np
 
 from cfp._constants import ArrayLike
-from cfp.data.data import PerturbationData
+from cfp.data.data import ValidationData
 from cfp.metrics.metrics import compute_e_distance, compute_r_squared, compute_scalar_mmd, compute_sinkhorn_div
 from cfp.networks import ConditionalVelocityField
 
@@ -26,6 +25,35 @@ class CFCallback(abc.ABC):
         pass
 
 
+class LoggingCallback(CFCallback, abc.ABC):
+    @abc.abstractmethod
+    def on_log_iteration(self, dict_to_log: dict[str, Any], **kwargs: Any) -> Any:
+        pass
+
+    @abc.abstractmethod
+    def on_train_end(self, dict_to_log: dict[str, Any], **kwargs: Any) -> Any:
+        pass
+
+
+class ComputationCallback(CFCallback, abc.ABC):
+    @abc.abstractmethod
+    def on_log_iteration(
+        self,
+        validation_data: dict[str, ValidationData],
+        predicted_data: dict[str, dict[str, ArrayLike]],
+        **kwargs: Any,
+    ) -> Any:
+        pass
+
+    def on_train_end(
+        self,
+        validation_data: dict[str, ValidationData],
+        predicted_data: dict[str, dict[str, ArrayLike]],
+        **kwargs: Any,
+    ) -> Any:
+        pass
+
+
 metric_to_func = {
     "r_squared": compute_r_squared,
     "MMD": compute_scalar_mmd,
@@ -34,13 +62,14 @@ metric_to_func = {
 }
 
 
-class ComputeMetrics(CFCallback):
+class ComputeMetrics(ComputationCallback):
     def __init__(
         self,
         metrics: list[Literal["r_squared", "MMD", "sinkhorn_div", "e_distance"]],
-        metric_aggregation: Literal["mean", "median", "id"] = "mean",
+        metric_aggregations: list[Literal["mean", "median", "id"]] = ["mean"],
     ):
         self.metrics = metrics
+        self.metric_aggregations = metric_aggregations
         for metric in metrics:
             if metric not in metric_to_func:
                 raise ValueError(
@@ -52,35 +81,29 @@ class ComputeMetrics(CFCallback):
 
     def on_log_iteration(
         self,
-        train_data_true: dict[str, Any],
-        test_data_true: dict[str, Any],
-        ood_data_true: dict[str, Any],
-        train_data_pred: dict[str, jax.Array],
-        test_data_pred: dict[str, Any],
-        ood_data_pred: dict[str, Any],
+        validation_data: dict[str, ValidationData],
+        predicted_data: dict[str, dict[str, ArrayLike]],
         **_: Any,
     ) -> dict[str, float]:
-        train_metrics = {}
+        metrics = {}
         for metric in self.metrics:
-            train_metrics[metric] = jtu.tree_map(
-                metric_to_func[metric], train_data_true, train_data_pred
-            )
-        test_metrics = {}
-        for metric in self.metrics:
-            test_metrics[metric] = jtu.tree_map(
-                metric_to_func[metric], test_data_true, test_data_pred
-            )
-        ood_metrics = {}
-        for metric in self.metrics:
-            ood_metrics[metric] = jtu.tree_map(
-                metric_to_func[metric], ood_data_true, ood_data_pred
-            )
+            for k in validation_data.keys():
+                metrics[f"{k}_{metric}"] = jtu.tree_map(
+                    metric_to_func[metric], validation_data[k], predicted_data[k]
+                )
+        # TODO: implement metric aggregation
+        return metrics
 
-    def on_train_end(self, *args: Any, **kwargs: Any) -> Any:
-        self.compute_metrics()
+    def on_train_end(
+        self,
+        validation_data: dict[str, ValidationData],
+        predicted_data: dict[str, dict[str, ArrayLike]],
+        **_: Any,
+    ) -> dict[str, float]:
+        return self.on_log_iteration(validation_data, predicted_data)
 
 
-class LoggingWandb(CFCallback):
+class LoggingWandb(LoggingCallback):
     try:
         import wandb
     except ImportError:
@@ -125,27 +148,29 @@ class LoggingWandb(CFCallback):
 class CallbackExecuter:
     def __init__(
         self,
-        computation_callbacks: list[CFCallback],
-        logging_callbacks: list[CFCallback],
-        pdata_train: PerturbationData | None,
-        pdata_test: PerturbationData | None,
-        pdata_ood: PerturbationData | None,
+        computation_callbacks: list[ComputationCallback],
+        logging_callbacks: list[LoggingCallback],
+        data: dict[str, ValidationData],
         n_conditions_train: int = 0,
         n_conditions_test: int = -1,
         n_conditions_ood: int = -1,
         seed: int = 0,
     ) -> None:
-        for callback in computation_callbacks.append(logging_callbacks):
-            if not isinstance(callback, CFCallback):
+        for callback in computation_callbacks:
+            if not isinstance(callback, ComputationCallback):
                 raise ValueError(
-                    f"Callback {callback} is not an instance of CFCallback"
+                    f"Callback {callback} is not a subclass of `ComputationCallback`"
+                )
+
+        for callback in logging_callbacks:
+            if not isinstance(callback, LoggingCallback):
+                raise ValueError(
+                    f"Callback {callback} is not a subclass of `LoggingCallback`"
                 )
 
         self.computation_callbacks = self.computation_callbacks
         self.logging_callbacks = self.logging_callbacks
-        self.pdata_train = pdata_train
-        self.pdata_test = pdata_test
-        self.pdata_ood = pdata_ood
+        self.validation_data = data
         self.n_conditions_train = n_conditions_train
         self.n_conditions_test = n_conditions_test
         self.n_conditions_ood = n_conditions_ood
