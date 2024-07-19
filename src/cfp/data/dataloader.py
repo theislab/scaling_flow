@@ -30,6 +30,10 @@ class CFSampler:
             )
             for i in range(self.n_source_dists)
         ]
+        self.get_embeddings = lambda idx: {
+            pert_cov: jnp.tile(arr[idx], (self.batch_size, 1, 1))
+            for pert_cov, arr in self.data.condition_data.items()
+        }
 
         @jax.jit
         def _sample(rng: jax.Array) -> Any:
@@ -64,13 +68,10 @@ class CFSampler:
             if self.data.condition_data is None:
                 return {"src_lin": source_batch, "tgt_lin": target_batch}
 
-            condition_batch = jnp.tile(
-                self.data.condition_data[target_dist_idx], (self.batch_size, 1, 1)
-            )
-
+            condition_batch = self.get_embeddings(target_dist_idx)
             return {
-                "src_lin": source_batch,
-                "tgt_lin": target_batch,
+                "src_cell_data": source_batch,
+                "tgt_cell_data": target_batch,
                 "src_condition": condition_batch,
             }
 

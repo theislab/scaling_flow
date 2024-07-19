@@ -34,6 +34,7 @@ class CellFlow:
         self.dataloader = None
         self.trainer = None
         self._solver = None
+        self._condition_dim: int | None = None
 
     def prepare_data(
         self,
@@ -78,7 +79,6 @@ class CellFlow:
             uns_perturbation_covariates=uns_perturbation_covariates,
         )
 
-        self._condition_dim = self.pdata.condition_data.shape[-1]
         self._data_dim = self.pdata.cell_data.shape[-1]
 
     def prepare_model(
@@ -133,6 +133,7 @@ class CellFlow:
             )
 
         condition_encoder_kwargs = condition_encoder_kwargs or {}
+        self._condition_dim = condition_embedding_dim
         velocity_field_kwargs = velocity_field_kwargs or {}
         solver_kwargs = solver_kwargs or {}
         flow = flow or {"constant_noise": 0.0}
@@ -153,7 +154,7 @@ class CellFlow:
             **velocity_field_kwargs,
         )
 
-        flow, noise = list(flow.items())[0]
+        flow, noise = next(iter(flow.items()))
         if flow == "constant_noise":
             flow = dynamics.ConstantNoiseFlow(noise)
         elif flow == "bridge":

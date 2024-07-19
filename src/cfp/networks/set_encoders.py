@@ -431,11 +431,12 @@ class SetTransformer(nn.Module):
 
     def __call__(
         self,
-        x: jnp.ndarray,
+        x: dict[int, jnp.ndarray],
         cond_sizes: jnp.ndarray | None = None,
         training: bool | None = None,
     ) -> jnp.ndarray:
         """Call the module."""
+        raise NotImplementedError("TODO: Here we need the adaptation to x being dicts")
         training = nn.merge_param("training", self.training, training)
         squeeze = x.ndim == 2
         if squeeze:
