@@ -69,7 +69,11 @@ class CellFlowTrainer:
                 tmat = match_fn(src, tgt)
                 src_ixs, tgt_ixs = solver_utils.sample_joint(rng_resample, tmat)
                 src, tgt = src[src_ixs], tgt[tgt_ixs]
-                src_cond = None if src_cond is None else src_cond[src_ixs]
+                src_cond = (
+                    None
+                    if src_cond is None
+                    else {k: cond[src_ixs] for k, cond in src_cond.items()}
+                )
 
             self.model.vf_state, loss = self.model.step_fn(
                 rng_step_fn,
