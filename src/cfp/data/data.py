@@ -11,7 +11,7 @@ import pandas as pd
 import scipy.sparse as sp
 from tqdm import tqdm
 
-from cfp._constants import CONTROL_HELPER, UNS_KEY_CONDITIONS
+from cfp._constants import CONTROL_HELPER
 from cfp._types import ArrayLike
 
 from .utils import _to_list
@@ -204,7 +204,9 @@ class PerturbationData:
             for obs_col in obs_group:
                 values = list(adata.obs[obs_col].unique())
                 if len(values) != 1:
-                    raise ValueError("Too many categories within distribution found")
+                    raise ValueError(
+                        f"Expected to find exactly one category within distribution, found {len(values)}."
+                    )
                 arr = jnp.asarray(adata.obs[obs_col].values[0])
                 arr = cls._check_shape(arr)
                 obs_group_emb.append(arr)
@@ -224,9 +226,16 @@ class PerturbationData:
                 values = list(adata.obs[obs_col].unique())
                 if len(values) != 1:
                     raise ValueError("Too many categories within distribution found")
-                assert uns_key in embedding_dict
-                assert isinstance(adata.uns[UNS_KEY_CONDITIONS][uns_key], dict)
-                assert values[0] in embedding_dict[uns_key]
+                if uns_key not in embedding_dict:
+                    raise ValueError(f"Key {uns_key} not found in `adata.uns`.")
+                if not isinstance(adata.uns[uns_key], dict):
+                    raise ValueError(
+                        f"Value of key {uns_key} in `adata.uns` should be of type `dict`, found {type(adata.uns[uns_key])}."
+                    )
+                if values[0] not in embedding_dict[uns_key]:
+                    raise ValueError(
+                        f"Value {values[0]} not found in `adata.uns[{uns_key}]`."
+                    )
                 arr = jnp.asarray(embedding_dict[uns_key][values[0]])
                 arr = cls._check_shape(arr)
                 uns_group_emb.append(arr)
@@ -260,7 +269,7 @@ class PerturbationData:
             split_covariates: Covariates in adata.obs to split all control cells into different control populations. The perturbed cells are also split according to these columns, but if an embedding for these covariates should be encoded in the model, the corresponding column should also be used in `obs_perturbation_covariates` or `uns_perturbation_covariates`.
             obs_perturbation_covariates: Tuples of covariates in adata.obs characterizing the perturbed cells (together with `split_covariates` and `uns_perturbation_covariates`) and encoded by the values as found in `adata.obs`. If a tuple contains more than
             one element, this is interpreted as a combination of covariates that should be treated as an unordered set.
-            uns_perturbation_covariates: Dictionaries with keys in adata.uns[`UNS_KEY_CONDITION`] and values columns in adata.obs which characterize the perturbed cells (together with `split_covariates` and `obs_perturbation_covariates`) and encoded by the values as found in `adata.uns[`UNS_KEY_CONDITION`][uns_perturbation_covariates.keys()]`. If a value of the dictionary is a tuple with more than one element, this is interpreted as a combination of covariates that should be treated as an unordered set.
+            uns_perturbation_covariates: Dictionaries with keys in adata.uns and values columns in adata.obs which characterize the perturbed cells (together with `split_covariates` and `obs_perturbation_covariates`) and encoded by the values as found in `adata.uns[uns_perturbation_covariates.keys()]`. If a value of the dictionary is a tuple with more than one element, this is interpreted as a combination of covariates that should be treated as an unordered set.
 
         Returns
         -------
@@ -286,9 +295,6 @@ class PerturbationData:
             else 0
         )
         max_combination_length = max(obs_combination_length, uns_combination_length)
-
-        if UNS_KEY_CONDITIONS not in adata.uns:
-            adata.uns[UNS_KEY_CONDITIONS] = {}
 
         for covariate in split_covariates:
             if covariate not in adata.obs:
@@ -367,7 +373,7 @@ class PerturbationData:
                 if condition_data is not None:
                     embedding = cls._get_perturbation_covariates(
                         adata=adata[mask],
-                        embedding_dict=adata.uns[UNS_KEY_CONDITIONS],
+                        embedding_dict=adata.uns,
                         obs_perturbation_covariates=obs_perturbation_covariates,
                         uns_perturbation_covariates=uns_perturbation_covariates,
                         max_combination_length=max_combination_length,

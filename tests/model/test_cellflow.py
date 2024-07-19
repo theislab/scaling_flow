@@ -19,7 +19,7 @@ class TestCellFlow:
         cf.prepare_data(
             cell_data=cell_data,
             control_key=("drug1", "control"),
-            obs_perturbation_covariates=[["dosage"]],
+            obs_perturbation_covariates=[("dosage",)],
             uns_perturbation_covariates=uns_perturbation_covariates,
         )
         assert cf.pdata is not None

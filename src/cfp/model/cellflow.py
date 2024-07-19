@@ -32,6 +32,7 @@ class CellFlow:
         self.dataloader = None
         self.model = None
         self._solver = None
+        self._condition_dim: int | None = None
 
     def prepare_data(
         self,
@@ -76,12 +77,13 @@ class CellFlow:
             uns_perturbation_covariates=uns_perturbation_covariates,
         )
 
-        self._condition_dim = self.pdata.condition_data.shape[-1]
         self._data_dim = self.pdata.cell_data.shape[-1]
 
     def prepare_model(
         self,
-        flow: dict[Literal["constant_noise", "schroedinger_bridge"], float] = {"constant_noise": 0.0},
+        flow: dict[Literal["constant_noise", "schroedinger_bridge"], float] = {
+            "constant_noise": 0.0
+        },
         condition_encoder: Literal["transformer", "deepset"] = "transformer",
         condition_embedding_dim: int = 32,
         condition_encoder_kwargs: dict[str, Any] | None = None,
@@ -119,6 +121,7 @@ class CellFlow:
             )
 
         condition_encoder_kwargs = condition_encoder_kwargs or {}
+        self._condition_dim = condition_embedding_dim
 
         vf = ConditionalVelocityField(
             output_dim=self._data_dim,
@@ -135,13 +138,15 @@ class CellFlow:
             decoder_dropout=decoder_dropout,
         )
 
-        flow, noise = next(flow.items())
+        flow, noise = next(iter(flow.items()))
         if flow == "constant_noise":
-            flow=dynamics.ConstantNoiseFlow(noise)
+            flow = dynamics.ConstantNoiseFlow(noise)
         elif flow == "bridge":
             flow = dynamics.BrownianBridge(noise)
         else:
-            raise NotImplementedError(f"The key of `flow` must be `constant_noise` or `bridge` but found {flow.keys()[0]}.")
+            raise NotImplementedError(
+                f"The key of `flow` must be `constant_noise` or `bridge` but found {flow.keys()[0]}."
+            )
         if self.solver == "otfm":
             self._solver = otfm.OTFlowMatching(
                 vf=vf,

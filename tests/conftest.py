@@ -4,8 +4,8 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from cfp._constants import UNS_KEY_CONDITIONS
 from cfp.data.data import PerturbationData
+from cfp.data.dataloader import CFSampler
 
 
 @pytest.fixture
@@ -56,8 +56,6 @@ def adata_perturbation() -> ad.AnnData:
     # Create an AnnData object
     adata = ad.AnnData(X=X_data, obs=obs_data)
 
-    adata.uns["cell_flow_conditions"] = {}
-
     # Add the random data to .layers and .obsm
     adata.layers["my_counts"] = my_counts
     adata.obsm["X_pca"] = X_pca
@@ -72,11 +70,12 @@ def adata_perturbation() -> ad.AnnData:
     drug_emb = {}
     for drug in adata.obs["drug1"].cat.categories:
         drug_emb[drug] = np.random.randn(5, 1)
-    adata.uns[UNS_KEY_CONDITIONS]["drug"] = drug_emb
+    adata.uns["drug"] = drug_emb
 
-    for drug in adata.obs["cell_type"].cat.categories:
-        drug_emb[drug] = np.random.randn(3, 1)
-    adata.uns[UNS_KEY_CONDITIONS]["cell_type"] = drug_emb
+    cell_type_emb = {}
+    for cell_type in adata.obs["cell_type"].cat.categories:
+        cell_type_emb[cell_type] = np.random.randn(3, 1)
+    adata.uns["cell_type"] = cell_type_emb
 
     return adata
 
@@ -99,3 +98,8 @@ def pdata(adata_perturbation: ad.AnnData) -> PerturbationData:
     )
 
     return pdata
+
+
+@pytest.fixture()
+def sampler(pdata: PerturbationData):
+    return CFSampler(pdata, batch_size=32)
