@@ -16,6 +16,11 @@ __all__ = [
     "SeedAttentionPooling",
     "TokenAttentionPooling",
     "ConditionEncoder",
+    "MLPBlock",
+    "SelfAttention",
+    "SeedAttentionPooling",
+    "TokenAttentionPooling",
+    "ConditionEncoder",
 ]
 
 
@@ -210,12 +215,34 @@ class SeedAttentionPooling(BaseModule):
         K_ = jnp.concatenate(jnp.split(K, self.num_heads, axis=2), axis=0)
         V_ = jnp.concatenate(jnp.split(V, self.num_heads, axis=2), axis=0)
         A = jnp.matmul(Q_, K_.transpose(0, 2, 1)) / jnp.sqrt(self.v_dim)
+        A = jnp.matmul(Q_, K_.transpose(0, 2, 1)) / jnp.sqrt(self.v_dim)
         if mask is not None:
+            # mask from (batch_, 1 | num_heads, set_, set_) to (batch_ * num_heads, 1, set_)
+            mask = jnp.repeat(mask[:, 0, [0], :], self.num_heads, axis=0)
+
             # mask from (batch_, 1 | num_heads, set_, set_) to (batch_ * num_heads, 1, set_)
             mask = jnp.repeat(mask[:, 0, [0], :], self.num_heads, axis=0)
 
             A = jnp.where(mask, A, -1e9)
         A = nn.softmax(A)
+        A = jnp.matmul(A, V_)
+
+        if self.transformer_block:
+            # query residual connection
+            O = jnp.concatenate(jnp.split(Q_ + A, self.num_heads, axis=0), axis=2)
+            O = nn.Dropout(rate=self.dropout_rate)(O, deterministic=not training)
+            if self.layer_norm:
+                O = nn.LayerNorm()(O)
+            # FC layer with residual connection
+            O_ = self.act_fn(nn.Dense(self.v_dim)(O))
+            O_ = nn.Dropout(rate=self.dropout_rate)(O_, deterministic=not training)
+            O = O + O_
+            if self.layer_norm:
+                O = nn.LayerNorm()(O)
+        else:
+            O = jnp.concatenate(jnp.split(A, self.num_heads, axis=0), axis=2)
+
+        return O.squeeze(1)
         A = jnp.matmul(A, V_)
 
         if self.transformer_block:
@@ -244,8 +271,16 @@ class TokenAttentionPooling(BaseModule):
     ----------
     output_dim : int
         Dimensionality of the output.
+    output_dim : int
+        Dimensionality of the output.
     num_heads : int
         Number of heads.
+    qkv_feature_dim : int
+        Feature dimension for the query, key, and value.
+    hidden_dims : Sequence[int]
+        Dimensions of the MLP layers after the attention.
+    dropout_rate : float
+        Dropout rate.
     qkv_feature_dim : int
         Feature dimension for the query, key, and value.
     hidden_dims : Sequence[int]
@@ -260,6 +295,12 @@ class TokenAttentionPooling(BaseModule):
     qkv_dim: int = 64
     dropout_rate: float = 0.0
     act_fn: Callable[[jnp.ndarray], jnp.ndarray] = nn.silu
+    """
+
+    num_heads: int = 8
+    qkv_dim: int = 64
+    dropout_rate: float = 0.0
+    act_fn: Callable[[jnp.ndarray], jnp.ndarray] = nn.silu
 
     @nn.compact
     def __call__(
@@ -267,11 +308,42 @@ class TokenAttentionPooling(BaseModule):
         x: jnp.ndarray,
         mask: jnp.ndarray | None = None,
         training: bool = True,
+        mask: jnp.ndarray | None = None,
+        training: bool = True,
     ) -> jnp.ndarray:
+        """Forward pass.
         """Forward pass.
 
         Parameters
         ----------
+        x : jnp.ndarray
+            Input tensor of shape (batch_size, set_size, input_dim).
+        mask : Optional[jnp.ndarray]
+            Mask tensor of shape (batch_size, 1 | num_heads, set_size, set_size).
+        training : bool
+            Whether the model is in training mode.
+        """
+        # add token
+        token_shape = (len(x), 1)
+        class_token = nn.Embed(num_embeddings=1, features=x.shape[-1])(
+            jnp.int32(jnp.zeros(token_shape))
+        )
+        z = jnp.concatenate((class_token, x), axis=-2)
+        token_mask = jnp.zeros((x.shape[0], 1, x.shape[1] + 1, x.shape[1] + 1))
+        token_mask = token_mask.at[:, :, 0, :].set(1)
+        token_mask = token_mask.at[:, :, :, 0].set(1)
+        token_mask = token_mask.at[:, :, 1:, 1:].set(mask)
+
+        # attention
+        attention = nn.MultiHeadDotProductAttention(
+            num_heads=self.num_heads,
+            qkv_features=self.qkv_dim,
+            dropout_rate=self.dropout_rate,
+        )
+        emb = attention(z, mask=token_mask, deterministic=not training)
+
+        # only continue with token 0
+        z = emb[:, 0, :]
         x : jnp.ndarray
             Input tensor of shape (batch_size, set_size, input_dim).
         mask : Optional[jnp.ndarray]
@@ -307,7 +379,9 @@ class TokenAttentionPooling(BaseModule):
 class ConditionEncoder(BaseModule):
     """
     Encoder for conditions represented as sets of perturbations.
+    Encoder for conditions represented as sets of perturbations.
 
+    Attributes
     Attributes
     ----------
     output_dim : int
@@ -469,9 +543,13 @@ class ConditionEncoder(BaseModule):
         rng: jax.Array,
         optimizer: optax.OptState,
         input_dim: int | tuple[int, ...],
+        input_dim: int | tuple[int, ...],
         **kwargs: Any,
     ):
         """Create initial training state."""
+        params = self.init(rng, conditions=jnp.empty(input_dim), training=False)[
+            "params"
+        ]
         params = self.init(rng, conditions=jnp.empty(input_dim), training=False)[
             "params"
         ]
