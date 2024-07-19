@@ -1,7 +1,7 @@
 import anndata as ad
 import jax
-import pytest
 import numpy as np
+import pytest
 
 
 class TestPerturbationData:
@@ -33,6 +33,10 @@ class TestPerturbationData:
             uns_perturbation_covariates=uns_perturbation_covariates,
         )
         assert isinstance(pdata, PerturbationData)
+        assert (
+            (pdata.perturbation_covariates_mask == -1)
+            + (pdata.split_covariates_mask == -1)
+        ).all()
         if split_covariates == []:
             assert pdata.n_controls == 1
         if split_covariates == ["cell_type"]:
@@ -45,7 +49,7 @@ class TestPerturbationData:
             assert pdata.max_combination_length == 0
         else:
             assert isinstance(pdata.condition_data, dict)
-            assert isinstance(pdata.condition_data[0], jax.Array)
+            assert isinstance(list(pdata.condition_data.values())[0], jax.Array)
             assert pdata.max_combination_length == 1
 
         if (
@@ -68,11 +72,6 @@ class TestPerturbationData:
         assert isinstance(pdata.split_idx_to_covariates, dict)
         assert isinstance(pdata.perturbation_covariates_mask, jax.Array)
         assert isinstance(pdata.perturbation_idx_to_covariates, dict)
-        for value in pdata.pert_embedding_idx_to_covariates.values():
-            assert isinstance(value, tuple) or isinstance(value, str)
-            if isinstance(value, tuple):
-                for el in value:
-                    assert isinstance(el, str)
         assert isinstance(pdata.control_to_perturbation, dict)
 
     @pytest.mark.parametrize("split_covariates", [[], ["cell_type"]])
@@ -100,6 +99,12 @@ class TestPerturbationData:
             uns_perturbation_covariates=uns_perturbation_covariates,
         )
         assert isinstance(pdata, PerturbationData)
+
+        assert (
+            (pdata.perturbation_covariates_mask == -1)
+            + (pdata.split_covariates_mask == -1)
+        ).all()
+
         if split_covariates == []:
             assert pdata.n_controls == 1
         if split_covariates == ["cell_type"]:
@@ -112,7 +117,7 @@ class TestPerturbationData:
             assert pdata.max_combination_length == 0
         else:
             assert isinstance(pdata.condition_data, dict)
-            assert isinstance(pdata.condition_data[0], jax.Array)
+            assert isinstance(list(pdata.condition_data.values())[0], jax.Array)
 
             assert pdata.max_combination_length == 2
 
@@ -136,11 +141,6 @@ class TestPerturbationData:
         assert isinstance(pdata.split_idx_to_covariates, dict)
         assert isinstance(pdata.perturbation_covariates_mask, jax.Array)
         assert isinstance(pdata.perturbation_idx_to_covariates, dict)
-        for value in pdata.pert_embedding_idx_to_covariates.values():
-            assert isinstance(value, tuple) or isinstance(value, str)
-            if isinstance(value, tuple):
-                for el in value:
-                    assert isinstance(el, str)
         assert isinstance(pdata.control_to_perturbation, dict)
 
     @pytest.mark.parametrize("el_to_delete", ["drug1", "cell_line_a"])
@@ -170,10 +170,10 @@ class TestPerturbationData:
                 uns_perturbation_covariates=uns_perturbation_covariates,
             )
 
-
     @pytest.mark.parametrize("null_token", [0.0, -99.0])
     def test_for_masks(self, adata_perturbation_with_nulls, null_token):
         from cfp.data.data import PerturbationData
+
         adata = adata_perturbation_with_nulls
         cell_data = "X"
         split_covariates = ["cell_type"]
@@ -194,17 +194,30 @@ class TestPerturbationData:
             null_token=null_token,
         )
 
-        
-        assert isinstance(pdata.pert_embedding_idx_to_covariates, dict)
-        correct_dict = {
-            0: ("dosage",),
-            1: "drug",
+        assert (
+            (pdata.perturbation_covariates_mask == -1)
+            + (pdata.split_covariates_mask == -1)
+        ).all()
+
+        perturbation_to_ix_mask = {
+            k: np.array([el == null_value for el in v])
+            for k, v in pdata.perturbation_idx_to_covariates.items()
         }
-        assert pdata.pert_embedding_idx_to_covariates == correct_dict
-        
-        perturbation_to_ix_mask = {k: np.array([el == null_value for el in v]) for k,v in pdata.perturbation_idx_to_covariates.items()}
-        
-        for perturbation_idx, is_null_perturbation_covariates_mask in perturbation_to_ix_mask.items():
-            for i, is_null_perturbation_covariate in enumerate(is_null_perturbation_covariates_mask):
-                condition_data_is_masked = bool(np.all(pdata.condition_data[i][perturbation_idx] == null_token, axis=1))
+
+        for (
+            perturbation_idx,
+            is_null_perturbation_covariates_mask,
+        ) in perturbation_to_ix_mask.items():
+            for condition_data_key, is_null_perturbation_covariate in zip(
+                pdata.condition_data.keys(),
+                is_null_perturbation_covariates_mask,
+                strict=False,
+            ):
+                condition_data_is_masked = bool(
+                    np.all(
+                        pdata.condition_data[condition_data_key][perturbation_idx]
+                        == null_token,
+                        axis=1,
+                    )
+                )
                 assert condition_data_is_masked == bool(is_null_perturbation_covariate)

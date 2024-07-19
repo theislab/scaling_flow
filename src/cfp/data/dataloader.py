@@ -31,8 +31,8 @@ class CFSampler:
             for i in range(self.n_source_dists)
         ]
         self.get_embeddings = lambda idx: {
-            i: jnp.tile(self.data.condition_data[i][idx], (self.batch_size, 1, 1))
-            for i in range(self.data.n_perturbation_covariates)
+            pert_cov: jnp.tile(arr[idx], (self.batch_size, 1, 1))
+            for pert_cov, arr in self.data.condition_data.items()
         }
 
         @jax.jit

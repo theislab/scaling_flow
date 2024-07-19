@@ -37,8 +37,6 @@ class PerturbationData:
         Dictionary explaining values in perturbation_covariates_mask.
     condition_data
         Dictionary with embeddings for conditions.
-    pert_embedding_idx_to_covariates
-        Dictionary explaining values in condition_data.
     control_to_perturbation
         Mapping from control index to target distribution indices.
     max_combination_length
@@ -63,9 +61,6 @@ class PerturbationData:
         int, tuple[str, ...]
     ]  # (n_targets,), dictionary explaining perturbation_covariates_mask
     condition_data: jax.Array | None  # (n_targets,) all embeddings for conditions
-    pert_embedding_idx_to_covariates: dict[
-        int, str
-    ]  # (n_targets,) dictionary explaining condition_data
     control_to_perturbation: dict[
         int, jax.Array
     ]  # mapping from control idx to target distribution idcs
@@ -160,7 +155,6 @@ class PerturbationData:
                         f"Covariate {covariate} could not be converted to categorical."
                     ) from None
 
-
     @staticmethod
     def _check_shape(arr: float | ArrayLike) -> ArrayLike:
         if not hasattr(arr, "shape") or len(arr.shape) == 0:
@@ -187,7 +181,9 @@ class PerturbationData:
         counter = 0
         if len(obs_perturbation_covariates):
             for obs_group in obs_perturbation_covariates:
-                pert_emb_idx_to_covariate[counter] = obs_group
+                pert_emb_idx_to_covariate[counter] = obs_group[
+                    0
+                ]  # TODO: we need this for sampling. the problem arises when we have multiple covariates in obs_perturbations
                 counter += 1
         if len(uns_perturbation_covariates):
             for uns_group in uns_perturbation_covariates:
@@ -217,7 +213,7 @@ class PerturbationData:
                         f"Expected to find exactly one category within distribution, found {len(values)}."
                     )
                 val = adata.obs[obs_col].values[0]
-                
+
                 if val == null_value:
                     obs_group_emb.append(
                         jnp.array(
@@ -231,11 +227,11 @@ class PerturbationData:
                     arr = cls._check_shape(arr)
                 obs_group_emb.append(arr)
             if len(obs_group) == 1:
-                embeddings[pert_embedding_idx_to_covariates_reversed[obs_group]] = (
+                embeddings[pert_embedding_idx_to_covariates_reversed[obs_group[0]]] = (
                     jnp.tile(obs_group_emb[0], (max_combination_length, 1))
                 )
             else:
-                embeddings[pert_embedding_idx_to_covariates_reversed[obs_group]] = (
+                embeddings[pert_embedding_idx_to_covariates_reversed[obs_group[0]]] = (
                     jnp.concatenate(obs_group_emb, axis=0)
                 )
 
@@ -253,7 +249,9 @@ class PerturbationData:
                         f"Value of key {uns_key} in `adata.uns` should be of type `dict`, found {type(adata.uns[uns_key])}."
                     )
                 if values[0] == null_value:
-                    arr = jnp.full(list(adata.uns[uns_key].values())[0].shape, null_token)
+                    arr = jnp.full(
+                        list(adata.uns[uns_key].values())[0].shape, null_token
+                    )
                 else:
                     if values[0] not in embedding_dict[uns_key]:
                         raise ValueError(
@@ -418,14 +416,22 @@ class PerturbationData:
             for pert_cov, emb in condition_data.items():
                 condition_data[pert_cov] = jnp.array(emb)
 
+        # make this more efficiently before in the loop, for now it's just to test
+        if condition_data is not None:
+            condition_data_adapted = {
+                pert_embedding_idx_to_covariates[k]: v
+                for k, v in condition_data.items()
+            }
+        else:
+            condition_data_adapted = None
+
         return cls(
             cell_data=cell_data,
             split_covariates_mask=jnp.asarray(split_covariates_mask),
             split_idx_to_covariates=split_covariates_to_idx,
             perturbation_covariates_mask=jnp.asarray(perturbation_covariates_mask),
             perturbation_idx_to_covariates=perturbation_covariates_to_idx,
-            condition_data=condition_data,
-            pert_embedding_idx_to_covariates=pert_embedding_idx_to_covariates,
+            condition_data=condition_data_adapted,
             control_to_perturbation=control_to_perturbation,
             max_combination_length=max_combination_length,
             null_value=null_value,
@@ -445,7 +451,7 @@ class PerturbationData:
     @property
     def n_perturbation_covariates(self) -> int:
         """Returns the number of perturbation covariates."""
-        return len(self.pert_embedding_idx_to_covariates)
+        return len(self.condition_data)
 
     def _format_params(self, fmt: Callable[[Any], str]) -> str:
         params = {
