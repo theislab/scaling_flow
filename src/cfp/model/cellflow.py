@@ -1,7 +1,9 @@
+import os
 from collections.abc import Callable, Sequence
 from typing import Any, Literal
 
 import anndata as ad
+import cloudpickle
 import jax
 import optax
 from numpy.typing import ArrayLike
@@ -30,7 +32,7 @@ class CellFlow:
         self.adata = adata
         self.solver = solver
         self.dataloader = None
-        self.model = None
+        self.trainer = None
         self._solver = None
         self._condition_dim: int | None = None
 
@@ -81,18 +83,23 @@ class CellFlow:
 
     def prepare_model(
         self,
-        flow: dict[Literal["constant_noise", "schroedinger_bridge"], float] = {
-            "constant_noise": 0.0
-        },
         condition_encoder: Literal["transformer", "deepset"] = "transformer",
         condition_embedding_dim: int = 32,
-        condition_encoder_kwargs: dict[str, Any] | None = None,
         time_encoder_dims: Sequence[int] = (1024, 1024, 1024),
         time_encoder_dropout: float = 0.0,
         hidden_dims: Sequence[int] = (1024, 1024, 1024),
         hidden_dropout: float = 0.0,
         decoder_dims: Sequence[int] = (1024, 1024, 1024),
         decoder_dropout: float = 0.0,
+        condition_encoder_kwargs: dict[str, Any] | None = None,
+        velocity_field_kwargs: dict[str, Any] | None = None,
+        solver_kwargs: dict[str, Any] | None = None,
+        flow: (
+            dict[Literal["constant_noise", "schroedinger_bridge"], float] | None
+        ) = None,
+        match_fn: Callable[
+            [ArrayLike, ArrayLike], ArrayLike
+        ] = solver_utils.match_linear,
         optimizer: optax.GradientTransformation = optax.adam(1e-4),
         seed=0,
     ) -> None:
@@ -107,7 +114,12 @@ class CellFlow:
             hidden_dims: Dimensions of the hidden layers.
             hidden_dropout: Dropout rate for the hidden layers.
             decoder_dims: Dimensions of the output layers.
+            condition_encoder_kwargs: Keyword arguments for the condition encoder.
+            velocity_field_kwargs: Keyword arguments for the velocity field.
+            solver_kwargs: Keyword arguments for the solver.
             decoder_dropout: Dropout rate for the output layers.
+            flow: Flow to use for training. Shoudl be a dict with the form {"constant_noise": noise_val} or {"schroedinger_bridge": noise_val}.
+            match_fn: Matching function.
             optimizer: Optimizer for training.
             seed: Random seed.
 
@@ -122,6 +134,9 @@ class CellFlow:
 
         condition_encoder_kwargs = condition_encoder_kwargs or {}
         self._condition_dim = condition_embedding_dim
+        velocity_field_kwargs = velocity_field_kwargs or {}
+        solver_kwargs = solver_kwargs or {}
+        flow = flow or {"constant_noise": 0.0}
 
         vf = ConditionalVelocityField(
             output_dim=self._data_dim,
@@ -136,6 +151,7 @@ class CellFlow:
             hidden_dropout=hidden_dropout,
             decoder_dims=decoder_dims,
             decoder_dropout=decoder_dropout,
+            **velocity_field_kwargs,
         )
 
         flow, noise = next(iter(flow.items()))
@@ -150,24 +166,24 @@ class CellFlow:
         if self.solver == "otfm":
             self._solver = otfm.OTFlowMatching(
                 vf=vf,
-                match_fn=solver_utils.match_linear,
-                flow=dynamics.ConstantNoiseFlow(0.0),
+                match_fn=match_fn,
+                flow=flow,
                 optimizer=optimizer,
                 rng=jax.random.PRNGKey(seed),
+                **solver_kwargs,
             )
         elif self.solver == "genot":
             self._solver = genot.GENOT(
                 vf=vf,
-                data_match_fn=solver_utils.match_linear,
-                flow=dynamics.ConstantNoiseFlow(0.0),
+                data_match_fn=match_fn,
+                flow=flow,
                 source_dim=self._data_dim,
                 target_dim=self._data_dim,
                 optimizer=optimizer,
                 rng=jax.random.PRNGKey(seed),
+                **solver_kwargs,
             )
-        # NOTE: The use of "model" is a bit confusing here, maybe we can harmonize the
-        # naming a bit better
-        self.model = CellFlowTrainer(model=self._solver)
+        self.trainer = CellFlowTrainer(model=self._solver)
 
     def train(
         self,
@@ -192,12 +208,12 @@ class CellFlow:
         if self.pdata is None:
             raise ValueError("Data not initialized. Please call prepare_data first.")
 
-        if self.model is None:
+        if self.trainer is None:
             raise ValueError("Model not initialized. Please call prepare_model first.")
 
         self.dataloader = CFSampler(data=self.pdata, batch_size=batch_size)
 
-        self.model.train(
+        self.trainer.train(
             dataloader=self.dataloader,
             num_iterations=num_iterations,
             valid_freq=valid_freq,
@@ -234,3 +250,37 @@ class CellFlow:
             Condition embedding.
         """
         pass
+
+    def save(
+        self,
+        dir_path: str,
+        file_prefix: str | None = None,
+        overwrite: bool = False,
+    ) -> None:
+        """
+        Save the model. Pickles the CellFlow class instance.
+
+        Args:
+        dir_path: Path to a directory, defaults to current directory
+        file_prefix: Prefix to prepend to the file name.
+        overwrite: Overwrite existing data or not.
+
+        Returns
+        -------
+        None
+        """
+        file_name = (
+            f"{file_prefix}_{self.__class__.__name__}.pkl"
+            if file_prefix is not None
+            else f"{self.__class__.__name__}.pkl"
+        )
+        file_dir = (
+            os.path.join(dir_path, file_name) if dir_path is not None else file_name
+        )
+
+        if not overwrite and os.path.exists(file_dir):
+            raise RuntimeError(
+                f"Unable to save to an existing file `{file_dir}` use `overwrite=True` to overwrite it."
+            )
+        with open(file_dir, "wb") as f:
+            cloudpickle.dump(self, f)
