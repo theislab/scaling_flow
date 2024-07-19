@@ -43,6 +43,10 @@ class PerturbationData:
         Mapping from control index to target distribution indices.
     max_combination_length
         Maximum number of covariates in a combination.
+    null_value
+        Values in :attr:`anndata.AnnData.obs` columns which indicate no treatment with the corresponding covariate. These values will be masked with `null_token`.
+    null_token
+        Token to use for masking `null_value`.
     """
 
     cell_data: jax.Array  # (n_cells, n_features)
@@ -66,6 +70,8 @@ class PerturbationData:
         int, jax.Array
     ]  # mapping from control idx to target distribution idcs
     max_combination_length: int
+    null_value: Any
+    null_token: Any
 
     @staticmethod
     def _get_cell_data(
@@ -154,6 +160,7 @@ class PerturbationData:
                         f"Covariate {covariate} could not be converted to categorical."
                     ) from None
 
+
     @staticmethod
     def _check_shape(arr: float | ArrayLike) -> ArrayLike:
         if not hasattr(arr, "shape") or len(arr.shape) == 0:
@@ -197,6 +204,8 @@ class PerturbationData:
         uns_perturbation_covariates: Any,
         max_combination_length: int,
         pert_embedding_idx_to_covariates_reversed: dict[int, str],
+        null_value: Any = np.nan,
+        null_token: Any = 0.0,
     ) -> dict[int, jax.Array]:
         embeddings = {}
         for obs_group in obs_perturbation_covariates:
@@ -207,8 +216,19 @@ class PerturbationData:
                     raise ValueError(
                         f"Expected to find exactly one category within distribution, found {len(values)}."
                     )
-                arr = jnp.asarray(adata.obs[obs_col].values[0])
-                arr = cls._check_shape(arr)
+                val = adata.obs[obs_col].values[0]
+                
+                if val == null_value:
+                    obs_group_emb.append(
+                        jnp.array(
+                            [
+                                null_token,
+                            ]
+                        )
+                    )
+                else:
+                    arr = jnp.asarray(val)
+                    arr = cls._check_shape(arr)
                 obs_group_emb.append(arr)
             if len(obs_group) == 1:
                 embeddings[pert_embedding_idx_to_covariates_reversed[obs_group]] = (
@@ -232,11 +252,14 @@ class PerturbationData:
                     raise ValueError(
                         f"Value of key {uns_key} in `adata.uns` should be of type `dict`, found {type(adata.uns[uns_key])}."
                     )
-                if values[0] not in embedding_dict[uns_key]:
-                    raise ValueError(
-                        f"Value {values[0]} not found in `adata.uns[{uns_key}]`."
-                    )
-                arr = jnp.asarray(embedding_dict[uns_key][values[0]])
+                if values[0] == null_value:
+                    arr = jnp.full(list(adata.uns[uns_key].values())[0].shape, null_token)
+                else:
+                    if values[0] not in embedding_dict[uns_key]:
+                        raise ValueError(
+                            f"Value {values[0]} not found in `adata.uns[{uns_key}]`."
+                        )
+                    arr = jnp.asarray(embedding_dict[uns_key][values[0]])
                 arr = cls._check_shape(arr)
                 uns_group_emb.append(arr)
             if len(uns_group) == 1:
@@ -259,6 +282,8 @@ class PerturbationData:
         split_covariates: Sequence[str],
         obs_perturbation_covariates: Sequence[tuple[str, ...]],
         uns_perturbation_covariates: Sequence[dict[str, tuple[str, ...] | str]],
+        null_value: Any = None,
+        null_token: Any = 0.0,
     ) -> "PerturbationData":
         """Load cell data from an AnnData object.
 
@@ -270,6 +295,8 @@ class PerturbationData:
             obs_perturbation_covariates: Tuples of covariates in adata.obs characterizing the perturbed cells (together with `split_covariates` and `uns_perturbation_covariates`) and encoded by the values as found in `adata.obs`. If a tuple contains more than
             one element, this is interpreted as a combination of covariates that should be treated as an unordered set.
             uns_perturbation_covariates: Dictionaries with keys in adata.uns and values columns in adata.obs which characterize the perturbed cells (together with `split_covariates` and `obs_perturbation_covariates`) and encoded by the values as found in `adata.uns[uns_perturbation_covariates.keys()]`. If a value of the dictionary is a tuple with more than one element, this is interpreted as a combination of covariates that should be treated as an unordered set.
+            null_value: Values in :attr:`anndata.AnnData.obs` columns which indicate no treatment with the corresponding covariate. These values will be masked with `null_token`.
+            null_token: Token to use for masking `null_value`.
 
         Returns
         -------
@@ -378,6 +405,8 @@ class PerturbationData:
                         uns_perturbation_covariates=uns_perturbation_covariates,
                         max_combination_length=max_combination_length,
                         pert_embedding_idx_to_covariates_reversed=pert_embedding_idx_to_covariates_reversed,
+                        null_value=null_value,
+                        null_token=null_token,
                     )
                     for pert_cov, emb in embedding.items():
                         condition_data[pert_cov].append(emb)
@@ -399,6 +428,8 @@ class PerturbationData:
             pert_embedding_idx_to_covariates=pert_embedding_idx_to_covariates,
             control_to_perturbation=control_to_perturbation,
             max_combination_length=max_combination_length,
+            null_value=null_value,
+            null_token=null_token,
         )
 
     @property

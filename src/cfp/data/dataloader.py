@@ -70,8 +70,8 @@ class CFSampler:
 
             condition_batch = self.get_embeddings(target_dist_idx)
             return {
-                "src_lin": source_batch,
-                "tgt_lin": target_batch,
+                "src_cell_data": source_batch,
+                "tgt_cell_data": target_batch,
                 "src_condition": condition_batch,
             }
 

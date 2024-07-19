@@ -14,12 +14,12 @@ class TestCFSampler:
         sample_1 = sampler.sample(rng_1)
         sample_2 = sampler.sample(rng_2)
 
-        assert "src_lin" in sample_1
-        assert "tgt_lin" in sample_1
+        assert "src_cell_data" in sample_1
+        assert "tgt_cell_data" in sample_1
         assert "src_condition" in sample_1
-        assert sample_1["src_lin"].shape[0] == batch_size
-        assert sample_2["src_lin"].shape[0] == batch_size
-        assert sample_1["tgt_lin"].shape[0] == batch_size
-        assert sample_2["tgt_lin"].shape[0] == batch_size
+        assert sample_1["src_cell_data"].shape[0] == batch_size
+        assert sample_2["src_cell_data"].shape[0] == batch_size
+        assert sample_1["tgt_cell_data"].shape[0] == batch_size
+        assert sample_2["tgt_cell_data"].shape[0] == batch_size
         assert sample_1["src_condition"][0].shape[0] == batch_size
         assert sample_2["src_condition"][0].shape[0] == batch_size
