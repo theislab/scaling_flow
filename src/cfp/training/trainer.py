@@ -96,6 +96,7 @@ class CellFlowTrainer:
     def train(
         self,
         dataloader: CFSampler,
+        val_data: dict[str, ArrayLike],
         num_iterations: int,
         valid_freq: int,
         callback_fn: (

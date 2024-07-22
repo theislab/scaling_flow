@@ -1,6 +1,6 @@
 import os
 from collections.abc import Callable, Sequence
-from typing import Any, Literal
+from typing import Any, Literal, Dict
 
 import anndata as ad
 import cloudpickle
@@ -31,9 +31,10 @@ class CellFlow:
 
         self.adata = adata
         self.solver = solver
-        self.dataloader = None
-        self.trainer = None
-        self._solver = None
+        self.val_data: Dict[str, PerturbationData] = {}
+        self.dataloader: CFSampler | None = None
+        self.trainer: CellFlowTrainer | None = None
+        self._solver: otfm.OTFlowMatching | genot.GENOT | None = None
         self._condition_dim: int | None = None
 
     def prepare_data(
@@ -76,6 +77,7 @@ class CellFlow:
             control_key if isinstance(control_key, tuple) else (control_key, True)
         )
         self.control_data = control_data
+        self.cell_data = cell_data
 
         self.pdata = PerturbationData.load_from_adata(
             self.adata,
@@ -87,6 +89,32 @@ class CellFlow:
         )
 
         self._data_dim = self.pdata.cell_data.shape[-1]
+
+    def prepare_validation_data(
+        self,
+        adata: ad.AnnData,
+        name: str = "validation",
+    ) -> None:
+        """Prepare validation data.
+
+        Args:
+            adata: Anndata object.
+            name: Name of the validation data.
+            **kwargs: Keyword arguments.
+
+        Returns
+        -------
+            None
+        """
+        val_data = PerturbationData.load_from_adata(
+            adata,
+            cell_data=self.cell_data,
+            split_covariates=self.split_covariates,
+            control_data=self.control_data,
+            obs_perturbation_covariates=self.obs_perturbation_covariates,
+            uns_perturbation_covariates=self.uns_perturbation_covariates,
+        )
+        self.val_data[name] = val_data
 
     def prepare_model(
         self,
@@ -222,6 +250,7 @@ class CellFlow:
 
         self.trainer.train(
             dataloader=self.dataloader,
+            val_data=self.val_data,
             num_iterations=num_iterations,
             valid_freq=valid_freq,
             callback_fn=callback_fn,
