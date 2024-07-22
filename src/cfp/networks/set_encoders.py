@@ -9,6 +9,7 @@ import optax
 from flax import linen as nn
 from flax.linen import initializers
 from flax.training import train_state
+from flax.typing import FrozenDict
 
 __all__ = [
     "MLPBlock",
@@ -118,7 +119,7 @@ class SelfAttention(BaseModule):
         Parameters
         ----------
         x : jnp.ndarray
-            Input tensor of shape ``(batch_size, set_size, input_dim)``.
+            Input tensor of shape ``(batch_size, set_size, input_dim)`` or ``(batch_size, input_dim)``.
         mask : Optional[jnp.ndarray]
             Mask tensor of shape ``(batch_size, 1 | num_heads, set_size, set_size)``.
         training : bool
@@ -128,6 +129,9 @@ class SelfAttention(BaseModule):
         -------
         Output tensor of shape ``(batch_size, set_size, input_dim)``.
         """
+        squeeze = x.ndim == 2
+        x = jnp.expand_dims(x, 1) if squeeze else x
+
         # self-attention
         z = nn.MultiHeadDotProductAttention(
             num_heads=self.num_heads,
@@ -146,7 +150,7 @@ class SelfAttention(BaseModule):
             z_ = nn.Dropout(self.dropout_rate)(z, deterministic=not training)
             z = z + z_
 
-        return z
+        return z.squeeze(1) if squeeze else z
 
 
 class SeedAttentionPooling(BaseModule):
@@ -221,10 +225,6 @@ class SeedAttentionPooling(BaseModule):
         if mask is not None:
             # mask from (batch_, 1 | num_heads, set_, set_) to (batch_ * num_heads, 1, set_)
             mask = jnp.repeat(mask[:, 0, [0], :], self.num_heads, axis=0)
-
-            # mask from (batch_, 1 | num_heads, set_, set_) to (batch_ * num_heads, 1, set_)
-            mask = jnp.repeat(mask[:, 0, [0], :], self.num_heads, axis=0)
-
             A = jnp.where(mask, A, -1e9)
         A = nn.softmax(A)
         A = jnp.matmul(A, V_)
@@ -348,12 +348,13 @@ class ConditionEncoder(BaseModule):
     def setup(self):
         """Initialize the modules."""
         # modules before pooling
-        self.separate_inputs = isinstance(self.layers_before_pool, dict)
+        self.separate_inputs = isinstance(self.layers_before_pool, (dict | FrozenDict))
         if self.separate_inputs:
             # different layers for different inputs
-            self.before_pool_modules = {}
-            for pert_cov, layers in self.layers_before_pool.items():
-                self.before_pool_modules[pert_cov] = self._get_layers(layers)
+            self.before_pool_modules = {
+                key: self._get_layers(layers)
+                for key, layers in self.layers_before_pool.items()
+            }
         else:
             self.before_pool_modules = self._get_layers(self.layers_before_pool)
 
@@ -415,7 +416,7 @@ class ConditionEncoder(BaseModule):
 
         # apply modules after pooling
         conditions = self._apply_modules(
-            self.after_pool_modules, conditions, attention_mask, training
+            self.after_pool_modules, conditions, None, training
         )
 
         return conditions
@@ -462,8 +463,8 @@ class ConditionEncoder(BaseModule):
         conditions: dict,
     ) -> tuple[jnp.ndarray, jnp.ndarray]:
         """Get mask for padded conditions tensor."""
-        masks = [jnp.all(c == self.mask_value, axis=-1) for c in conditions.values()]
         # FIXME: need some check but jittable
+        # masks = [jnp.all(c == self.mask_value, axis=-1) for c in conditions.values()]
         # if not all(jnp.array_equal(masks[0], mask) for mask in masks):
         #     raise ValueError("Conditions have different masked values.")
 
@@ -492,16 +493,17 @@ class ConditionEncoder(BaseModule):
         self,
         rng: jax.Array,
         optimizer: optax.OptState,
-        input_dim: int | tuple[int, ...],
+        conditions: dict[str, jnp.ndarray],
         **kwargs: Any,
     ):
         """Create initial training state."""
-        params = self.init(rng, conditions=jnp.empty(input_dim), training=False)[
-            "params"
-        ]
-        params = self.init(rng, conditions=jnp.empty(input_dim), training=False)[
-            "params"
-        ]
+        params = self.init(
+            rng,
+            conditions={
+                k: jnp.empty((1, v.shape[1], v.shape[2])) for k, v in conditions.items()
+            },
+            training=False,
+        )["params"]
         return train_state.TrainState.create(
             apply_fn=self.apply,
             params=params,

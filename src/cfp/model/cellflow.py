@@ -34,7 +34,6 @@ class CellFlow:
         self.dataloader = None
         self.trainer = None
         self._solver = None
-        self._condition_dim: int | None = None
 
     def prepare_data(
         self,
@@ -42,7 +41,7 @@ class CellFlow:
         control_key: str | Sequence[str, Any],
         obs_perturbation_covariates: Sequence[tuple[str, ...]] | None = None,
         uns_perturbation_covariates: (
-            Sequence[dict[str, Sequence[str, ...] | str]] | None
+            Sequence[dict[str, Sequence[str] | str]] | None
         ) = None,
         split_covariates: Sequence[str] | None = None,
         **kwargs,
@@ -133,7 +132,6 @@ class CellFlow:
             )
 
         condition_encoder_kwargs = condition_encoder_kwargs or {}
-        self._condition_dim = condition_embedding_dim
         velocity_field_kwargs = velocity_field_kwargs or {}
         solver_kwargs = solver_kwargs or {}
         flow = flow or {"constant_noise": 0.0}
@@ -142,7 +140,6 @@ class CellFlow:
             output_dim=self._data_dim,
             max_combination_length=self.pdata.max_combination_length,
             encode_conditions=encode_conditions,
-            condition_dim=self._condition_dim,
             condition_embedding_dim=condition_embedding_dim,
             condition_encoder_kwargs=condition_encoder_kwargs,
             time_encoder_dims=time_encoder_dims,
@@ -169,7 +166,7 @@ class CellFlow:
                 match_fn=match_fn,
                 flow=flow,
                 optimizer=optimizer,
-                pert_covs=self.pdata.condition_data.keys(),
+                conditions=self.pdata.condition_data,
                 rng=jax.random.PRNGKey(seed),
                 **solver_kwargs,
             )
