@@ -16,7 +16,7 @@ from cfp._types import ArrayLike
 
 from .utils import _to_list
 
-__all__ = ["PerturbationData"]
+__all__ = ["PerturbationData", "ValidationData"]
 
 
 @dataclass
@@ -462,3 +462,10 @@ class PerturbationData:
 
     def __repr__(self) -> str:
         return f"{self.__class__.__name__}[{self._format_params(repr)}]"
+
+
+@dataclass
+class ValidationData:
+    """Data for validation."""
+
+    pass
