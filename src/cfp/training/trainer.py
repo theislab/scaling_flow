@@ -3,6 +3,7 @@ from typing import Any
 
 import jax
 import numpy as np
+import jax.numpy as jnp
 from numpy.typing import ArrayLike
 from ott.neural.methods.flows import genot, otfm
 from ott.solvers import utils as solver_utils
@@ -35,7 +36,7 @@ class CellFlowTrainer:
 
         self.model = model
 
-    def _genot_step_fn(self, rng, src, tgt, src_cond):
+    def _genot_step_fn(self, rng, src, tgt, condition):
         """Step function for GENOT solver."""
         rng, rng_resample, rng_noise, rng_time, rng_step_fn = jax.random.split(rng, 5)
 
@@ -56,26 +57,26 @@ class CellFlowTrainer:
         )
 
         src, tgt = src[src_ixs], tgt[tgt_ixs]  # (n, k, ...),  # (m, k, ...)
-        if src_cond is not None:
-            src_cond = src_cond[src_ixs]
+        if condition is not None:
+            condition = jnp.tile(condition, (src.shape[0], 1, 1))
 
         if self.model.latent_match_fn is not None:
-            src, src_cond, tgt = self.model._match_latent(
-                rng, src, src_cond, latent, tgt
+            src, condition, tgt = self.model._match_latent(
+                rng, src, condition, latent, tgt
             )
 
         src = src.reshape(-1, *src.shape[2:])  # (n * k, ...)
         tgt = tgt.reshape(-1, *tgt.shape[2:])  # (m * k, ...)
         latent = latent.reshape(-1, *latent.shape[2:])
-        if src_cond is not None:
-            src_cond = src_cond.reshape(-1, *src_cond.shape[2:])
+        if condition is not None:
+            condition = condition.reshape(-1, *condition.shape[2:])
 
         loss, self.model.vf_state = self.model.step_fn(
-            rng_step_fn, self.model.vf_state, time, src, tgt, latent, src_cond
+            rng_step_fn, self.model.vf_state, time, src, tgt, latent, condition
         )
         return loss
 
-    def _otfm_step_fn(self, rng, src, tgt, src_cond):
+    def _otfm_step_fn(self, rng, src, tgt, condition):
         """Step function for OTFM solver."""
         rng_resample, rng_step_fn = jax.random.split(rng, 2)
         if self.model.match_fn is not None:
@@ -88,7 +89,7 @@ class CellFlowTrainer:
             self.model.vf_state,
             src,
             tgt,
-            src_cond,
+            condition,
         )
         return loss
 
@@ -120,8 +121,8 @@ class CellFlowTrainer:
             rng, rng_step_fn = jax.random.split(rng, 3)
             batch = dataloader.sample(rng)
 
-            src, tgt = batch["src_lin"], batch["tgt_lin"]
-            src_cond = batch.get("src_condition")
+            src, tgt = batch["src_cell_data"], batch["tgt_cell_data"]
+            condition = batch.get("condition")
 
             if isinstance(self.model, genot.GENOT):
                 loss = self._genot_step_fn(rng_step_fn, src, tgt, src_cond)
