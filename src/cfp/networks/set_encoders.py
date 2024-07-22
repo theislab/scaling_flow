@@ -1,5 +1,6 @@
-from collections.abc import Callable
-from dataclasses import field as dc_field
+import abc
+from collections.abc import Callable, Sequence
+from dataclasses import field
 from typing import Any, Literal
 
 import jax
@@ -8,667 +9,499 @@ import optax
 from flax import linen as nn
 from flax.linen import initializers
 from flax.training import train_state
+from flax.typing import FrozenDict
 
 __all__ = [
-    "MultiHeadAttention",
-    "MLPEncoder",
-    "DeepSet",
-    "DeepSetEncoder",
-    "MAB",
-    "SAB",
-    "PMA",
-    "SetTransformer",
-    "SetEncoder",
-    "ConditionSetEncoder",
+    "MLPBlock",
+    "SelfAttention",
+    "SeedAttentionPooling",
+    "TokenAttentionPooling",
+    "ConditionEncoder",
+    "MLPBlock",
+    "SelfAttention",
+    "SeedAttentionPooling",
+    "TokenAttentionPooling",
+    "ConditionEncoder",
 ]
 
-Shape = tuple[int, ...]
+
+class BaseModule(abc.ABC, nn.Module):
+    """Base module for condition encoder and its components."""
+
+    @abc.abstractmethod
+    def __call__(self, x: jnp.ndarray, training: bool = True) -> jnp.ndarray:
+        """Forward pass."""
+        pass
 
 
-class MultiHeadAttention(nn.Module):
-    """Multi-head attention which aggregates sets by learning a token.
+class MLPBlock(BaseModule):
+    """
+    MLP block.
 
-    Args:
-        num_heads: Number of heads.
-        qkv_feature_dim: Feature dimension for the query, key, and value.
-        max_comb_length: Maximum number of elements in the set.
-        dropout_rate: Dropout rate.
+    Parameters
+    ----------
+    dims : Sequence[int]
+        Dimensions of the MLP layers.
+    dropout_rate : float
+        Dropout rate.
+    act_last_layer : bool
+        Whether to apply the activation function to the last layer.
+    act_fn : Callable[[jnp.ndarray], jnp.ndarray]
+        Activation function.
     """
 
-    num_heads: int
-    qkv_feature_dim: int
-    max_comb_length: int
+    dims: Sequence[int] = (128, 128, 128)
     dropout_rate: float = 0.0
-
-    @nn.compact
-    def __call__(self, condition: jnp.ndarray, training: bool = True) -> jnp.ndarray:
-        """Call the module."""
-        token_shape = (len(condition), 1) if condition.ndim > 2 else (1,)
-        class_token = nn.Embed(num_embeddings=1, features=condition.shape[-1])(
-            jnp.int32(jnp.zeros(token_shape))
-        )
-
-        condition = jnp.concatenate((class_token, condition), axis=-2)
-        mask = self.get_masks(condition)
-
-        attention = nn.MultiHeadDotProductAttention(
-            num_heads=self.num_heads,
-            qkv_features=self.qkv_feature_dim,
-            dropout_rate=self.dropout_rate,
-            deterministic=not training,
-        )
-        emb = attention(condition, mask=mask)
-        condition = emb[:, 0, :]  # only continue with token 0
-
-        for cond_dim in self.condition_dims:
-            condition = self.act_fn(nn.Dense(cond_dim)(condition))
-            condition = nn.Dropout(rate=self.dropout_rate, deterministic=not training)(
-                condition
-            )
-        return condition
-
-
-class MLPEncoder(nn.Module):
-    """A MLP that encodes a condition into a latent vector.
-
-    Args:
-        hidden_dim: sequence specifying size of hidden dimensions. If None, the
-            encoder a identity function.
-        output_dim: output dimension of the latent vector
-        act_fn: Activation function
-    """
-
-    hidden_dim: int = 128
-    n_hidden: int = 1
-    output_dim: int = 5
-    act_fn: Callable[[jnp.ndarray], jnp.ndarray] = nn.leaky_relu
-    dropout_rate: float = 0.0
-    training: bool | None = None
-
-    @nn.compact
-    def __call__(self, x: jnp.ndarray, training: bool | None = None) -> jnp.ndarray:
-        """Call the module."""
-        training = nn.merge_param("training", self.training, training)
-        if self.hidden_dim is None:
-            return x
-
-        squeeze = x.ndim == 1
-        if squeeze:
-            x = jnp.expand_dims(x, 0)
-
-        z = x
-        for _ in range(self.n_hidden):
-            Wx = nn.Dense(self.hidden_dim, use_bias=True)
-            z = self.act_fn(Wx(z))
-            z = nn.Dropout(rate=self.dropout_rate)(z, deterministic=not training)
-        Wx = nn.Dense(self.output_dim, use_bias=True)
-        z = Wx(z)
-
-        return z.squeeze(0) if squeeze else z
-
-    def create_train_state(
-        self,
-        rng: jax.Array,
-        optimizer: optax.OptState,
-        input_dim: int | tuple[int, ...],
-        **kwargs: Any,
-    ):
-        """Create initial training state."""
-        params = self.init(rng, x=jnp.ones(input_dim), training=False)["params"]
-        return train_state.TrainState.create(
-            apply_fn=self.apply,
-            params=params,
-            tx=optimizer,
-            **kwargs,
-        )
-
-
-class DeepSet(nn.Module):
-    """DeepSet layer mapping shape (input_dim, n) to (output_dim, n).
-
-    Args:
-        input_dim: input dimension of the latent vector
-        output_dim: output dimension of the latent vector
-        dtype: the dtype of the computation (default: infer from input and params).
-        param_dtype: the dtype passed to parameter initializers (default: float32).
-        alpha_init: initializer function for alpha.
-        beta_init: initializer function for beta.
-        gamma_init: initializer function for gamma.
-    """
-
-    input_dim: int
-    output_dim: int
-    dtype: Any | None = None
-    param_dtype: Any = jnp.float32
-    alpha_init: Callable[[Any, Shape, Any], jnp.ndarray] = initializers.lecun_normal()
-    beta_init: Callable[[Any, Shape, Any], jnp.ndarray] = initializers.lecun_normal()
-    gamma_init: Callable[[Any, Shape, Any], jnp.ndarray] = initializers.lecun_normal()
-
-    @nn.compact
-    def __call__(self, x: jnp.ndarray) -> jnp.ndarray:
-        """Call the module."""
-        alpha = self.param(
-            "alpha",
-            self.alpha_init,
-            (self.output_dim, self.input_dim),
-            self.param_dtype,
-        )
-        beta = self.param(
-            "beta",
-            self.beta_init,
-            (self.output_dim, self.input_dim),
-            self.param_dtype,
-        )
-        gamma = self.param(
-            "gamma",
-            self.gamma_init,
-            (self.output_dim, 1),
-            self.param_dtype,
-        )
-        y = (
-            jnp.einsum("...jz, ij -> ...iz", x, alpha)
-            + jnp.einsum("...jz, ij -> ...iz", x.sum(axis=-1)[..., None], beta)
-            + gamma
-        )
-        return y
-
-
-class DeepSetEncoder(nn.Module):
-    """A DeepSet encoder that encodes a condition into a latent vector.
-
-    Args:
-        hidden_dim: sequence specifying size of hidden dimensions.
-        output_dim: output dimension of the latent vector
-        act_fn: Activation function
-    """
-
-    hidden_dim_before_pool: int = 128
-    hidden_dim_after_pool: int = 128
-    n_layers_before_pool: int = 1
-    n_layers_after_pool: int = 1
-    output_dim: int = 5
+    act_last_layer: bool = True
     act_fn: Callable[[jnp.ndarray], jnp.ndarray] = nn.silu
-    dropout_rate_before_pool: float = 0.0
-    dropout_rate_after_pool: float = 0.0
-    equivar_transform: Literal["deepset", "mlp"] = "mlp"
-    pool: Literal["max", "mean", "sum"] = "mean"
-    training: bool | None = None
+
+    @nn.compact
+    def __call__(self, x: jnp.ndarray, training: bool = True) -> jnp.ndarray:
+        """
+        Forward pass.
+
+        Parameters
+        ----------
+        x : jnp.ndarray
+            Input tensor of shape ``(batch_size, input_dim)``.
+        training : bool
+            Whether the model is in training mode.
+
+        Returns
+        -------
+        Output tensor of shape ``(batch_size, output_dim)``.
+        """
+        z = x
+        for i in range(len(self.dims) - 1):
+            z = self.act_fn(nn.Dense(self.dims[i])(z))
+            z = nn.Dropout(self.dropout_rate)(z, deterministic=not training)
+        z = nn.Dense(self.dims[-1])(z)
+        z = self.act_fn(z) if self.act_last_layer else z
+        z = nn.Dropout(self.dropout_rate)(z, deterministic=not training)
+        return z
+
+
+class SelfAttention(BaseModule):
+    """
+    Self-attention optionally followed by FC layer with residual connection, making it a transformer block.
+
+    Parameters
+    ----------
+    num_heads : int
+        Number of heads.
+    qkv_dim : int
+        Dimensionality of the query, key, and value.
+    dropout_rate : float
+        Dropout rate.
+    transformer_block : bool
+        Whether to make it a transformer block (adds FC layer with residual connection).
+    layer_norm : bool
+        Whether to use layer normalization
+    """
+
+    num_heads: int = 8
+    qkv_dim: int = 64
+    dropout_rate: float = 0.0
+    transformer_block: bool = False
+    layer_norm: bool = False
+    act_fn: Callable[[jnp.ndarray], jnp.ndarray] = nn.silu
 
     @nn.compact
     def __call__(
         self,
         x: jnp.ndarray,
-        cond_sizes: jnp.ndarray | None = None,
-        training: bool | None = None,
-    ) -> jnp.ndarray:
-        """Call the module."""
-        # prepare input and mask
-        training = nn.merge_param("training", self.training, training)
+        mask: jnp.ndarray | None = None,
+        training: bool = True,
+    ):
+        """
+        Forward pass.
+
+        Parameters
+        ----------
+        x : jnp.ndarray
+            Input tensor of shape ``(batch_size, set_size, input_dim)`` or ``(batch_size, input_dim)``.
+        mask : Optional[jnp.ndarray]
+            Mask tensor of shape ``(batch_size, 1 | num_heads, set_size, set_size)``.
+        training : bool
+            Whether the model is in training mode.
+
+        Returns
+        -------
+        Output tensor of shape ``(batch_size, set_size, input_dim)``.
+        """
         squeeze = x.ndim == 2
-        if squeeze:
-            x = jnp.expand_dims(x, 0)
-        if cond_sizes is None:
-            cond_sizes = jnp.full(x.shape[0], x.shape[1])
-        mask = jnp.arange(x.shape[1]) < cond_sizes[:, None]
-        z = x
+        x = jnp.expand_dims(x, 1) if squeeze else x
 
-        # equivariant transform
-        if self.equivar_transform == "deepset":
-            z = z.transpose(0, 2, 1)
-            for _ in range(self.n_layers_before_pool):
-                Wx = DeepSet(z.shape[1], self.hidden_dim_before_pool)
-                z = self.act_fn(Wx(z))
-                z = nn.Dropout(rate=self.dropout_rate_before_pool)(
-                    z, deterministic=not training
-                )
-            axis_pool = 2
-            mask = jnp.expand_dims(mask, 1)
-        elif self.equivar_transform == "mlp":
-            for _ in range(self.n_layers_before_pool):
-                Wx = nn.Dense(self.hidden_dim_before_pool, use_bias=True)
-                z = Wx(z)
-                z = self.act_fn(z)
-                z = nn.Dropout(rate=self.dropout_rate_before_pool)(
-                    z, deterministic=not training
-                )
-            axis_pool = 1
-            mask = jnp.expand_dims(mask, -1)
-        else:
-            raise ValueError("Invalid equivariant transform")
+        # self-attention
+        z = nn.MultiHeadDotProductAttention(
+            num_heads=self.num_heads,
+            qkv_features=self.qkv_dim,
+            dropout_rate=self.dropout_rate,
+        )(x, mask=mask, deterministic=not training)
 
-        # pooling
-        if self.pool == "max":
-            z = z + (1 - mask) * (-99999)
-            z = z.max(axis=axis_pool)
-        elif self.pool == "mean":
-            z = z * mask
-            z = z.mean(axis=axis_pool)
-        elif self.pool == "sum":
-            z = z * mask
-            z = z.sum(axis=axis_pool)
+        if self.transformer_block:
+            # query residual connection
+            z = nn.Dropout(self.dropout_rate)(z, deterministic=not training)
+            z = z + x
+            if self.layer_norm:
+                z = nn.LayerNorm()(z)
+            # FC layer with residual connection
+            z_ = self.act_fn(nn.Dense(self.qkv_dim)(z))
+            z_ = nn.Dropout(self.dropout_rate)(z, deterministic=not training)
+            z = z + z_
 
-        # mlp
-        for _ in range(self.n_layers_after_pool):
-            Wx = nn.Dense(self.hidden_dim_after_pool, use_bias=True)
-            z = Wx(z)
-            z = self.act_fn(z)
-            z = nn.Dropout(rate=self.dropout_rate_after_pool)(
-                z, deterministic=not training
-            )
-        Wx = nn.Dense(self.output_dim, use_bias=True)
-        z = Wx(z)
-
-        return z.squeeze(0) if squeeze else z
+        return z.squeeze(1) if squeeze else z
 
 
-class MAB(nn.Module):
-    """Multi-head attention block."""
+class SeedAttentionPooling(BaseModule):
+    """
+    Pooling by multi-head attention with a trainable seed.
 
-    dim_V: int
-    num_heads: int
-    ln: bool = False
+    Parameters
+    ----------
+    num_heads : int
+        Number of heads.
+    v_dim : int
+        Dimensionality of the value.
+    seed_dim : int
+        Dimensionality of the seed.
+    dropout_rate : float
+        Dropout rate.
+    transformer_block : bool
+        Whether to make it a transformer block (adds FC layer with residual connection).
+    layer_norm : bool
+        Whether to use layer normalization.
+    act_fn : Callable[[jnp.ndarray], jnp.ndarray]
+        Activation function.
+
+    References
+    ----------
+    #FIXME: add set transformer reference
+    """
+
+    num_heads: int = 8
+    v_dim: int = 64
+    seed_dim: int = 64
     dropout_rate: float = 0.0
-    training: bool | None = None
+    transformer_block: bool = False
+    layer_norm: bool = False
+    act_fn: Callable[[jnp.ndarray], jnp.ndarray] = nn.silu
 
     @nn.compact
-    def __call__(self, Q, K, mask=None, training: bool | None = None):
-        """Call the module."""
-        training = nn.merge_param("training", self.training, training)
-        is_eval = not training
+    def __call__(
+        self,
+        x: jnp.ndarray,
+        mask: jnp.ndarray | None = None,
+        training: bool = True,
+    ):
+        """
+        Apply the pooling by multi-head attention.
 
-        Q = nn.Dense(self.dim_V)(Q)
-        K, V = nn.Dense(self.dim_V)(K), nn.Dense(self.dim_V)(K)
+        Parameters
+        ----------
+        x : jnp.ndarray
+            Input tensor of shape ``(batch_size, set_size, input_dim)``.
+        mask : Optional[jnp.ndarray]
+            Mask tensor of shape ``(batch_size, 1, set_size, set_size)``.
+        training : bool
+            Whether the model is in training mode.
 
+        Returns
+        -------
+        Output tensor of shape ``(batch_size, input_dim)``.
+        """
+        # trainable seed
+        S = self.param("S", initializers.xavier_uniform(), (1, 1, self.seed_dim))
+        S = jnp.tile(S, (x.shape[0], 1, 1))
+
+        # multi-head attention
+        Q = nn.Dense(self.v_dim)(S)
+        K, V = nn.Dense(self.v_dim)(x), nn.Dense(self.v_dim)(x)
         Q_ = jnp.concatenate(jnp.split(Q, self.num_heads, axis=2), axis=0)
         K_ = jnp.concatenate(jnp.split(K, self.num_heads, axis=2), axis=0)
         V_ = jnp.concatenate(jnp.split(V, self.num_heads, axis=2), axis=0)
-
-        A = jnp.matmul(Q_, K_.transpose(0, 2, 1)) / jnp.sqrt(self.dim_V)
+        A = jnp.matmul(Q_, K_.transpose(0, 2, 1)) / jnp.sqrt(self.v_dim)
+        A = jnp.matmul(Q_, K_.transpose(0, 2, 1)) / jnp.sqrt(self.v_dim)
         if mask is not None:
-            if Q_.shape[1] != 1:
-                # mask from (batch_, set_, set_) to (batch_ * num_heads, set_, set_)
-                mask = jnp.repeat(mask, self.num_heads, axis=0)
-            else:
-                # mask from (batch_, set_, set_) to (batch_ * num_heads, 1, set_)
-                mask = jnp.repeat(mask[:, [0], :], self.num_heads, axis=0)
+            # mask from (batch_, 1 | num_heads, set_, set_) to (batch_ * num_heads, 1, set_)
+            mask = jnp.repeat(mask[:, 0, [0], :], self.num_heads, axis=0)
             A = jnp.where(mask, A, -1e9)
         A = nn.softmax(A)
+        A = jnp.matmul(A, V_)
 
-        O = jnp.concatenate(
-            jnp.split(Q_ + jnp.matmul(A, V_), self.num_heads, axis=0), axis=2
-        )
+        if self.transformer_block:
+            # query residual connection
+            O = jnp.concatenate(jnp.split(Q_ + A, self.num_heads, axis=0), axis=2)
+            O = nn.Dropout(rate=self.dropout_rate)(O, deterministic=not training)
+            if self.layer_norm:
+                O = nn.LayerNorm()(O)
+            # FC layer with residual connection
+            O_ = self.act_fn(nn.Dense(self.v_dim)(O))
+            O_ = nn.Dropout(rate=self.dropout_rate)(O_, deterministic=not training)
+            O = O + O_
+            if self.layer_norm:
+                O = nn.LayerNorm()(O)
+        else:
+            O = jnp.concatenate(jnp.split(A, self.num_heads, axis=0), axis=2)
 
-        O = nn.Dropout(rate=self.dropout_rate)(O, deterministic=is_eval)
-        if self.ln:
-            O = nn.LayerNorm()(O)
-        O_ = nn.relu(nn.Dense(self.dim_V)(O))
-        O_ = nn.Dropout(rate=self.dropout_rate)(O_, deterministic=is_eval)
-        O = O + O_
-        if self.ln:
-            O = nn.LayerNorm()(O)
-
-        return O
-
-
-class SAB(nn.Module):
-    """Self-attention block."""
-
-    dim_out: int
-    num_heads: int
-    ln: bool = False
-    dropout_rate: float = 0.0
-    training: bool | None = None
-
-    @nn.compact
-    def __call__(self, X, mask=None, training: bool | None = None):
-        """Call the module."""
-        training = nn.merge_param("training", self.training, training)
-        return MAB(self.dim_out, self.num_heads, self.ln, self.dropout_rate, training)(
-            X, X, mask
-        )
+        return O.squeeze(1)
 
 
-class PMA(nn.Module):
-    """Pooling by multi-head attention."""
-
-    dim: int
-    num_heads: int
-    num_seeds: int
-    ln: bool = False
-    dropout_rate: float = 0.0
-    training: bool | None = None
-
-    @nn.compact
-    def __call__(self, X, mask=None, training: bool | None = None):
-        """Call the module."""
-        training = nn.merge_param("training", self.training, training)
-        S = self.param(
-            "S", initializers.xavier_uniform(), (1, self.num_seeds, self.dim)
-        )
-        S = jnp.tile(S, (X.shape[0], 1, 1))
-        return MAB(self.dim, self.num_heads, self.ln, self.dropout_rate, training)(
-            S, X, mask
-        )
-
-
-class SetTransformer(nn.Module):
+class TokenAttentionPooling(BaseModule):
     """
-    Set transformer.
+    Multi-head attention which aggregates sets by learning a token.
 
     Parameters
     ----------
-    dim_input : int
-        Input dimension.
-    num_outputs : int
-        Number of output features.
-    dim_output : int
-        Output dimension.
-    num_inds : int
-        Number of induced set elements.
-    dim_hidden : int
-        Hidden dimension.
-    num_heads : int
-        Number of heads.
-    ln : bool
-        Whether to use layer normalization.
+    num_heads: int = 8
+    qkv_dim: int = 64
+    dropout_rate: float = 0.0
+    act_fn: Callable[[jnp.ndarray], jnp.ndarray] = nn.silu
     """
 
-    # Copyright (c) 2020 Juho Lee
-    # Permission is hereby granted, free of charge, to any person obtaining a copy
-    # of this software and associated documentation files (the "Software"), to deal
-    # in the Software without restriction, including without limitation the rights
-    # to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-    # copies of the Software, and to permit persons to whom the Software is
-    # furnished to do so, subject to the following conditions:
-    # The above copyright notice and this permission notice shall be included in all
-    # copies or substantial portions of the Software.
-
-    dim_output: int
-    num_outputs: int = 1
-    dim_hidden_before_pool: int = 128
-    dim_hidden_after_pool: int = 128
-    num_heads: int = 4
-    ln: bool = False
-    n_enc_sab: int = 2
-    n_dec_sab: int = 2
-    dropout_rate_before_pool: float = 0.0
-    dropout_rate_pool: float = 0.0
-    dropout_rate_after_pool: float = 0.0
-    training: bool | None = None
-
-    def setup(self):
-        """Setup the module."""
-        self.enc_layers = [
-            SAB(
-                self.dim_hidden_before_pool,
-                self.num_heads,
-                self.ln,
-                self.dropout_rate_before_pool,
-            )
-            for _ in range(self.n_enc_sab)
-        ]
-        self.dec_layers = (
-            [
-                PMA(
-                    self.dim_hidden_after_pool,
-                    self.num_heads,
-                    self.num_outputs,
-                    self.ln,
-                    self.dropout_rate_pool,
-                )
-            ]
-            + [
-                SAB(
-                    self.dim_hidden_after_pool,
-                    self.num_heads,
-                    self.ln,
-                    self.dropout_rate_after_pool,
-                )
-                for _ in range(self.n_dec_sab)
-            ]
-            + [nn.Dense(self.dim_output)]
-        )
-
-    def __call__(
-        self,
-        x: dict[int, jnp.ndarray],
-        cond_sizes: jnp.ndarray | None = None,
-        training: bool | None = None,
-    ) -> jnp.ndarray:
-        """Call the module."""
-        raise NotImplementedError("TODO: Here we need the adaptation to x being dicts")
-        training = nn.merge_param("training", self.training, training)
-        squeeze = x.ndim == 2
-        if squeeze:
-            x = jnp.expand_dims(x, 0)
-
-        if cond_sizes is None:
-            cond_sizes = jnp.full(x.shape[0], x.shape[1])
-
-        # create mask, transform it from (batch_, set_) to (batch_, set_, set_) for attention
-        mask = jnp.arange(x.shape[1]) < cond_sizes[:, None]
-        mask = jnp.expand_dims(mask, -1)
-        mask = mask & mask.transpose(0, 2, 1)
-
-        for layer in self.enc_layers:
-            x = layer(x, mask, training)
-        for layer in self.dec_layers:
-            if isinstance(layer, PMA):
-                x = layer(x, mask, training)
-            elif isinstance(layer, SAB):
-                x = layer(x, training=training)
-            else:
-                x = layer(x)
-
-        x = x.squeeze(1)
-
-        return x.squeeze(0) if squeeze else x
-
-
-class SetEncoder(nn.Module):
-    """
-    Encoder for conditions represented as sets of perturbations, times, and doses.
-
-    Parameters
-    ----------
-    hidden_dim : Sequence[int]
-        Sequence specifying size of hidden dimensions.
-    max_set_size : int
-        Maximum set size, to which all sets were padded.
-    output_dim : int
-        Output dimension of the latent vector.
-    act_fn : Callable[[jnp.ndarray], jnp.ndarray]
-        Activation function.
-    set_encoder : Literal["deepset", "transformer"]
-        Set encoder to use.
-    set_encoder_kwargs : dict
-        Keyword arguments for the set encoder.
-    perturb_encoder_hidden_dim : Optional[Sequence[int]]
-        Hidden dimensions for the perturbation encoder (if any).
-    perturb_encoder_output_dim : Optional[int]
-        Output dimension for the perturbation encoder (if any).
-    time_encoder : Optional[Callable[[jnp.ndarray], jnp.ndarray]]
-        Encoder for time.
-    dose_encoder : Optional[Callable[[jnp.ndarray], jnp.ndarray]]
-        Encoder for dose.
-    """
-
-    hidden_dim_before_pool: int = 128
-    hidden_dim_after_pool: int = 128
-    n_layers_before_pool: int = 1
-    n_layers_after_pool: int = 1
-    max_set_size: int = 2
-    output_dim: int = 10
-    act_fn: Callable[[jnp.ndarray], jnp.ndarray] = nn.leaky_relu
-    dropout_rate_before_pool: float = 0.0
-    dropout_rate_after_pool: float = 0.0
-    set_encoder: Literal["deepset", "transformer"] = "deepset"
-    set_encoder_kwargs: dict[str, Any] = dc_field(default_factory=lambda: {})
-    equivar_transform: Literal["deepset", "mlp"] = "mlp"
-    training: bool | None = None
+    num_heads: int = 8
+    qkv_dim: int = 64
+    dropout_rate: float = 0.0
+    act_fn: Callable[[jnp.ndarray], jnp.ndarray] = nn.silu
 
     @nn.compact
     def __call__(
         self,
         x: jnp.ndarray,
-        cond_sizes: jnp.ndarray | None = None,
-        training: bool | None = None,
+        mask: jnp.ndarray | None = None,
+        training: bool = True,
     ) -> jnp.ndarray:
-        """
-        Apply the set encoder.
+        """Forward pass.
 
         Parameters
         ----------
-        x : tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray, jnp.ndarray]
-            tuple of perturbations, times, doses, and condition sizes.
+        x : jnp.ndarray
+            Input tensor of shape (batch_size, set_size, input_dim).
+        mask : Optional[jnp.ndarray]
+            Mask tensor of shape (batch_size, 1 | num_heads, set_size, set_size).
+        training : bool
+            Whether the model is in training mode.
+
+        Returns
+        -------
+        Output tensor of shape (batch_size, input_dim).
         """
-        training = nn.merge_param("training", self.training, training)
-        if self.set_encoder == "deepset":
-            SetEncoder = DeepSetEncoder(
-                hidden_dim_before_pool=self.hidden_dim_before_pool,
-                hidden_dim_after_pool=self.hidden_dim_after_pool,
-                n_layers_before_pool=self.n_layers_before_pool,
-                n_layers_after_pool=self.n_layers_after_pool,
-                output_dim=self.output_dim,
-                act_fn=self.act_fn,
-                dropout_rate_before_pool=self.dropout_rate_before_pool,
-                dropout_rate_after_pool=self.dropout_rate_after_pool,
-                equivar_transform=self.equivar_transform,
-                **self.set_encoder_kwargs,
-            )
-        elif self.set_encoder == "transformer":
-            SetEncoder = SetTransformer(
-                dim_output=self.output_dim,
-                dim_hidden_before_pool=self.hidden_dim_before_pool,
-                dim_hidden_after_pool=self.hidden_dim_after_pool,
-                n_enc_sab=self.n_layers_before_pool,
-                n_dec_sab=self.n_layers_after_pool,
-                dropout_rate_before_pool=self.dropout_rate_before_pool,
-                dropout_rate_after_pool=self.dropout_rate_after_pool,
-                **self.set_encoder_kwargs,
-            )
-        else:
-            raise ValueError(f"Set encoder {self.set_encoder} not implemented.")
-        z = SetEncoder(x, cond_sizes, training)
+        # add token
+        token_shape = (len(x), 1)
+        class_token = nn.Embed(num_embeddings=1, features=x.shape[-1])(
+            jnp.int32(jnp.zeros(token_shape))
+        )
+        z = jnp.concatenate((class_token, x), axis=-2)
+        token_mask = jnp.zeros((x.shape[0], 1, x.shape[1] + 1, x.shape[1] + 1))
+        token_mask = token_mask.at[:, :, 0, :].set(1)
+        token_mask = token_mask.at[:, :, :, 0].set(1)
+        token_mask = token_mask.at[:, :, 1:, 1:].set(mask)
+
+        # attention
+        attention = nn.MultiHeadDotProductAttention(
+            num_heads=self.num_heads,
+            qkv_features=self.qkv_dim,
+            dropout_rate=self.dropout_rate,
+        )
+        emb = attention(z, mask=token_mask, deterministic=not training)
+
+        # only continue with token 0
+        z = emb[:, 0, :]
 
         return z
 
-    def create_train_state(
-        self,
-        rng: jax.Array,
-        optimizer: optax.OptState,
-        input_dim: int,
-        **kwargs: Any,
-    ):
-        """Create initial training state."""
-        params = self.init(
-            rng,
-            x=jnp.ones((1, self.max_set_size, input_dim)),
-            cond_sizes=jnp.array([1]),
-            training=False,
-        )["params"]
-        return train_state.TrainState.create(
-            apply_fn=self.apply,
-            params=params,
-            tx=optimizer,
-            **kwargs,
-        )
 
-
-class ConditionSetEncoder(nn.Module):
+class ConditionEncoder(BaseModule):
     """
-    Encoder for conditions represented as sets of perturbations, times, and doses.
+    Encoder for conditions represented as sets of perturbations.
 
     Parameters
     ----------
-    hidden_dim : Sequence[int]
-        Sequence specifying size of hidden dimensions.
-    max_set_size : int
-        Maximum set size, to which all sets were padded.
     output_dim : int
-        Output dimension of the latent vector.
-    act_fn : Callable[[jnp.ndarray], jnp.ndarray]
-        Activation function.
-    set_encoder : Literal["deepset", "transformer"]
-        Set encoder to use.
-    set_encoder_kwargs : dict
-        Keyword arguments for the set encoder.
-    perturb_encoder_hidden_dim : Optional[Sequence[int]]
-        Hidden dimensions for the perturbation encoder (if any).
-    perturb_encoder_output_dim : Optional[int]
-        Output dimension for the perturbation encoder (if any).
-    time_encoder : Optional[Callable[[jnp.ndarray], jnp.ndarray]]
-        Encoder for time.
-    dose_encoder : Optional[Callable[[jnp.ndarray], jnp.ndarray]]
-        Encoder for dose.
+        Dimensionality of the output.
+    pooling : Literal["mean", "attention_token", "attention_seed"]
+        Pooling method.
+    pooling_kwargs : dict
+        Keyword arguments for the pooling method.
+    layers_before_pool : Sequence[tuple[Literal["mlp", "self_attention"], dict]] | dict
+        Layers before pooling. Either a sequence of tuples with layer type and parameters or a dictionary with input-specific layers.
+    layers_after_pool : Sequence[tuple[Literal["mlp", "self-attention"], dict]]
+        Layers after pooling.
+    output_dropout : float
+        Dropout rate for the output layer.
+    mask_value : float
+        Value for masked elements used in input conditions.
     """
 
-    hidden_dim_before_pool: int = 128
-    hidden_dim_after_pool: int = 128
-    n_layers_before_pool: int = 1
-    n_layers_after_pool: int = 1
-    max_set_size: int = 2
-    output_dim: int = 10
-    act_fn: Callable[[jnp.ndarray], jnp.ndarray] = nn.leaky_relu
-    dropout_rate_before_pool: float = 0.0
-    dropout_rate_after_pool: float = 0.0
-    set_encoder: Literal["deepset", "transformer"] = "deepset"
-    set_encoder_kwargs: dict[str, Any] = dc_field(default_factory=lambda: {})
-    equivar_transform: Literal["deepset", "mlp"] = "mlp"
-    training: bool | None = None
+    output_dim: int
+    pooling: Literal["mean", "attention_token", "attention_seed"] = "attention_token"
+    pooling_kwargs: dict = field(default_factory=lambda: {})
+    layers_before_pool: (
+        Sequence[tuple[Literal["mlp", "self_attention"], dict]] | dict
+    ) = field(default_factory=lambda: [])
+    layers_after_pool: Sequence[tuple[Literal["mlp", "self-attention"], dict]] = field(
+        default_factory=lambda: []
+    )
+    output_dropout: float = 0.0
+    mask_value: float = 0.0
 
-    @nn.compact
+    def setup(self):
+        """Initialize the modules."""
+        # modules before pooling
+        self.separate_inputs = isinstance(self.layers_before_pool, (dict | FrozenDict))
+        if self.separate_inputs:
+            # different layers for different inputs
+            self.before_pool_modules = {
+                key: self._get_layers(layers)
+                for key, layers in self.layers_before_pool.items()
+            }
+        else:
+            self.before_pool_modules = self._get_layers(self.layers_before_pool)
+
+        # pooling
+        if self.pooling == "mean":
+            self.pool_module = lambda x, mask: jnp.mean(x * mask, axis=-2)
+        elif self.pooling == "attention_token":
+            self.pool_module = TokenAttentionPooling(**self.pooling_kwargs)
+        elif self.pooling == "attention_seed":
+            self.pool_module = SeedAttentionPooling(**self.pooling_kwargs)
+
+        # modules after pooling
+        self.after_pool_modules = self._get_layers(
+            self.layers_after_pool, self.output_dim, self.output_dropout
+        )
+
     def __call__(
         self,
-        x: tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray, jnp.ndarray],
-        training: bool,
+        conditions: dict[str, jnp.ndarray],
+        training: bool = True,
     ) -> jnp.ndarray:
         """
         Apply the set encoder.
 
         Parameters
         ----------
-        x : tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray, jnp.ndarray]
-            tuple of perturbations, times, doses, and condition sizes.
-        """
-        training = nn.merge_param("training", self.training, training)
-        perturbs, times, doses, cond_sizes = x
-        CondSetEncoder = SetEncoder(
-            hidden_dim_before_pool=self.hidden_dim_before_pool,
-            hidden_dim_after_pool=self.hidden_dim_after_pool,
-            n_layers_before_pool=self.n_layers_before_pool,
-            n_layers_after_pool=self.n_layers_after_pool,
-            output_dim=self.output_dim,
-            act_fn=self.act_fn,
-            dropout_rate_before_pool=self.dropout_rate_before_pool,
-            dropout_rate_after_pool=self.dropout_rate_after_pool,
-            set_encoder=self.set_encoder,
-            set_encoder_kwargs=self.set_encoder_kwargs,
-            equivar_transform=self.equivar_transform,
-        )
-        # NOTE: maybe better to format the perturbs * concentrations earlier
-        perturb_doses = perturbs * doses
-        conds = jnp.concatenate([perturb_doses, times], axis=2)
-        z = CondSetEncoder(conds, cond_sizes, training)
+        conditions : dict[str, jnp.ndarray]
+            Dictionary of batch of conditions of shape ``(batch_size, set_size, condition_dim)``.
+        training : bool
+            Whether the model is in training mode.
 
-        return z
+        Returns
+        -------
+        Encoded conditions of shape ``(batch_size, output_dim)``.
+        """
+        mask, attention_mask = self._get_masks(conditions)
+
+        # apply modules before pooling
+        if self.separate_inputs:
+            processed_inputs = []
+            for pert_cov, conditions_i in conditions.items():
+                conditions_i = self._apply_modules(
+                    self.before_pool_modules[pert_cov],
+                    conditions_i,
+                    attention_mask,
+                    training,
+                )
+                processed_inputs.append(conditions_i)
+            conditions = jnp.concatenate(processed_inputs, axis=-1)
+        else:
+            conditions = jnp.concatenate(list(conditions.values()), axis=-1)
+            conditions = self._apply_modules(
+                self.before_pool_modules, conditions, attention_mask, training
+            )
+
+        # pooling
+        pool_mask = mask if self.pooling == "mean" else attention_mask
+        conditions = self.pool_module(conditions, pool_mask)
+
+        # apply modules after pooling
+        conditions = self._apply_modules(
+            self.after_pool_modules, conditions, None, training
+        )
+
+        return conditions
+
+    def _get_layers(
+        self,
+        layers: dict,
+        output_dim: int | None = None,
+        dropout_rate: float | None = None,
+    ) -> list:
+        """
+        Get modules from layer parameters.
+
+        Parameters
+        ----------
+        layers : dict
+            Layer parameters.
+        output_dim : int
+            Dimensionality of the output (adds a dense layer at the end).
+        dropout_rate : float
+            Dropout rate for the output layer.
+
+        Returns
+        -------
+        List of modules.
+        """
+        modules = []
+        for layer_type, layer_params in layers:
+            if layer_type == "mlp":
+                layer = MLPBlock(**layer_params)
+            elif layer_type == "self_attention":
+                layer = SelfAttention(**layer_params)
+            else:
+                raise ValueError(f"Unknown layer type: {layer_type}")
+            modules.append(layer)
+        if output_dim is not None:
+            modules.append(nn.Dense(output_dim))
+            if dropout_rate is not None:
+                modules.append(nn.Dropout(dropout_rate))
+        return modules
+
+    def _get_masks(
+        self,
+        conditions: dict,
+    ) -> tuple[jnp.ndarray, jnp.ndarray]:
+        """Get mask for padded conditions tensor."""
+        # FIXME: need some check but jittable
+        # masks = [jnp.all(c == self.mask_value, axis=-1) for c in conditions.values()]
+        # if not all(jnp.array_equal(masks[0], mask) for mask in masks):
+        #     raise ValueError("Conditions have different masked values.")
+
+        # mask of shape (batch_size, set_size)
+        mask = 1 - jnp.all(list(conditions.values())[0] == self.mask_value, axis=-1)
+        mask = jnp.expand_dims(mask, -1)
+
+        # attention mask of shape (batch_size, 1, set_size, set_size)
+        attention_mask = mask & jnp.matrix_transpose(mask)
+        attention_mask = jnp.expand_dims(attention_mask, 1)
+
+        return mask, attention_mask
+
+    def _apply_modules(self, modules, conditions, attention_mask, training):
+        """Apply modules to conditions."""
+        for module in modules:
+            if isinstance(module, SelfAttention):
+                conditions = module(conditions, attention_mask, training)
+            if isinstance(module, nn.Dense):
+                conditions = module(conditions)
+            else:
+                conditions = module(conditions, training)
+        return conditions
 
     def create_train_state(
         self,
         rng: jax.Array,
         optimizer: optax.OptState,
-        input_dim: tuple[int, ...],
+        conditions: dict[str, jnp.ndarray],
         **kwargs: Any,
     ):
         """Create initial training state."""
         params = self.init(
             rng,
-            x=(
-                jnp.ones((1, self.max_set_size, input_dim[0])),
-                jnp.ones((1, self.max_set_size, input_dim[1])),
-                jnp.ones((1, self.max_set_size, input_dim[2])),
-                jnp.array([1]),
-            ),
+            conditions={
+                k: jnp.empty((1, v.shape[1], v.shape[2])) for k, v in conditions.items()
+            },
             training=False,
         )["params"]
         return train_state.TrainState.create(

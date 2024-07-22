@@ -15,13 +15,12 @@ def dataloader():
 
         def sample(self, rng):
             return {
-                "src_lin": jnp.ones((10, 5)) * 10,
-                "tgt_lin": jnp.ones((10, 5)),
-                "src_condition": jnp.ones((10, 2, 3)),
+                "src_cell_data": jnp.ones((10, 5)) * 10,
+                "tgt_cell_data": jnp.ones((10, 5)),
+                "condition": {"pert1": jnp.ones((1, 2, 3))},
             }
 
     return DataLoader()
-
 
 
 @pytest.fixture()
@@ -80,13 +79,14 @@ def adata_perturbation() -> ad.AnnData:
 
     return adata
 
+
 @pytest.fixture()
 def adata_perturbation_with_nulls(adata_perturbation: ad.AnnData) -> ad.AnnData:
     adata = adata_perturbation.copy()
     del adata.obs["drug1"]
     del adata.obs["drug2"]
     del adata.obs["drug3"]
-    n_obs=adata.n_obs
+    n_obs = adata.n_obs
     drugs = ["drug_a", "drug_b", "drug_c", "control", "no_drug"]
     drug1 = np.random.choice(drugs, n_obs)
     drug2 = np.random.choice(drugs, n_obs)
@@ -124,4 +124,3 @@ def pdata(adata_perturbation: ad.AnnData) -> PerturbationData:
 @pytest.fixture()
 def sampler(pdata: PerturbationData):
     return CFSampler(pdata, batch_size=32)
-
