@@ -117,7 +117,7 @@ class PerturbationData:
                 f"Data should be a sequence, found {data} to be of type {type(data)}."
             )
         for group in data:
-            if not isinstance(group, tuple):
+            if not isinstance(group, tuple | list):
                 raise ValueError(
                     f"Group should be a tuple, found {group} to be of type {type(group)}."
                 )
@@ -136,7 +136,7 @@ class PerturbationData:
                 raise ValueError(
                     f"Key should be a string, found {group} to be of type {type(group)}."
                 )
-            if not isinstance(group, tuple):
+            if not isinstance(group, tuple | list):
                 raise ValueError(
                     f"Group should be a tuple, found {group} to be of type {type(group)}."
                 )
@@ -305,6 +305,7 @@ class PerturbationData:
             adata.obs[CONTROL_HELPER] = True
             adata.obs[CONTROL_HELPER] = adata.obs[CONTROL_HELPER].astype("category")
             split_covariates = [CONTROL_HELPER]
+
         cls._verify_control_data(adata, control_data)
         cls._verify_obs_perturbation_covariates(adata, obs_perturbation_covariates)
         cls._verify_uns_perturbation_covariates(adata, uns_perturbation_covariates)
@@ -465,7 +466,7 @@ class PerturbationData:
 
 
 @dataclass
-class ValidationData:
+class ValidationData(PerturbationData):
     """Data for validation."""
 
     pass
