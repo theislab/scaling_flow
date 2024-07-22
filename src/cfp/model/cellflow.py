@@ -64,11 +64,18 @@ class CellFlow:
 
         """
         obs_perturbation_covariates = obs_perturbation_covariates or []
+        self.obs_perturbation_covariates = obs_perturbation_covariates
+
         uns_perturbation_covariates = uns_perturbation_covariates or {}
+        self.uns_perturbation_covariates = uns_perturbation_covariates
+
         split_covariates = split_covariates or []
+        self.split_covariates = split_covariates
+
         control_data = (
             control_key if isinstance(control_key, tuple) else (control_key, True)
         )
+        self.control_data = control_data
 
         self.pdata = PerturbationData.load_from_adata(
             self.adata,
