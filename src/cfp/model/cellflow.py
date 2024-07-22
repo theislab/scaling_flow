@@ -86,6 +86,7 @@ class CellFlow:
             control_data=control_data,
             obs_perturbation_covariates=obs_perturbation_covariates,
             uns_perturbation_covariates=uns_perturbation_covariates,
+            **kwargs,
         )
 
         self._data_dim = self.pdata.cell_data.shape[-1]

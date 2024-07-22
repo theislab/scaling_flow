@@ -160,7 +160,7 @@ class PerturbationData:
         if not hasattr(arr, "shape") or len(arr.shape) == 0:
             return np.ones((1, 1)) * arr
         if arr.ndim == 1:  # type: ignore[union-attr]
-            return arr[:, None]  # type: ignore[index]
+            return np.expand_dims(arr, 0)  # type: ignore[return-value]
         elif arr.ndim == 2:  # type: ignore[union-attr]
             if arr.shape[0] == 1:
                 return arr  # type: ignore[return-value]
@@ -226,6 +226,10 @@ class PerturbationData:
                     arr = jnp.asarray(val)
                     arr = cls._check_shape(arr)
                 obs_group_emb.append(arr)
+            # TODO: currently this assumes that obs_group is either a single element or
+            # max_combination_length, otherwise the shapes will not match up.
+            # It might be good to make this a bit more explicit in the interface
+            # to avoid confusion.
             if len(obs_group) == 1:
                 embeddings[pert_embedding_idx_to_covariates_reversed[obs_group[0]]] = (
                     jnp.tile(obs_group_emb[0], (max_combination_length, 1))
@@ -236,7 +240,6 @@ class PerturbationData:
                 )
 
         for uns_key, uns_group in uns_perturbation_covariates.items():
-            uns_group = _to_list(uns_group)
             uns_group_emb = []
             for obs_col in uns_group:
                 values = list(adata.obs[obs_col].unique())
@@ -307,7 +310,11 @@ class PerturbationData:
             split_covariates = [CONTROL_HELPER]
 
         cls._verify_control_data(adata, control_data)
+        obs_perturbation_covariates = [_to_list(c) for c in obs_perturbation_covariates]
         cls._verify_obs_perturbation_covariates(adata, obs_perturbation_covariates)
+        uns_perturbation_covariates = {
+            k: _to_list(v) for k, v in uns_perturbation_covariates.items()
+        }
         cls._verify_uns_perturbation_covariates(adata, uns_perturbation_covariates)
 
         obs_combination_length = (
@@ -325,7 +332,8 @@ class PerturbationData:
         for covariate in split_covariates:
             if covariate not in adata.obs:
                 raise ValueError(f"Split covariate {covariate} not found in adata.obs.")
-            assert adata.obs[covariate].dtype.name == "category"
+            if adata.obs[covariate].dtype.name != "category":
+                adata.obs[covariate] = adata.obs[covariate].astype("category")
 
         pert_embedding_idx_to_covariates = cls._get_pert_emb_idx_to_covariate(
             obs_perturbation_covariates, uns_perturbation_covariates
@@ -346,7 +354,7 @@ class PerturbationData:
         tgt_dist_uns = {
             covariate: adata.obs[covariate].cat.categories
             for emb_covariates in uns_perturbation_covariates.values()  # type: ignore[attr-defined]
-            for covariate in _to_list(emb_covariates)
+            for covariate in emb_covariates
         }
         tgt_dist_obs.update(tgt_dist_uns)
         src_counter = 0
@@ -368,8 +376,11 @@ class PerturbationData:
             else {i: [] for i in range(len(pert_embedding_idx_to_covariates))}
         )
 
+        observed_tgt_combs = (
+            adata.obs[list(tgt_dist_obs.keys())].drop_duplicates().values
+        )
         control_mask = (adata.obs[control_data[0]] == control_data[1]) == 1
-        for src_combination in tqdm(src_dists):
+        for src_combination in src_dists:
             filter_dict = dict(zip(split_covariates, src_combination, strict=False))
             split_cov_mask = (
                 adata.obs[list(filter_dict.keys())] == list(filter_dict.values())
@@ -382,7 +393,8 @@ class PerturbationData:
             split_covariates_to_idx[src_counter] = src_combination
 
             conditional_distributions = []
-            for tgt_combination in itertools.product(*tgt_dist_obs.values()):
+
+            for tgt_combination in tqdm(observed_tgt_combs):
                 mask = (
                     (adata.obs[list(tgt_dist_obs.keys())] == list(tgt_combination)).all(
                         axis=1
