@@ -82,7 +82,6 @@ class CellFlowTrainer:
             tmat = self.model.match_fn(src, tgt)
             src_ixs, tgt_ixs = solver_utils.sample_joint(rng_resample, tmat)
             src, tgt = src[src_ixs], tgt[tgt_ixs]
-            src_cond = None if src_cond is None else src_cond[src_ixs]
 
         self.model.vf_state, loss = self.model.step_fn(
             rng_step_fn,
@@ -118,30 +117,16 @@ class CellFlowTrainer:
 
         pbar = tqdm(range(num_iterations))
         for it in pbar:
-            rng, rng_step_fn, rng_resample = jax.random.split(rng, 3)
+            rng, rng_step_fn = jax.random.split(rng, 3)
             batch = dataloader.sample(rng)
 
             src, tgt = batch["src_lin"], batch["tgt_lin"]
             src_cond = batch.get("src_condition")
 
-            match_fn = getattr(self.model, self._match_fn_name)
-            if match_fn is not None:
-                tmat = match_fn(src, tgt)
-                src_ixs, tgt_ixs = solver_utils.sample_joint(rng_resample, tmat)
-                src, tgt = src[src_ixs], tgt[tgt_ixs]
-                src_cond = (
-                    None
-                    if src_cond is None
-                    else {k: cond[src_ixs] for k, cond in src_cond.items()}
-                )
-
-            self.model.vf_state, loss = self.model.step_fn(
-                rng_step_fn,
-                self.model.vf_state,
-                src,
-                tgt,
-                src_cond,
-            )
+            if isinstance(self.model, genot.GENOT):
+                loss = self._genot_step_fn(rng_step_fn, src, tgt, src_cond)
+            else:
+                loss = self._otfm_step_fn(rng_step_fn, src, tgt, src_cond)
 
             training_logs["loss"].append(float(loss))
             if ((it - 1) % valid_freq == 0) and (it > 1):
