@@ -169,6 +169,7 @@ class CellFlow:
                 match_fn=match_fn,
                 flow=flow,
                 optimizer=optimizer,
+                pert_covs=self.pdata.condition_data.keys(),
                 rng=jax.random.PRNGKey(seed),
                 **solver_kwargs,
             )

@@ -37,7 +37,7 @@ class MLPBlock(BaseModule):
     """
     MLP block.
 
-    Attributes
+    Parameters
     ----------
     dims : Sequence[int]
         Dimensions of the MLP layers.
@@ -62,14 +62,13 @@ class MLPBlock(BaseModule):
         Parameters
         ----------
         x : jnp.ndarray
-            Input tensor of shape (batch_size, input_dim).
+            Input tensor of shape ``(batch_size, input_dim)``.
         training : bool
             Whether the model is in training mode.
 
         Returns
         -------
-        z : jnp.ndarray
-            Output tensor of shape (batch_size, output_dim).
+        Output tensor of shape ``(batch_size, output_dim)``.
         """
         z = x
         for i in range(len(self.dims) - 1):
@@ -85,7 +84,7 @@ class SelfAttention(BaseModule):
     """
     Self-attention optionally followed by FC layer with residual connection, making it a transformer block.
 
-    Attributes
+    Parameters
     ----------
     num_heads : int
         Number of heads.
@@ -119,16 +118,15 @@ class SelfAttention(BaseModule):
         Parameters
         ----------
         x : jnp.ndarray
-            Input tensor of shape (batch_size, set_size, input_dim).
+            Input tensor of shape ``(batch_size, set_size, input_dim)``.
         mask : Optional[jnp.ndarray]
-            Mask tensor of shape (batch_size, 1 | num_heads, set_size, set_size).
+            Mask tensor of shape ``(batch_size, 1 | num_heads, set_size, set_size)``.
         training : bool
             Whether the model is in training mode.
 
         Returns
         -------
-        z : jnp.ndarray
-            Output tensor of shape (batch_size, set_size, input_dim).
+        Output tensor of shape ``(batch_size, set_size, input_dim)``.
         """
         # self-attention
         z = nn.MultiHeadDotProductAttention(
@@ -155,7 +153,7 @@ class SeedAttentionPooling(BaseModule):
     """
     Pooling by multi-head attention with a trainable seed.
 
-    Attributes
+    Parameters
     ----------
     num_heads : int
         Number of heads.
@@ -198,11 +196,15 @@ class SeedAttentionPooling(BaseModule):
         Parameters
         ----------
         x : jnp.ndarray
-            Input tensor of shape (batch_size, set_size, input_dim).
+            Input tensor of shape ``(batch_size, set_size, input_dim)``.
         mask : Optional[jnp.ndarray]
-            Mask tensor of shape (batch_size, 1, set_size, set_size).
+            Mask tensor of shape ``(batch_size, 1, set_size, set_size)``.
         training : bool
             Whether the model is in training mode.
+
+        Returns
+        -------
+        Output tensor of shape ``(batch_size, input_dim)``.
         """
         # trainable seed
         S = self.param("S", initializers.xavier_uniform(), (1, 1, self.seed_dim))
@@ -243,54 +245,14 @@ class SeedAttentionPooling(BaseModule):
             O = jnp.concatenate(jnp.split(A, self.num_heads, axis=0), axis=2)
 
         return O.squeeze(1)
-        A = jnp.matmul(A, V_)
-
-        if self.transformer_block:
-            # query residual connection
-            O = jnp.concatenate(jnp.split(Q_ + A, self.num_heads, axis=0), axis=2)
-            O = nn.Dropout(rate=self.dropout_rate)(O, deterministic=not training)
-            if self.layer_norm:
-                O = nn.LayerNorm()(O)
-            # FC layer with residual connection
-            O_ = self.act_fn(nn.Dense(self.v_dim)(O))
-            O_ = nn.Dropout(rate=self.dropout_rate)(O_, deterministic=not training)
-            O = O + O_
-            if self.layer_norm:
-                O = nn.LayerNorm()(O)
-        else:
-            O = jnp.concatenate(jnp.split(A, self.num_heads, axis=0), axis=2)
-
-        return O.squeeze(1)
 
 
 class TokenAttentionPooling(BaseModule):
     """
     Multi-head attention which aggregates sets by learning a token.
 
-    Attributes
+    Parameters
     ----------
-    output_dim : int
-        Dimensionality of the output.
-    output_dim : int
-        Dimensionality of the output.
-    num_heads : int
-        Number of heads.
-    qkv_feature_dim : int
-        Feature dimension for the query, key, and value.
-    hidden_dims : Sequence[int]
-        Dimensions of the MLP layers after the attention.
-    dropout_rate : float
-        Dropout rate.
-    qkv_feature_dim : int
-        Feature dimension for the query, key, and value.
-    hidden_dims : Sequence[int]
-        Dimensions of the MLP layers after the attention.
-    dropout_rate : float
-        Dropout rate.
-    act_fn : Callable[[jnp.ndarray], jnp.ndarray]
-        Activation function.
-    """
-
     num_heads: int = 8
     qkv_dim: int = 64
     dropout_rate: float = 0.0
@@ -308,10 +270,7 @@ class TokenAttentionPooling(BaseModule):
         x: jnp.ndarray,
         mask: jnp.ndarray | None = None,
         training: bool = True,
-        mask: jnp.ndarray | None = None,
-        training: bool = True,
     ) -> jnp.ndarray:
-        """Forward pass.
         """Forward pass.
 
         Parameters
@@ -322,34 +281,10 @@ class TokenAttentionPooling(BaseModule):
             Mask tensor of shape (batch_size, 1 | num_heads, set_size, set_size).
         training : bool
             Whether the model is in training mode.
-        """
-        # add token
-        token_shape = (len(x), 1)
-        class_token = nn.Embed(num_embeddings=1, features=x.shape[-1])(
-            jnp.int32(jnp.zeros(token_shape))
-        )
-        z = jnp.concatenate((class_token, x), axis=-2)
-        token_mask = jnp.zeros((x.shape[0], 1, x.shape[1] + 1, x.shape[1] + 1))
-        token_mask = token_mask.at[:, :, 0, :].set(1)
-        token_mask = token_mask.at[:, :, :, 0].set(1)
-        token_mask = token_mask.at[:, :, 1:, 1:].set(mask)
 
-        # attention
-        attention = nn.MultiHeadDotProductAttention(
-            num_heads=self.num_heads,
-            qkv_features=self.qkv_dim,
-            dropout_rate=self.dropout_rate,
-        )
-        emb = attention(z, mask=token_mask, deterministic=not training)
-
-        # only continue with token 0
-        z = emb[:, 0, :]
-        x : jnp.ndarray
-            Input tensor of shape (batch_size, set_size, input_dim).
-        mask : Optional[jnp.ndarray]
-            Mask tensor of shape (batch_size, 1 | num_heads, set_size, set_size).
-        training : bool
-            Whether the model is in training mode.
+        Returns
+        -------
+        Output tensor of shape (batch_size, input_dim).
         """
         # add token
         token_shape = (len(x), 1)
@@ -379,10 +314,8 @@ class TokenAttentionPooling(BaseModule):
 class ConditionEncoder(BaseModule):
     """
     Encoder for conditions represented as sets of perturbations.
-    Encoder for conditions represented as sets of perturbations.
 
-    Attributes
-    Attributes
+    Parameters
     ----------
     output_dim : int
         Dimensionality of the output.
@@ -419,8 +352,8 @@ class ConditionEncoder(BaseModule):
         if self.separate_inputs:
             # different layers for different inputs
             self.before_pool_modules = {}
-            for cond_key, layers in self.layers_before_pool.items():
-                self.before_pool_modules[cond_key] = self._get_layers(layers)
+            for pert_cov, layers in self.layers_before_pool.items():
+                self.before_pool_modules[pert_cov] = self._get_layers(layers)
         else:
             self.before_pool_modules = self._get_layers(self.layers_before_pool)
 
@@ -461,9 +394,9 @@ class ConditionEncoder(BaseModule):
         # apply modules before pooling
         if self.separate_inputs:
             processed_inputs = []
-            for cond_key, conditions_i in conditions.items():
+            for pert_cov, conditions_i in conditions.items():
                 conditions_i = self._apply_modules(
-                    self.before_pool_modules[cond_key],
+                    self.before_pool_modules[pert_cov],
                     conditions_i,
                     attention_mask,
                     training,
@@ -493,6 +426,22 @@ class ConditionEncoder(BaseModule):
         output_dim: int | None = None,
         dropout_rate: float | None = None,
     ) -> list:
+        """
+        Get modules from layer parameters.
+
+        Parameters
+        ----------
+        layers : dict
+            Layer parameters.
+        output_dim : int
+            Dimensionality of the output (adds a dense layer at the end).
+        dropout_rate : float
+            Dropout rate for the output layer.
+
+        Returns
+        -------
+        List of modules.
+        """
         modules = []
         for layer_type, layer_params in layers:
             if layer_type == "mlp":
@@ -510,16 +459,16 @@ class ConditionEncoder(BaseModule):
 
     def _get_masks(
         self,
-        conditions: jnp.ndarray | tuple[jnp.ndarray, ...],
+        conditions: dict,
     ) -> tuple[jnp.ndarray, jnp.ndarray]:
         """Get mask for padded conditions tensor."""
-        if isinstance(conditions, tuple):
-            masks = [jnp.all(c == self.mask_value, axis=-1) for c in conditions]
-            if not all(jnp.array_equal(masks[0], mask) for mask in masks):
-                raise ValueError("Conditions have different masked values.")
+        masks = [jnp.all(c == self.mask_value, axis=-1) for c in conditions.values()]
+        # FIXME: need some check but jittable
+        # if not all(jnp.array_equal(masks[0], mask) for mask in masks):
+        #     raise ValueError("Conditions have different masked values.")
 
         # mask of shape (batch_size, set_size)
-        mask = 1 - jnp.all(conditions == self.mask_value, axis=-1)
+        mask = 1 - jnp.all(list(conditions.values())[0] == self.mask_value, axis=-1)
         mask = jnp.expand_dims(mask, -1)
 
         # attention mask of shape (batch_size, 1, set_size, set_size)
@@ -529,6 +478,7 @@ class ConditionEncoder(BaseModule):
         return mask, attention_mask
 
     def _apply_modules(self, modules, conditions, attention_mask, training):
+        """Apply modules to conditions."""
         for module in modules:
             if isinstance(module, SelfAttention):
                 conditions = module(conditions, attention_mask, training)
@@ -542,7 +492,6 @@ class ConditionEncoder(BaseModule):
         self,
         rng: jax.Array,
         optimizer: optax.OptState,
-        input_dim: int | tuple[int, ...],
         input_dim: int | tuple[int, ...],
         **kwargs: Any,
     ):

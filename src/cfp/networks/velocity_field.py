@@ -10,7 +10,7 @@ from flax import linen as nn
 from flax.training import train_state
 from ott.neural.networks.layers import time_encoder
 
-from cfp import logger
+from cfp._logging import logger
 from cfp.networks.modules import MLPBlock
 from cfp.networks.set_encoders import ConditionEncoder
 
@@ -109,6 +109,7 @@ class ConditionalVelocityField(nn.Module):
         t = time_encoder.cyclical_time_encoder(t, n_freqs=1024)
         t = self.time_encoder(t, training=train)
         x = self.x_encoder(x, training=train)
+        condition = jnp.tile(condition, (x.shape[0], 1))
         concatenated = jnp.concatenate((t, x, condition), axis=-1)
         out = self.decoder(concatenated, training=train)
         return self.output_layer(out)
@@ -137,6 +138,7 @@ class ConditionalVelocityField(nn.Module):
         rng: jax.Array,
         optimizer: optax.OptState,
         input_dim: int,
+        pert_covs: Sequence[str],
         condition_dim: int | None = None,
     ) -> train_state.TrainState:
         """Create the training state.
@@ -152,7 +154,10 @@ class ConditionalVelocityField(nn.Module):
         """
         condition_dim = condition_dim or self.condition_dim
         t, x = jnp.ones((1, 1)), jnp.ones((1, input_dim))
-        cond = jnp.ones((1, self.max_combination_length, condition_dim))
+        cond = {
+            pert_cov: jnp.ones((1, self.max_combination_length, condition_dim))
+            for pert_cov in pert_covs
+        }
         params = self.init(rng, t, x, cond, train=False)["params"]
         return train_state.TrainState.create(
             apply_fn=self.apply, params=params, tx=optimizer

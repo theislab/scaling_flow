@@ -60,7 +60,7 @@ class PerturbationData:
     perturbation_idx_to_covariates: dict[
         int, tuple[str, ...]
     ]  # (n_targets,), dictionary explaining perturbation_covariates_mask
-    condition_data: jax.Array | None  # (n_targets,) all embeddings for conditions
+    condition_data: dict[str, jnp.ndarray] | None  # (n_targets,) all embeddings for conditions
     control_to_perturbation: dict[
         int, jax.Array
     ]  # mapping from control idx to target distribution idcs
