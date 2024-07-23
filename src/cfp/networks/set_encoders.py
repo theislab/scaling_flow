@@ -463,13 +463,13 @@ class ConditionEncoder(BaseModule):
         conditions: dict,
     ) -> tuple[jnp.ndarray, jnp.ndarray]:
         """Get mask for padded conditions tensor."""
-        # FIXME: need some check but jittable
-        # masks = [jnp.all(c == self.mask_value, axis=-1) for c in conditions.values()]
-        # if not all(jnp.array_equal(masks[0], mask) for mask in masks):
-        #     raise ValueError("Conditions have different masked values.")
-
         # mask of shape (batch_size, set_size)
-        mask = 1 - jnp.all(list(conditions.values())[0] == self.mask_value, axis=-1)
+        mask = 1 - jnp.all(
+            jnp.array(
+                [jnp.all(c == self.mask_value, axis=-1) for c in conditions.values()]
+            ),
+            axis=0,
+        )
         mask = jnp.expand_dims(mask, -1)
 
         # attention mask of shape (batch_size, 1, set_size, set_size)
