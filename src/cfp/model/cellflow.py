@@ -31,9 +31,9 @@ class CellFlow:
 
         self.adata = adata
         self.solver = solver
-        self.val_data: Dict[str, PerturbationData] = {}
         self.dataloader: CFSampler | None = None
         self.trainer: CellFlowTrainer | None = None
+        self._validation_data: Dict[str, PerturbationData] = {}
         self._solver: otfm.OTFlowMatching | genot.GENOT | None = None
         self._condition_dim: int | None = None
 
@@ -81,6 +81,7 @@ class CellFlow:
         self.control_data = control_data
         self.cell_data = cell_data
         self.null_value = null_value
+        self.data_kwargs = kwargs
 
         self.pdata = PerturbationData.load_from_adata(
             self.adata,
@@ -124,8 +125,9 @@ class CellFlow:
             uns_perturbation_covariates=self.uns_perturbation_covariates,
             max_combination_length=self.pdata.max_combination_length,
             null_value=self.null_value,
+            **self.data_kwargs,
         )
-        self.val_data[name] = val_data
+        self._validation_data[name] = val_data
 
     def prepare_model(
         self,
@@ -260,7 +262,7 @@ class CellFlow:
 
         self.trainer.train(
             dataloader=self.dataloader,
-            val_data=self.val_data,
+            val_data=self._validation_data,
             num_iterations=num_iterations,
             valid_freq=valid_freq,
             callback_fn=callback_fn,

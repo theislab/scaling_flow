@@ -6,11 +6,16 @@ import numpy as np
 
 from cfp._constants import ArrayLike
 from cfp.data.data import ValidationData
-from cfp.metrics.metrics import compute_e_distance, compute_r_squared, compute_scalar_mmd, compute_sinkhorn_div
+from cfp.metrics.metrics import (
+    compute_e_distance,
+    compute_r_squared,
+    compute_scalar_mmd,
+    compute_sinkhorn_div,
+)
 from cfp.networks import ConditionalVelocityField
 
 
-class CFCallback(abc.ABC):
+class BaseCallback(abc.ABC):
 
     @abc.abstractmethod
     def on_train_begin(self, *args: Any, **kwargs: Any) -> None:
@@ -25,7 +30,7 @@ class CFCallback(abc.ABC):
         pass
 
 
-class LoggingCallback(CFCallback, abc.ABC):
+class LoggingCallback(BaseCallback, abc.ABC):
     @abc.abstractmethod
     def on_log_iteration(self, dict_to_log: dict[str, Any], **kwargs: Any) -> Any:
         pass
@@ -35,7 +40,7 @@ class LoggingCallback(CFCallback, abc.ABC):
         pass
 
 
-class ComputationCallback(CFCallback, abc.ABC):
+class ComputationCallback(BaseCallback, abc.ABC):
     @abc.abstractmethod
     def on_log_iteration(
         self,
@@ -145,7 +150,7 @@ class LoggingWandb(LoggingCallback):
         wandb.log(dict_to_log)
 
 
-class CallbackExecuter:
+class CallbackRunner:
     def __init__(
         self,
         computation_callbacks: list[ComputationCallback],
