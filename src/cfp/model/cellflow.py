@@ -10,7 +10,7 @@ from numpy.typing import ArrayLike
 from ott.neural.methods.flows import dynamics, genot, otfm
 from ott.solvers import utils as solver_utils
 
-from cfp.data.data import PerturbationData
+from cfp.data.data import PerturbationData, ValidationData
 from cfp.data.dataloader import CFSampler
 from cfp.networks.velocity_field import ConditionalVelocityField
 from cfp.training.trainer import CellFlowTrainer
@@ -46,6 +46,7 @@ class CellFlow:
             Sequence[dict[str, Sequence[str] | str]] | None
         ) = None,
         split_covariates: Sequence[str] | None = None,
+        null_value: float = 0.0,
         **kwargs,
     ) -> None:
         """Prepare dataloader for training from anndata object.
@@ -58,6 +59,7 @@ class CellFlow:
             obs_perturbation_covariates: Tuples of covariates in adata.obs characterizing the perturbed cells (together with `split_covariates` and `uns_perturbation_covariates`) and encoded by the values as found in `adata.obs`. If a tuple contains more than
             one element, this is interpreted as a combination of covariates that should be treated as an unordered set.
             uns_perturbation_covariates: Dictionaries with keys in adata.uns[`UNS_KEY_CONDITION`] and values columns in adata.obs which characterize the perturbed cells (together with `split_covariates` and `obs_perturbation_covariates`) and encoded by the values as found in `adata.uns[`UNS_KEY_CONDITION`][uns_perturbation_covariates.keys()]`. If a value of the dictionary is a tuple with more than one element, this is interpreted as a combination of covariates that should be treated as an unordered set.
+            null_value: Value to use indication the lack of a covariate in the data.
 
         Returns
         -------
@@ -78,6 +80,7 @@ class CellFlow:
         )
         self.control_data = control_data
         self.cell_data = cell_data
+        self.null_value = null_value
 
         self.pdata = PerturbationData.load_from_adata(
             self.adata,
@@ -86,6 +89,7 @@ class CellFlow:
             control_data=control_data,
             obs_perturbation_covariates=obs_perturbation_covariates,
             uns_perturbation_covariates=uns_perturbation_covariates,
+            null_value=null_value,
             **kwargs,
         )
 
@@ -107,13 +111,19 @@ class CellFlow:
         -------
             None
         """
-        val_data = PerturbationData.load_from_adata(
+        if self.pdata is None:
+            raise ValueError(
+                "Dataloader not initialized. Training data needs to be set up before preparing validation data. Please call prepare_data first."
+            )
+        val_data = ValidationData.load_from_adata(
             adata,
             cell_data=self.cell_data,
             split_covariates=self.split_covariates,
             control_data=self.control_data,
             obs_perturbation_covariates=self.obs_perturbation_covariates,
             uns_perturbation_covariates=self.uns_perturbation_covariates,
+            max_combination_length=self.pdata.max_combination_length,
+            null_value=self.null_value,
         )
         self.val_data[name] = val_data
 
