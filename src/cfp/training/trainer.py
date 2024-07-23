@@ -94,12 +94,33 @@ class CellFlowTrainer:
         )
         return loss
 
+    def _validation_step(
+        self,
+        val_data,
+    ):
+        """Validation step."""
+
+        pred_data: dict[str, dict[str, ArrayLike]] = {}
+        for val_key, vdl in val_data.items():
+            pred_data[val_key] = {}
+            for src_dist in vdl.src_data:
+                pred_data[val_key][src_dist] = {}
+                src = vdl.src_data[src_dist]
+                tgt_dists = vdl.tgt_data[src_dist]
+                for tgt_dist in tgt_dists:
+                    condition = vdl.condition_data[src_dist][tgt_dist]
+                    pred = self.predict(src, condition)
+                    pred_data[val_key][src_dist][tgt_dist] = pred
+
+        return pred_data
+
     def train(
         self,
         dataloader: CFSampler,
-        val_data: dict[str, ArrayLike],
         num_iterations: int,
         valid_freq: int,
+        valid_data: dict[str, dict[str, dict[str, ArrayLike]]] = {},
+        log_freq: int = 10,
         callback_fn: (
             Callable[[otfm.OTFlowMatching | genot.GENOT, dict[str, Any]], Any] | None
         ) = None,
@@ -118,6 +139,8 @@ class CellFlowTrainer:
         training_logs: dict[str, Any] = {"loss": []}
         rng = jax.random.PRNGKey(0)
 
+        valid_data["train"] = {}
+
         pbar = tqdm(range(num_iterations))
         for it in pbar:
             rng, rng_step_fn = jax.random.split(rng, 2)
@@ -132,11 +155,16 @@ class CellFlowTrainer:
                 loss = self._otfm_step_fn(rng_step_fn, src, tgt, condition)
 
             training_logs["loss"].append(float(loss))
-            if ((it - 1) % valid_freq == 0) and (it > 1):
-                train_loss = np.mean(training_logs["loss"][valid_freq:])
-                log_metrics = {"train_loss": train_loss}
-
+            if ((it - 1) % log_freq == 0) and (it > 1):
                 pbar.set_postfix({"loss": float(loss.mean().round(2))})
+
+            if ((it - 1) % valid_freq == 0) and (it > 1):
+                valid_data["train"][0] = {
+                    "src_data": src,
+                    "tgt_data": tgt,
+                    "condition_data": condition,
+                }
+                pred_data = self._validation_step(valid_data)
 
                 if callback_fn is not None:
                     callback_fn(

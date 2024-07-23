@@ -837,6 +837,8 @@ class ValidationData:
                 continue
 
             src_data[src_counter] = cls._get_cell_data(adata[mask], cell_data)
+            tgt_data[src_counter] = {}
+            condition_data[src_counter] = {}
 
             tgt_counter = 0
             for tgt_combination in tqdm(observed_tgt_combs):
@@ -849,9 +851,6 @@ class ValidationData:
                 ) == 1
                 if mask.sum() == 0:
                     continue
-
-                if src_counter not in tgt_data:
-                    tgt_data[src_counter] = {}
 
                 tgt_data[src_counter][tgt_counter] = cls._get_cell_data(
                     adata[mask], cell_data
@@ -869,12 +868,12 @@ class ValidationData:
                         null_token=null_token,
                     )
 
-                    if tgt_counter not in condition_data:
-                        condition_data[tgt_counter] = {}
-
+                    condition_data[src_counter][tgt_counter] = {}
                     for pert_cov, emb in embedding.items():
                         pert_key = pert_embedding_idx_to_covariates[pert_cov]
-                        condition_data[tgt_counter][pert_key] = emb
+                        condition_data[src_counter][tgt_counter][pert_key] = (
+                            jnp.expand_dims(emb, 0)
+                        )
 
                 tgt_counter += 1
             src_counter += 1

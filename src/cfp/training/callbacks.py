@@ -94,7 +94,9 @@ class ComputeMetrics(ComputationCallback):
         for metric in self.metrics:
             for k in validation_data.keys():
                 metrics[f"{k}_{metric}"] = jtu.tree_map(
-                    metric_to_func[metric], validation_data[k], predicted_data[k]
+                    metric_to_func[metric],
+                    validation_data[k].tgt_data,
+                    predicted_data[k],
                 )
         # TODO: implement metric aggregation
         return metrics

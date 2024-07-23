@@ -262,9 +262,9 @@ class CellFlow:
 
         self.trainer.train(
             dataloader=self.dataloader,
-            val_data=self._validation_data,
             num_iterations=num_iterations,
             valid_freq=valid_freq,
+            valid_data=self._validation_data,
             callback_fn=callback_fn,
         )
 
