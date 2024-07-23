@@ -60,7 +60,9 @@ class PerturbationData:
     perturbation_idx_to_covariates: dict[
         int, tuple[str, ...]
     ]  # (n_targets,), dictionary explaining perturbation_covariates_mask
-    condition_data: jax.Array | None  # (n_targets,) all embeddings for conditions
+    condition_data: (
+        dict[str, jnp.ndarray] | None
+    )  # (n_targets,) all embeddings for conditions
     control_to_perturbation: dict[
         int, jax.Array
     ]  # mapping from control idx to target distribution idcs
@@ -81,10 +83,10 @@ class PerturbationData:
                 return jnp.asarray(cell_data)
         if isinstance(cell_data, str):
             if cell_data not in adata.obsm:
-                raise error_message
+                raise ValueError(error_message)
             return jnp.asarray(adata.obsm[cell_data])
         if not isinstance(cell_data, dict):
-            raise error_message
+            raise ValueError(error_message)
         attr = list(cell_data.keys())[0]
         key = list(cell_data.values())[0]
         return jnp.asarray(getattr(adata, attr)[key])

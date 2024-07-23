@@ -31,7 +31,7 @@ class CFSampler:
             for i in range(self.n_source_dists)
         ]
         self.get_embeddings = lambda idx: {
-            pert_cov: jnp.tile(arr[idx], (self.batch_size, 1, 1))
+            pert_cov: jnp.expand_dims(arr[idx], 0)
             for pert_cov, arr in self.data.condition_data.items()
         }
 
@@ -66,13 +66,13 @@ class CFSampler:
             )
             target_batch = self.data.cell_data[target_batch_idcs]
             if self.data.condition_data is None:
-                return {"src_lin": source_batch, "tgt_lin": target_batch}
+                return {"src_cell_data": source_batch, "tgt_cell_data": target_batch}
 
             condition_batch = self.get_embeddings(target_dist_idx)
             return {
                 "src_cell_data": source_batch,
                 "tgt_cell_data": target_batch,
-                "src_condition": condition_batch,
+                "condition": condition_batch,
             }
 
         self.sample = _sample

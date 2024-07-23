@@ -23,11 +23,9 @@ class TestCellFlow:
             uns_perturbation_covariates=uns_perturbation_covariates,
         )
         assert cf.pdata is not None
-        assert hasattr(cf, "_condition_dim")
         assert hasattr(cf, "_data_dim")
 
         cf.prepare_model(
-            condition_encoder="transformer",
             condition_embedding_dim=32,
             hidden_dims=(32, 32),
             decoder_dims=(32, 32),
