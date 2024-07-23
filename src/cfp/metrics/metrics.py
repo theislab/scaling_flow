@@ -1,4 +1,7 @@
+import jax
+from jax import numpy as jnp
 import numpy as np
+from functools import partial
 from ott.geometry import costs, pointcloud
 from ott.tools.sinkhorn_divergence import sinkhorn_divergence
 from sklearn.metrics import pairwise_distances, r2_score
@@ -12,7 +15,7 @@ def compute_r_squared(x: np.array, y: np.array) -> float:
     return r2_score(np.mean(x, axis=0), np.mean(y, axis=0))
 
 
-def compute_sinkhorn_div(x: np.array, y: np.array, epsilon: float) -> float:
+def compute_sinkhorn_div(x: np.array, y: np.array, epsilon: float = 1e-2) -> float:
     """Compute the Sinkhorn divergence between x and y."""
     return float(
         sinkhorn_divergence(
@@ -58,28 +61,44 @@ def compute_mean_metrics(metrics: dict[str, dict[str, float]], prefix: str = "")
     return metric_dict
 
 
-def mmd_distance(x, y, gamma):
-    """Compute single MMD based on RBF kernel."""
-    xx = rbf_kernel(x, x, gamma)
-    xy = rbf_kernel(x, y, gamma)
-    yy = rbf_kernel(y, y, gamma)
-
-    return xx.mean() + yy.mean() - 2 * xy.mean()
+@jax.jit
+@partial(jax.vmap, in_axes=[0, None])
+@partial(jax.vmap, in_axes=[None, 0])
+def rbf_kernel(x, y, gamma):
+    return jnp.exp(-gamma * (jnp.linalg.norm(x - y) ** 2))
 
 
-def compute_scalar_mmd(target, transport, gammas=None):  # from CellOT repo
+@jax.jit
+def rbf_kernel_fast(X, Y, gamma):
+    XX = (X**2).sum(1)
+    YY = (Y**2).sum(1)
+    XY = X @ Y.T
+    sq_distances = XX[:, None] + YY - 2 * XY
+    return jnp.exp(-gamma * sq_distances)
+
+
+def maximum_mean_discrepancy(X, Y, gamma=1.0, exact=False):
+    """Compute the Maximum Mean Discrepancy (MMD) between two samples: x and y.
+    Args:
+        x: a tensor of shape [num_samples, num_features]
+        y: a tensor of shape [num_samples, num_features]
+        exact: a bool
+    Returns:
+        a scalar denoting the squared maximum mean discrepancy loss.
+    """
+    kernel = rbf_kernel if exact else rbf_kernel_fast
+    XX = kernel(X, X, gamma)
+    XY = kernel(X, Y, gamma)
+    YY = kernel(Y, Y, gamma)
+    return XX.mean() + YY.mean() - 2 * XY.mean()
+
+
+def compute_scalar_mmd(x: np.array, y: np.array, gammas=None):  # from CellOT repo
     """Compute MMD across different length scales"""
     if gammas is None:
         gammas = [2, 1, 0.5, 0.1, 0.01, 0.005]
-
-    def safe_mmd(*args):
-        try:
-            mmd = mmd_distance(*args)
-        except ValueError:
-            mmd = np.nan
-        return mmd
-
-    return np.mean(list(lambda x: safe_mmd(target, transport, x), gammas))
+    mmds = [maximum_mean_discrepancy(x, y, gamma=gamma) for gamma in gammas]
+    return np.nanmean(jnp.array(mmds))
 
 
 def compute_metrics_fast(x: np.array, y: np.array) -> dict[str, float]:

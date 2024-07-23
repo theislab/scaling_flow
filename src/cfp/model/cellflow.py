@@ -237,16 +237,17 @@ class CellFlow:
         num_iterations: int,
         batch_size: int = 64,
         valid_freq: int = 10,
-        callback_fn: (
-            Callable[[otfm.OTFlowMatching | genot.GENOT, dict[str, Any]], Any] | None
-        ) = None,
+        callbacks: Sequence[Callable] | None = None,
+        monitor_metrics: Sequence[str] = [],
     ) -> None:
         """Train the model.
 
         Args:
             num_iterations: Number of iterations to train the model.
+            batch_size: Batch size.
             valid_freq: Frequency of validation.
-            callback_fn: Callback function.
+            callbacks: Callback functions.
+            monitor_metrics: Metrics to monitor.
 
         Returns
         -------
@@ -265,7 +266,8 @@ class CellFlow:
             num_iterations=num_iterations,
             valid_freq=valid_freq,
             valid_data=self._validation_data,
-            callback_fn=callback_fn,
+            callbacks=callbacks,
+            monitor_metrics=monitor_metrics,
         )
 
     def predict(
