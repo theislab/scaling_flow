@@ -19,6 +19,7 @@ from .utils import _to_list
 __all__ = ["PerturbationData", "ValidationData"]
 
 
+# TODO: base class for perturb data to avoid duplicating methods
 @dataclass
 class PerturbationData:
     """Data container for the perturbation data.
