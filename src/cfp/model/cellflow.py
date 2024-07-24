@@ -10,7 +10,7 @@ from numpy.typing import ArrayLike
 from ott.neural.methods.flows import dynamics, genot, otfm
 from ott.solvers import utils as solver_utils
 
-from cfp.data.data import PerturbationData
+from cfp.data.data import PerturbationData, ValidationData
 from cfp.data.dataloader import CFSampler
 from cfp.networks.velocity_field import ConditionalVelocityField
 from cfp.training.trainer import CellFlowTrainer
@@ -31,9 +31,11 @@ class CellFlow:
 
         self.adata = adata
         self.solver = solver
-        self.dataloader = None
-        self.trainer = None
-        self._solver = None
+        self.dataloader: CFSampler | None = None
+        self.trainer: CellFlowTrainer | None = None
+        self._validation_data: dict[str, PerturbationData] = {}
+        self._solver: otfm.OTFlowMatching | genot.GENOT | None = None
+        self._condition_dim: int | None = None
 
     def prepare_data(
         self,
@@ -44,6 +46,7 @@ class CellFlow:
             Sequence[dict[str, Sequence[str] | str]] | None
         ) = None,
         split_covariates: Sequence[str] | None = None,
+        null_value: float = 0.0,
         **kwargs,
     ) -> None:
         """Prepare dataloader for training from anndata object.
@@ -56,6 +59,7 @@ class CellFlow:
             obs_perturbation_covariates: Tuples of covariates in adata.obs characterizing the perturbed cells (together with `split_covariates` and `uns_perturbation_covariates`) and encoded by the values as found in `adata.obs`. If a tuple contains more than
             one element, this is interpreted as a combination of covariates that should be treated as an unordered set.
             uns_perturbation_covariates: Dictionaries with keys in adata.uns[`UNS_KEY_CONDITION`] and values columns in adata.obs which characterize the perturbed cells (together with `split_covariates` and `obs_perturbation_covariates`) and encoded by the values as found in `adata.uns[`UNS_KEY_CONDITION`][uns_perturbation_covariates.keys()]`. If a value of the dictionary is a tuple with more than one element, this is interpreted as a combination of covariates that should be treated as an unordered set.
+            null_value: Value to use indication the lack of a covariate in the data.
 
         Returns
         -------
@@ -63,11 +67,21 @@ class CellFlow:
 
         """
         obs_perturbation_covariates = obs_perturbation_covariates or []
+        self.obs_perturbation_covariates = obs_perturbation_covariates
+
         uns_perturbation_covariates = uns_perturbation_covariates or {}
+        self.uns_perturbation_covariates = uns_perturbation_covariates
+
         split_covariates = split_covariates or []
+        self.split_covariates = split_covariates
+
         control_data = (
             control_key if isinstance(control_key, tuple) else (control_key, True)
         )
+        self.control_data = control_data
+        self.cell_data = cell_data
+        self.null_value = null_value
+        self.data_kwargs = kwargs
 
         self.pdata = PerturbationData.load_from_adata(
             self.adata,
@@ -76,9 +90,44 @@ class CellFlow:
             control_data=control_data,
             obs_perturbation_covariates=obs_perturbation_covariates,
             uns_perturbation_covariates=uns_perturbation_covariates,
+            null_value=null_value,
+            **kwargs,
         )
 
         self._data_dim = self.pdata.cell_data.shape[-1]
+
+    def prepare_validation_data(
+        self,
+        adata: ad.AnnData,
+        name: str = "validation",
+    ) -> None:
+        """Prepare validation data.
+
+        Args:
+            adata: Anndata object.
+            name: Name of the validation data.
+            **kwargs: Keyword arguments.
+
+        Returns
+        -------
+            None
+        """
+        if self.pdata is None:
+            raise ValueError(
+                "Dataloader not initialized. Training data needs to be set up before preparing validation data. Please call prepare_data first."
+            )
+        val_data = ValidationData.load_from_adata(
+            adata,
+            cell_data=self.cell_data,
+            split_covariates=self.split_covariates,
+            control_data=self.control_data,
+            obs_perturbation_covariates=self.obs_perturbation_covariates,
+            uns_perturbation_covariates=self.uns_perturbation_covariates,
+            max_combination_length=self.pdata.max_combination_length,
+            null_value=self.null_value,
+            **self.data_kwargs,
+        )
+        self._validation_data[name] = val_data
 
     def prepare_model(
         self,
@@ -188,16 +237,17 @@ class CellFlow:
         num_iterations: int,
         batch_size: int = 64,
         valid_freq: int = 10,
-        callback_fn: (
-            Callable[[otfm.OTFlowMatching | genot.GENOT, dict[str, Any]], Any] | None
-        ) = None,
+        callbacks: Sequence[Callable] = [],
+        monitor_metrics: Sequence[str] = [],
     ) -> None:
         """Train the model.
 
         Args:
             num_iterations: Number of iterations to train the model.
+            batch_size: Batch size.
             valid_freq: Frequency of validation.
-            callback_fn: Callback function.
+            callbacks: Callback functions.
+            monitor_metrics: Metrics to monitor.
 
         Returns
         -------
@@ -215,7 +265,9 @@ class CellFlow:
             dataloader=self.dataloader,
             num_iterations=num_iterations,
             valid_freq=valid_freq,
-            callback_fn=callback_fn,
+            valid_data=self._validation_data,
+            callbacks=callbacks,
+            monitor_metrics=monitor_metrics,
         )
 
     def predict(

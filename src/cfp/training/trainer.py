@@ -1,4 +1,4 @@
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from typing import Any
 
 import diffrax
@@ -11,6 +11,7 @@ from ott.solvers import utils as solver_utils
 from tqdm import tqdm
 
 from cfp.data.dataloader import CFSampler
+from cfp.training.callbacks import CallbackRunner
 
 
 class CellFlowTrainer:
@@ -36,8 +37,15 @@ class CellFlowTrainer:
             )
 
         self.model = model
+        self.training_logs: dict[str, Any] = {}
 
-    def _genot_step_fn(self, rng, src, tgt, condition):
+    def _genot_step_fn(
+        self,
+        rng: jnp.ndarray,
+        src: jnp.ndarray,
+        tgt: jnp.ndarray,
+        condition: jnp.ndarray,
+    ):
         """Step function for GENOT solver."""
         rng, rng_resample, rng_noise, rng_time, rng_step_fn = jax.random.split(rng, 5)
 
@@ -77,7 +85,13 @@ class CellFlowTrainer:
         )
         return loss
 
-    def _otfm_step_fn(self, rng, src, tgt, condition):
+    def _otfm_step_fn(
+        self,
+        rng: jnp.ndarray,
+        src: jnp.ndarray,
+        tgt: jnp.ndarray,
+        condition: jnp.ndarray,
+    ):
         """Step function for OTFM solver."""
         rng_resample, rng_step_fn = jax.random.split(rng, 2)
         if self.model.match_fn is not None:
@@ -94,28 +108,72 @@ class CellFlowTrainer:
         )
         return loss
 
+    def _validation_step(
+        self,
+        batch: dict[str, ArrayLike],
+        val_data: dict[str, dict[str, dict[str, ArrayLike]]],
+    ) -> dict[str, dict[str, dict[str, ArrayLike]]]:
+        """Compute predictions for validation data."""
+        # TODO: Sample fixed number of conditions to validate on
+
+        valid_pred_data: dict[str, dict[str, ArrayLike]] = {}
+        for val_key, vdl in val_data.items():
+            valid_pred_data[val_key] = {}
+            for src_dist in vdl.src_data:
+                valid_pred_data[val_key][src_dist] = {}
+                src = vdl.src_data[src_dist]
+                tgt_dists = vdl.tgt_data[src_dist]
+                for tgt_dist in tgt_dists:
+                    condition = vdl.condition_data[src_dist][tgt_dist]
+                    pred = self.predict(src, condition)
+                    valid_pred_data[val_key][src_dist][tgt_dist] = pred
+
+        src = batch["src_cell_data"]
+        condition = batch.get("condition")
+        train_pred = self.predict(src, condition)
+        batch["pred_data"] = train_pred
+
+        return batch, valid_pred_data
+
+    def _update_logs(self, logs: dict[str, Any]) -> None:
+        """Update training logs."""
+        for k, v in logs.items():
+            if k not in self.training_logs:
+                self.training_logs[k] = []
+            self.training_logs[k].append(v)
+
     def train(
         self,
         dataloader: CFSampler,
         num_iterations: int,
         valid_freq: int,
-        callback_fn: (
-            Callable[[otfm.OTFlowMatching | genot.GENOT, dict[str, Any]], Any] | None
-        ) = None,
+        valid_data: dict[str, dict[str, dict[str, ArrayLike]]] | None = None,
+        monitor_metrics: Sequence[str] = [],
+        callbacks: Sequence[Callable] = [],
     ) -> None:
         """Trains the model.
 
         Args:
             num_iterations: Number of iterations to train the model.
+            batch_size: Batch size.
             valid_freq: Frequency of validation.
-            callback_fn: Callback
+            callbacks: Callback functions.
+            monitor_metrics: Metrics to monitor.
 
         Returns
         -------
             None
         """
-        training_logs: dict[str, Any] = {"loss": []}
+        self.training_logs = {"loss": []}
         rng = jax.random.PRNGKey(0)
+
+        # Initiate callbacks
+        valid_data = valid_data or {}
+        crun = CallbackRunner(
+            callbacks=callbacks,
+            data=valid_data,
+        )
+        crun.on_train_begin()
 
         pbar = tqdm(range(num_iterations))
         for it in pbar:
@@ -130,18 +188,32 @@ class CellFlowTrainer:
             else:
                 loss = self._otfm_step_fn(rng_step_fn, src, tgt, condition)
 
-            training_logs["loss"].append(float(loss))
+            self.training_logs["loss"].append(float(loss))
+
             if ((it - 1) % valid_freq == 0) and (it > 1):
-                train_loss = np.mean(training_logs["loss"][valid_freq:])
-                log_metrics = {"train_loss": train_loss}
+                # TODO: Accumulate tran data over multiple iterations
 
-                pbar.set_postfix({"loss": float(loss.mean().round(2))})
+                # Get predictions from validation data
+                train_data, valid_pred_data = self._validation_step(batch, valid_data)
 
-                if callback_fn is not None:
-                    callback_fn(
-                        self.model,
-                        log_metrics,
-                    )
+                # Run callbacks
+                metrics = crun.on_log_iteration(train_data, valid_pred_data)
+                self._update_logs(metrics)
+
+                # Update progress bar
+                mean_loss = np.mean(self.training_logs["loss"][-valid_freq:])
+                postfix_dict = {
+                    metric: round(self.training_logs[metric][-1], 3)
+                    for metric in monitor_metrics
+                }
+                postfix_dict["loss"] = round(mean_loss, 3)
+                pbar.set_postfix(postfix_dict)
+
+        if num_iterations > 0:
+            # Val step and callbacks at the end of training
+            train_data, valid_pred_data = self._validation_step(batch, valid_data)
+            metrics = crun.on_train_end(train_data, valid_pred_data)
+            self._update_logs(metrics)
 
     def get_condition_embedding(self, condition: ArrayLike) -> ArrayLike:
         """Encode conditions

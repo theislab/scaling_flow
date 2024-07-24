@@ -221,3 +221,67 @@ class TestPerturbationData:
                     )
                 )
                 assert condition_data_is_masked == bool(is_null_perturbation_covariate)
+
+
+class TestValidationData:
+    @pytest.mark.parametrize(
+        "cell_data",
+        ["X", "X_pca", {"obsm": "X_pca"}, {"layers": "my_counts"}],
+    )
+    @pytest.mark.parametrize("split_covariates", [[], ["cell_type"]])
+    @pytest.mark.parametrize("control_data", [("drug1", "control")])
+    @pytest.mark.parametrize("obs_perturbation_covariates", [[], [("dosage",)]])
+    def test_load_from_adata_with_combinations(
+        self,
+        adata_perturbation: ad.AnnData,
+        cell_data,
+        split_covariates,
+        control_data,
+        obs_perturbation_covariates,
+    ):
+        from cfp.data.data import ValidationData
+
+        cell_data = "X"
+        split_covariates = ["cell_type"]
+        control_data = ("drug1", "control")
+        obs_perturbation_covariates = []
+        uns_perturbation_covariates = {"drug": ["drug1", "drug2"]}
+
+        vdata = ValidationData.load_from_adata(
+            adata_perturbation,
+            cell_data=cell_data,
+            split_covariates=split_covariates,
+            control_data=control_data,
+            obs_perturbation_covariates=obs_perturbation_covariates,
+            uns_perturbation_covariates=uns_perturbation_covariates,
+            max_combination_length=2,
+        )
+        assert isinstance(vdata, ValidationData)
+        assert isinstance(vdata.tgt_data, dict)
+        assert isinstance(vdata.src_data, dict)
+        assert isinstance(vdata.condition_data, dict)
+        assert vdata.max_combination_length == 2
+        assert vdata.condition_data[0][0]["drug"].shape[1] == 2
+
+    def raise_wrong_comb_size(self, adata_perturbation: ad.AnnData):
+        from cfp.data.data import PerturbationData
+
+        cell_data = "X"
+        split_covariates = ["cell_type"]
+        control_data = ("drug1", "control")
+        obs_perturbation_covariates = [("dosage",)]
+        uns_perturbation_covariates = {
+            "drug": ("drug1", "drug2"),
+            "cell_type": ("cell_type",),
+        }
+
+        with pytest.raises(ValueError):
+            _ = ValidationData.load_from_adata(
+                adata_perturbation,
+                cell_data=cell_data,
+                split_covariates=split_covariates,
+                control_data=control_data,
+                obs_perturbation_covariates=obs_perturbation_covariates,
+                uns_perturbation_covariates=uns_perturbation_covariates,
+                max_combination_length=1,
+            )

@@ -53,6 +53,7 @@ jobs:
       - name: Install dependencies
         run: |
           pip install ${{ matrix.pip-flags }} ".[dev,test]"
+          pip install wandb omegaconf
       - name: Test
         env:
           MPLBACKEND: agg
