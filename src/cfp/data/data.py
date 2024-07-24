@@ -24,8 +24,25 @@ __all__ = ["TrainingData", "ValidationData"]
 class BaseData(abc.ABC):
     """Base class for data containers."""
 
-    @abc.abstractmethod
+    cell_data: jax.Array | None = None  # (n_cells, n_features)
+    src_data: dict[int, jnp.ndarray] | None = None
+    tgt_data: dict[int, dict[int, jnp.ndarray]] | None = None
+    condition_data: dict[str | int, jnp.ndarray] | None = None
+    split_covariates_mask: jax.Array | None = (
+        None  # (n_cells,), which cell assigned to which source distribution
+    )
+    split_idx_to_covariates: dict[int, str] | None = None
+    perturbation_covariates_mask: jax.Array | None = (
+        None  # (n_cells,), which cell assigned to which target distribution
+    )
+    perturbation_idx_to_covariates: dict[int, tuple[str, ...]] | None = None
+    control_to_perturbation: dict[int, jax.Array] | None = None
+    max_combination_length: int | None = None
+    null_value: Any | None = None
+    null_token: Any | None = None
+
     @classmethod
+    @abc.abstractmethod
     def load_from_adata(cls, adata: anndata.AnnData, **kwargs) -> "BaseData":
         """Load data from an AnnData object.
 
