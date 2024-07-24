@@ -29,11 +29,11 @@ def validdata():
         n_conditions = 10
 
         def __init__(self):
-            self.src_data = {0: (jnp.ones((10, 5)) * 10,)}
-            self.tgt_cell_data = {0: {0: (jnp.ones((10, 5)),)}}
-            self.condition = {0: {0: {"pert1": jnp.ones((1, 2, 3))}}}
+            self.src_data = {0: jnp.ones((10, 5)) * 10}
+            self.tgt_data = {0: {0: jnp.ones((10, 5))}}
+            self.condition_data = {0: {0: {"pert1": jnp.ones((1, 2, 3))}}}
 
-    return {"valid": ValidData()}
+    return {"val": ValidData()}
 
 
 @pytest.fixture()
