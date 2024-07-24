@@ -7,6 +7,7 @@ from jax.typing import ArrayLike
 from ott.geometry import costs, pointcloud
 from ott.tools.sinkhorn_divergence import sinkhorn_divergence
 from sklearn.metrics import pairwise_distances, r2_score
+from sklearn.metrics.pairwise import rbf_kernel
 
 __all__ = ["compute_metrics", "compute_metrics_fast", "compute_mean_metrics"]
 
@@ -60,13 +61,6 @@ def compute_mean_metrics(metrics: dict[str, dict[str, float]], prefix: str = "")
             stat += vals[met]
         metric_dict[prefix + met] = stat / len(metrics)
     return metric_dict
-
-
-@jax.jit
-@partial(jax.vmap, in_axes=[0, None])
-@partial(jax.vmap, in_axes=[None, 0])
-def rbf_kernel(x: ArrayLike, y: ArrayLike, gamma: float):
-    return jnp.exp(-gamma * (jnp.linalg.norm(x - y) ** 2))
 
 
 @jax.jit
