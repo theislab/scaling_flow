@@ -380,9 +380,11 @@ class PerturbationData:
             else {i: [] for i in range(len(pert_embedding_idx_to_covariates))}
         )
 
-        observed_tgt_combs = (
-            adata.obs[list(tgt_dist_obs.keys())].drop_duplicates().values
-        )
+        tgt_dist_keys = list(tgt_dist_obs.keys())
+        if len(tgt_dist_keys) > 0:
+            observed_tgt_combs = adata.obs[tgt_dist_keys].drop_duplicates().values
+        else:
+            observed_tgt_combs = [[]]
         control_mask = (adata.obs[control_data[0]] == control_data[1]) == 1
         for src_combination in src_dists:
             filter_dict = dict(zip(split_covariates, src_combination, strict=False))
@@ -501,9 +503,9 @@ class ValidationData:
         Token to use for masking `null_value`.
     """
 
-    src_data: dict[str, jnp.ndarray]
-    tgt_data: dict[str, dict[str, jnp.ndarray]]
-    condition_data: dict[str, jnp.ndarray] | None
+    src_data: dict[int, jnp.ndarray]
+    tgt_data: dict[int, dict[int, jnp.ndarray]]
+    condition_data: dict[int, jnp.ndarray] | None
     max_combination_length: int
     null_value: Any
     null_token: Any
@@ -728,7 +730,7 @@ class ValidationData:
         # expecially if there are both float and str columns.
         null_value: Any = None,
         null_token: Any = 0.0,
-    ) -> "PerturbationData":
+    ) -> "ValidationData":
         """Load cell data from an AnnData object.
 
         Args:

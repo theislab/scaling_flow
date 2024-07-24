@@ -89,6 +89,7 @@ class ComputeMetrics(ComputationCallback):
             np.median if metric_aggregation == "median" else np.mean
         )
         for metric in metrics:
+            # TODO: support custom callables as metrics
             if metric not in metric_to_func:
                 raise ValueError(
                     f"Metric {metric} not supported. Supported metrics are {list(metric_to_func.keys())}"
@@ -116,7 +117,7 @@ class ComputeMetrics(ComputationCallback):
                 # TODO: support multiple aggregation functions
                 metrics[f"{k}_{metric}"] = self._aggregation_func(result)
             result = metric_to_func[metric](
-                training_data["tgt_data"], training_data["pred_data"]
+                training_data["tgt_cell_data"], training_data["pred_data"]
             )
             metrics[f"train_{metric}"] = self._aggregation_func(result)
 

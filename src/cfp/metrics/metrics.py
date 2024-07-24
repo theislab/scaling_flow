@@ -1,21 +1,22 @@
-import jax
-from jax import numpy as jnp
-import numpy as np
 from functools import partial
+
+import jax
+import numpy as np
+from jax import numpy as jnp
+from jax.typing import ArrayLike
 from ott.geometry import costs, pointcloud
 from ott.tools.sinkhorn_divergence import sinkhorn_divergence
 from sklearn.metrics import pairwise_distances, r2_score
-from sklearn.metrics.pairwise import rbf_kernel
 
 __all__ = ["compute_metrics", "compute_metrics_fast", "compute_mean_metrics"]
 
 
-def compute_r_squared(x: np.array, y: np.array) -> float:
+def compute_r_squared(x: ArrayLike, y: ArrayLike) -> float:
     """Compute the R squared between true (x) and predicted (y)"""
     return r2_score(np.mean(x, axis=0), np.mean(y, axis=0))
 
 
-def compute_sinkhorn_div(x: np.array, y: np.array, epsilon: float = 1e-2) -> float:
+def compute_sinkhorn_div(x: ArrayLike, y: ArrayLike, epsilon: float = 1e-2) -> float:
     """Compute the Sinkhorn divergence between x and y."""
     return float(
         sinkhorn_divergence(
@@ -29,7 +30,7 @@ def compute_sinkhorn_div(x: np.array, y: np.array, epsilon: float = 1e-2) -> flo
     )
 
 
-def compute_e_distance(x: np.array, y: np.array) -> float:
+def compute_e_distance(x: ArrayLike, y: ArrayLike) -> float:
     """Compute the energy distance as in Peidli et al."""
     sigma_X = pairwise_distances(x, x, metric="sqeuclidean").mean()
     sigma_Y = pairwise_distances(y, y, metric="sqeuclidean").mean()
@@ -37,7 +38,7 @@ def compute_e_distance(x: np.array, y: np.array) -> float:
     return 2 * delta - sigma_X - sigma_Y
 
 
-def compute_metrics(x: np.array, y: np.array) -> dict[str, float]:
+def compute_metrics(x: ArrayLike, y: ArrayLike) -> dict[str, float]:
     """Compute different metrics for x (true) and y (predicted)."""
     metrics = {}
     metrics["r_squared"] = compute_r_squared(x, y)
@@ -64,44 +65,51 @@ def compute_mean_metrics(metrics: dict[str, dict[str, float]], prefix: str = "")
 @jax.jit
 @partial(jax.vmap, in_axes=[0, None])
 @partial(jax.vmap, in_axes=[None, 0])
-def rbf_kernel(x, y, gamma):
+def rbf_kernel(x: ArrayLike, y: ArrayLike, gamma: float):
     return jnp.exp(-gamma * (jnp.linalg.norm(x - y) ** 2))
 
 
 @jax.jit
-def rbf_kernel_fast(X, Y, gamma):
-    XX = (X**2).sum(1)
-    YY = (Y**2).sum(1)
-    XY = X @ Y.T
-    sq_distances = XX[:, None] + YY - 2 * XY
+def rbf_kernel_fast(x: ArrayLike, y: ArrayLike, gamma: float):
+    xx = (x**2).sum(1)
+    yy = (y**2).sum(1)
+    xy = x @ y.T
+    sq_distances = xx[:, None] + yy - 2 * xy
     return jnp.exp(-gamma * sq_distances)
 
 
-def maximum_mean_discrepancy(X, Y, gamma=1.0, exact=False):
+def maximum_mean_discrepancy(
+    x: ArrayLike, y: ArrayLike, gamma: float = 1.0, exact: bool = False
+) -> float:
     """Compute the Maximum Mean Discrepancy (MMD) between two samples: x and y.
+
     Args:
         x: a tensor of shape [num_samples, num_features]
         y: a tensor of shape [num_samples, num_features]
         exact: a bool
-    Returns:
+
+    Returns
+    -------
         a scalar denoting the squared maximum mean discrepancy loss.
     """
     kernel = rbf_kernel if exact else rbf_kernel_fast
-    XX = kernel(X, X, gamma)
-    XY = kernel(X, Y, gamma)
-    YY = kernel(Y, Y, gamma)
-    return XX.mean() + YY.mean() - 2 * XY.mean()
+    xx = kernel(x, x, gamma)
+    xy = kernel(x, y, gamma)
+    yy = kernel(y, y, gamma)
+    return xx.mean() + yy.mean() - 2 * xy.mean()
 
 
-def compute_scalar_mmd(x: np.array, y: np.array, gammas=None):  # from CellOT repo
+def compute_scalar_mmd(
+    x: ArrayLike, y: ArrayLike, gammas: float | None = None
+) -> float:
     """Compute MMD across different length scales"""
     if gammas is None:
         gammas = [2, 1, 0.5, 0.1, 0.01, 0.005]
     mmds = [maximum_mean_discrepancy(x, y, gamma=gamma) for gamma in gammas]
-    return np.nanmean(jnp.array(mmds))
+    return np.nanmean(np.array(mmds))
 
 
-def compute_metrics_fast(x: np.array, y: np.array) -> dict[str, float]:
+def compute_metrics_fast(x: ArrayLike, y: ArrayLike) -> dict[str, float]:
     """Compute metrics which are fast to compute."""
     metrics = {}
     metrics["r_squared"] = compute_r_squared(x, y)

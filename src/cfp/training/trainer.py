@@ -39,7 +39,13 @@ class CellFlowTrainer:
         self.model = model
         self.training_logs: dict[str, Any] = {}
 
-    def _genot_step_fn(self, rng, src, tgt, condition):
+    def _genot_step_fn(
+        self,
+        rng: jnp.ndarray,
+        src: jnp.ndarray,
+        tgt: jnp.ndarray,
+        condition: jnp.ndarray,
+    ):
         """Step function for GENOT solver."""
         rng, rng_resample, rng_noise, rng_time, rng_step_fn = jax.random.split(rng, 5)
 
@@ -79,7 +85,13 @@ class CellFlowTrainer:
         )
         return loss
 
-    def _otfm_step_fn(self, rng, src, tgt, condition):
+    def _otfm_step_fn(
+        self,
+        rng: jnp.ndarray,
+        src: jnp.ndarray,
+        tgt: jnp.ndarray,
+        condition: jnp.ndarray,
+    ):
         """Step function for OTFM solver."""
         rng_resample, rng_step_fn = jax.random.split(rng, 2)
         if self.model.match_fn is not None:
@@ -98,9 +110,9 @@ class CellFlowTrainer:
 
     def _validation_step(
         self,
-        train_data,
-        val_data,
-    ):
+        batch: dict[str, ArrayLike],
+        val_data: dict[str, dict[str, dict[str, ArrayLike]]],
+    ) -> dict[str, dict[str, dict[str, ArrayLike]]]:
         """Compute predictions for validation data."""
         # TODO: Sample fixed number of conditions to validate on
 
@@ -116,10 +128,12 @@ class CellFlowTrainer:
                     pred = self.predict(src, condition)
                     valid_pred_data[val_key][src_dist][tgt_dist] = pred
 
-        train_pred = self.predict(train_data["src_data"], train_data["condition"])
-        train_data["pred_data"] = train_pred
+        src = batch["src_cell_data"]
+        condition = batch.get("condition")
+        train_pred = self.predict(src, condition)
+        batch["pred_data"] = train_pred
 
-        return train_data, valid_pred_data
+        return batch, valid_pred_data
 
     def _update_logs(self, logs: dict[str, Any]) -> None:
         """Update training logs."""
@@ -133,7 +147,7 @@ class CellFlowTrainer:
         dataloader: CFSampler,
         num_iterations: int,
         valid_freq: int,
-        valid_data: dict[str, dict[str, dict[str, ArrayLike]]] = {},
+        valid_data: dict[str, dict[str, dict[str, ArrayLike]]] | None = None,
         monitor_metrics: Sequence[str] = [],
         callbacks: Sequence[Callable] = [],
     ) -> None:
@@ -154,6 +168,7 @@ class CellFlowTrainer:
         rng = jax.random.PRNGKey(0)
 
         # Initiate callbacks
+        valid_data = valid_data or {}
         crun = CallbackRunner(
             callbacks=callbacks,
             data=valid_data,
@@ -177,16 +192,9 @@ class CellFlowTrainer:
 
             if ((it - 1) % valid_freq == 0) and (it > 1):
                 # TODO: Accumulate tran data over multiple iterations
-                train_data = {
-                    "src_data": src,
-                    "tgt_data": tgt,
-                    "condition": condition,
-                }
 
                 # Get predictions from validation data
-                train_data, valid_pred_data = self._validation_step(
-                    train_data, valid_data
-                )
+                train_data, valid_pred_data = self._validation_step(batch, valid_data)
 
                 # Run callbacks
                 metrics = crun.on_log_iteration(train_data, valid_pred_data)
@@ -201,10 +209,11 @@ class CellFlowTrainer:
                 postfix_dict["loss"] = round(mean_loss, 3)
                 pbar.set_postfix(postfix_dict)
 
-        # Val step and callbacks at the end of training
-        train_data, valid_pred_data = self._validation_step(train_data, valid_data)
-        metrics = crun.on_train_end(train_data, valid_pred_data)
-        self._update_logs(metrics)
+        if num_iterations > 0:
+            # Val step and callbacks at the end of training
+            train_data, valid_pred_data = self._validation_step(batch, valid_data)
+            metrics = crun.on_train_end(train_data, valid_pred_data)
+            self._update_logs(metrics)
 
     def get_condition_embedding(self, condition: ArrayLike) -> ArrayLike:
         """Encode conditions

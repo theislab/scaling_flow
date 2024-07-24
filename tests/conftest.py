@@ -23,6 +23,19 @@ def dataloader():
     return DataLoader()
 
 
+@pytest.fixture
+def validdata():
+    class ValidData:
+        n_conditions = 10
+
+        def __init__(self):
+            self.src_data = {0: (jnp.ones((10, 5)) * 10,)}
+            self.tgt_cell_data = {0: {0: (jnp.ones((10, 5)),)}}
+            self.condition = {0: {0: {"pert1": jnp.ones((1, 2, 3))}}}
+
+    return {"valid": ValidData()}
+
+
 @pytest.fixture()
 def adata_perturbation() -> ad.AnnData:
 

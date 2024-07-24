@@ -1,6 +1,6 @@
 import os
 from collections.abc import Callable, Sequence
-from typing import Any, Literal, Dict
+from typing import Any, Literal
 
 import anndata as ad
 import cloudpickle
@@ -33,7 +33,7 @@ class CellFlow:
         self.solver = solver
         self.dataloader: CFSampler | None = None
         self.trainer: CellFlowTrainer | None = None
-        self._validation_data: Dict[str, PerturbationData] = {}
+        self._validation_data: dict[str, PerturbationData] = {}
         self._solver: otfm.OTFlowMatching | genot.GENOT | None = None
         self._condition_dim: int | None = None
 
@@ -237,7 +237,7 @@ class CellFlow:
         num_iterations: int,
         batch_size: int = 64,
         valid_freq: int = 10,
-        callbacks: Sequence[Callable] | None = None,
+        callbacks: Sequence[Callable] = [],
         monitor_metrics: Sequence[str] = [],
     ) -> None:
         """Train the model.
