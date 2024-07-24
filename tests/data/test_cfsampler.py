@@ -1,13 +1,13 @@
 import jax
 import pytest
 
-from cfp.data.dataloader import CFSampler
+from cfp.data.dataloader import TrainSampler
 
 
-class TestCFSampler:
+class TestTrainSampler:
     @pytest.mark.parametrize("batch_size", [1, 31])
     def test_sampling_no_combinations(self, pdata, batch_size):
-        sampler = CFSampler(data=pdata, batch_size=batch_size)
+        sampler = TrainSampler(data=pdata, batch_size=batch_size)
         rng_1 = jax.random.PRNGKey(0)
         rng_2 = jax.random.PRNGKey(1)
 

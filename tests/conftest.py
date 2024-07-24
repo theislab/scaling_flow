@@ -4,8 +4,8 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from cfp.data.data import PerturbationData
-from cfp.data.dataloader import CFSampler
+from cfp.data.data import TrainingData
+from cfp.data.dataloader import TrainSampler
 
 
 @pytest.fixture
@@ -115,14 +115,14 @@ def adata_perturbation_with_nulls(adata_perturbation: ad.AnnData) -> ad.AnnData:
 
 
 @pytest.fixture()
-def pdata(adata_perturbation: ad.AnnData) -> PerturbationData:
+def pdata(adata_perturbation: ad.AnnData) -> TrainingData:
     cell_data = "X"
     split_covariates = ["cell_type"]
     control_data = ("drug1", "control")
     obs_perturbation_covariates = [("dosage",)]
     uns_perturbation_covariates = {"drug": ("drug1", "drug2")}
 
-    pdata = PerturbationData.load_from_adata(
+    pdata = TrainingData.load_from_adata(
         adata_perturbation,
         cell_data=cell_data,
         split_covariates=split_covariates,
@@ -135,5 +135,5 @@ def pdata(adata_perturbation: ad.AnnData) -> PerturbationData:
 
 
 @pytest.fixture()
-def sampler(pdata: PerturbationData):
-    return CFSampler(pdata, batch_size=32)
+def sampler(pdata: TrainingData):
+    return TrainSampler(pdata, batch_size=32)
