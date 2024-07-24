@@ -417,7 +417,7 @@ class TrainingData(PerturbationData):
                 len(obs_perturbation_covariates) == 0
                 and len(uns_perturbation_covariates) == 0
             )
-            else {i: [] for i in range(len(pert_embedding_idx_to_covariates))}
+            else {i: [] for i in pert_embedding_idx_to_covariates_reversed}
         )
 
         tgt_dist_keys = list(tgt_dist_obs.keys())
