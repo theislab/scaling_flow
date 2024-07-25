@@ -1,1 +1,1 @@
-from cfp.data.dataloader import CFSampler
+from cfp.data.dataloader import TrainSampler

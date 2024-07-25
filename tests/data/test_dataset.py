@@ -4,7 +4,7 @@ import numpy as np
 import pytest
 
 
-class TestPerturbationData:
+class TestTrainingData:
     @pytest.mark.parametrize(
         "cell_data",
         ["X", "X_pca", {"obsm": "X_pca"}, {"layers": "my_counts"}],
@@ -22,9 +22,9 @@ class TestPerturbationData:
         obs_perturbation_covariates,
         uns_perturbation_covariates,
     ):
-        from cfp.data.data import PerturbationData
+        from cfp.data.data import TrainingData
 
-        pdata = PerturbationData.load_from_adata(
+        pdata = TrainingData.load_from_adata(
             adata_perturbation,
             cell_data=cell_data,
             split_covariates=split_covariates,
@@ -32,7 +32,7 @@ class TestPerturbationData:
             obs_perturbation_covariates=obs_perturbation_covariates,
             uns_perturbation_covariates=uns_perturbation_covariates,
         )
-        assert isinstance(pdata, PerturbationData)
+        assert isinstance(pdata, TrainingData)
         assert (
             (pdata.perturbation_covariates_mask == -1)
             + (pdata.split_covariates_mask == -1)
@@ -88,9 +88,9 @@ class TestPerturbationData:
         obs_perturbation_covariates,
         uns_perturbation_covariates,
     ):
-        from cfp.data.data import PerturbationData
+        from cfp.data.data import TrainingData
 
-        pdata = PerturbationData.load_from_adata(
+        pdata = TrainingData.load_from_adata(
             adata_perturbation,
             cell_data="X",
             split_covariates=split_covariates,
@@ -98,7 +98,7 @@ class TestPerturbationData:
             obs_perturbation_covariates=obs_perturbation_covariates,
             uns_perturbation_covariates=uns_perturbation_covariates,
         )
-        assert isinstance(pdata, PerturbationData)
+        assert isinstance(pdata, TrainingData)
 
         assert (
             (pdata.perturbation_covariates_mask == -1)
@@ -145,7 +145,7 @@ class TestPerturbationData:
 
     @pytest.mark.parametrize("el_to_delete", ["drug1", "cell_line_a"])
     def raise_wrong_uns_dict(self, adata_perturbation: ad.AnnData, el_to_delete):
-        from cfp.data.data import PerturbationData
+        from cfp.data.data import TrainingData
 
         cell_data = "X"
         split_covariates = ["cell_type"]
@@ -161,7 +161,7 @@ class TestPerturbationData:
             del adata_perturbation.uns["cell_type"]["cell_line_a"]
 
         with pytest.raises(KeyError):
-            _ = PerturbationData.load_from_adata(
+            _ = TrainingData.load_from_adata(
                 adata_perturbation,
                 cell_data=cell_data,
                 split_covariates=split_covariates,
@@ -172,7 +172,7 @@ class TestPerturbationData:
 
     @pytest.mark.parametrize("null_token", [0.0, -99.0])
     def test_for_masks(self, adata_perturbation_with_nulls, null_token):
-        from cfp.data.data import PerturbationData
+        from cfp.data.data import TrainingData
 
         adata = adata_perturbation_with_nulls
         cell_data = "X"
@@ -183,7 +183,7 @@ class TestPerturbationData:
 
         null_value = "no_drug"
 
-        pdata = PerturbationData.load_from_adata(
+        pdata = TrainingData.load_from_adata(
             adata,
             cell_data=cell_data,
             split_covariates=split_covariates,
@@ -264,7 +264,7 @@ class TestValidationData:
         assert vdata.condition_data[0][0]["drug"].shape[1] == 2
 
     def raise_wrong_comb_size(self, adata_perturbation: ad.AnnData):
-        from cfp.data.data import PerturbationData
+        from cfp.data.data import ValidationData
 
         cell_data = "X"
         split_covariates = ["cell_type"]

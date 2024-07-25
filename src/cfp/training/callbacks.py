@@ -17,39 +17,57 @@ from cfp.networks import ConditionalVelocityField
 
 
 class BaseCallback(abc.ABC):
+    """Base class for callbacks in the CellFlowTrainer"""
 
     @abc.abstractmethod
     def on_train_begin(self, *args: Any, **kwargs: Any) -> None:
+        """Called at the beginning of training"""
         pass
 
     @abc.abstractmethod
     def on_log_iteration(self, *args: Any, **kwargs: Any) -> Any:
+        """Called at each validation/log iteration"""
         pass
 
     @abc.abstractmethod
     def on_train_end(self, *args: Any, **kwargs: Any) -> Any:
+        """Called at the end of training"""
         pass
 
 
 class LoggingCallback(BaseCallback, abc.ABC):
+    """Base class for logging callbacks in the CellFlowTrainer"""
 
     @abc.abstractmethod
     def on_train_begin(self) -> Any:
+        """Called at the beginning of training to initiate logging"""
         pass
 
     @abc.abstractmethod
     def on_log_iteration(self, dict_to_log: dict[str, Any]) -> Any:
+        """Called at each validation/log iteration to log data
+
+        Args:
+            dict_to_log: Dictionary containing data to log
+        """
         pass
 
     @abc.abstractmethod
     def on_train_end(self, dict_to_log: dict[str, Any]) -> Any:
+        """Called at the end of trainging to log data
+
+        Args:
+            dict_to_log: Dictionary containing data to log
+        """
         pass
 
 
 class ComputationCallback(BaseCallback, abc.ABC):
+    """Base class for computation callbacks in the CellFlowTrainer"""
 
     @abc.abstractmethod
     def on_train_begin(self) -> Any:
+        """Called at the beginning of training to initiate metric computation"""
         pass
 
     @abc.abstractmethod
@@ -57,7 +75,15 @@ class ComputationCallback(BaseCallback, abc.ABC):
         self,
         validation_data: dict[str, ValidationData],
         predicted_data: dict[str, dict[str, ArrayLike]],
+        training_data: dict[str, ArrayLike],
     ) -> dict[str, float]:
+        """Called at each validation/log iteration to compute metrics
+
+        Args:
+            validation_data: Validation data
+            predicted_data: Predicted data
+            training_data: Current batch and predicted data
+        """
         pass
 
     @abc.abstractmethod
@@ -65,7 +91,15 @@ class ComputationCallback(BaseCallback, abc.ABC):
         self,
         validation_data: dict[str, ValidationData],
         predicted_data: dict[str, dict[str, ArrayLike]],
+        training_data: dict[str, ArrayLike],
     ) -> dict[str, float]:
+        """Called at the end of training to compute metrics
+
+        Args:
+            validation_data: Validation data
+            predicted_data: Predicted data
+            training_data: Current batch and predicted data
+        """
         pass
 
 
@@ -78,6 +112,20 @@ metric_to_func = {
 
 
 class ComputeMetrics(ComputationCallback):
+    """Callback to compute metrics on validation data during training
+
+    Parameters
+    ----------
+    metrics : list
+        List of metrics to compute
+    metric_aggregation : list
+        List of aggregation functions to use for each metric
+
+    Returns
+    -------
+        None
+    """
+
     def __init__(
         self,
         metrics: list[Literal["r_squared", "mmd", "sinkhorn_div", "e_distance"]],
@@ -104,6 +152,13 @@ class ComputeMetrics(ComputationCallback):
         predicted_data: dict[str, dict[str, ArrayLike]],
         training_data: dict[str, ArrayLike],
     ) -> dict[str, float]:
+        """Called at each validation/log iteration to compute metrics
+
+        Args:
+            validation_data: Validation data
+            predicted_data: Predicted data
+            training_data: Current batch and predicted data
+        """
         metrics = {}
         for metric in self.metrics:
             for k in validation_data.keys():
@@ -129,10 +184,35 @@ class ComputeMetrics(ComputationCallback):
         predicted_data: dict[str, dict[str, ArrayLike]],
         training_data: dict[str, ArrayLike],
     ) -> dict[str, float]:
+        """Called at the end of training to compute metrics
+
+        Args:
+            validation_data: Validation data
+            predicted_data: Predicted data
+            training_data: Current batch and predicted data
+        """
         return self.on_log_iteration(validation_data, predicted_data)
 
 
 class WandbLogger(LoggingCallback):
+    """Callback to log data to Weights and Biases
+
+    Parameters
+    ----------
+    project : str
+        The project name in wandb
+    out_dir : str
+        The output directory to save the logs
+    config : dict
+        The configuration to log
+    **kwargs : Any
+        Additional keyword arguments to pass to wandb.init
+
+    Returns
+    -------
+        None
+    """
+
     try:
         import wandb
     except ImportError:
@@ -159,6 +239,7 @@ class WandbLogger(LoggingCallback):
         self.kwargs = kwargs
 
     def on_train_begin(self) -> Any:
+        """Called at the beginning of training to initiate WandB logging"""
         if isinstance(self.config, dict):
             config = omegaconf.OmegaConf.create(self.config)
         wandb.login()
@@ -176,9 +257,11 @@ class WandbLogger(LoggingCallback):
         dict_to_log: dict[str, float],
         **_: Any,
     ) -> Any:
+        """Called at each validation/log iteration to log data to WandB"""
         wandb.log(dict_to_log)
 
     def on_train_end(self, dict_to_log: dict[str, float]) -> Any:
+        """Called at the end of training to log data to WandB"""
         wandb.log(dict_to_log)
 
 
@@ -215,7 +298,7 @@ class CallbackRunner:
             )
 
     def on_train_begin(self) -> Any:
-
+        """Called at the beginning of training to initiate callbacks"""
         for callback in self.computation_callbacks:
             callback.on_train_begin()
 
@@ -223,6 +306,16 @@ class CallbackRunner:
             callback.on_train_begin()
 
     def on_log_iteration(self, train_data, pred_data) -> dict[str, Any]:
+        """Called at each validation/log iteration to run callbacks. First computes metrics with computation callbacks and then logs data with logging callbacks.
+
+        Args:
+            train_data: Training data
+            pred_data: Predicted data
+
+        Returns
+        -------
+            dict_to_log: Dictionary containing data to log
+        """
         dict_to_log: dict[str, Any] = {}
 
         for callback in self.computation_callbacks:
@@ -237,6 +330,16 @@ class CallbackRunner:
         return dict_to_log
 
     def on_train_end(self, train_data, pred_data) -> dict[str, Any]:
+        """Called at the end of training to run callbacks. First computes metrics with computation callbacks and then logs data with logging callbacks.
+
+        Args:
+            train_data: Training data
+            pred_data: Predicted data
+
+        Returns
+        -------
+            dict_to_log: Dictionary containing data to log
+        """
         dict_to_log: dict[str, Any] = {}
 
         for callback in self.computation_callbacks:

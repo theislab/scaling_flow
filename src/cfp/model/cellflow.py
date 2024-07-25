@@ -10,8 +10,8 @@ from numpy.typing import ArrayLike
 from ott.neural.methods.flows import dynamics, genot, otfm
 from ott.solvers import utils as solver_utils
 
-from cfp.data.data import PerturbationData, ValidationData
-from cfp.data.dataloader import CFSampler
+from cfp.data.data import TrainingData, ValidationData
+from cfp.data.dataloader import TrainSampler
 from cfp.networks.velocity_field import ConditionalVelocityField
 from cfp.training.trainer import CellFlowTrainer
 
@@ -31,9 +31,9 @@ class CellFlow:
 
         self.adata = adata
         self.solver = solver
-        self.dataloader: CFSampler | None = None
+        self.dataloader: TrainSampler | None = None
         self.trainer: CellFlowTrainer | None = None
-        self._validation_data: dict[str, PerturbationData] = {}
+        self._validation_data: dict[str, ValidationData] = {}
         self._solver: otfm.OTFlowMatching | genot.GENOT | None = None
         self._condition_dim: int | None = None
 
@@ -83,7 +83,7 @@ class CellFlow:
         self.null_value = null_value
         self.data_kwargs = kwargs
 
-        self.pdata = PerturbationData.load_from_adata(
+        self.pdata = TrainingData.load_from_adata(
             self.adata,
             cell_data=cell_data,
             split_covariates=split_covariates,
@@ -259,7 +259,7 @@ class CellFlow:
         if self.trainer is None:
             raise ValueError("Model not initialized. Please call prepare_model first.")
 
-        self.dataloader = CFSampler(data=self.pdata, batch_size=batch_size)
+        self.dataloader = TrainSampler(data=self.pdata, batch_size=batch_size)
 
         self.trainer.train(
             dataloader=self.dataloader,

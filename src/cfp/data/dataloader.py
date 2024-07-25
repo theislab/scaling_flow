@@ -3,23 +3,23 @@ from typing import Any
 import jax
 import jax.numpy as jnp
 
-from cfp.data.data import PerturbationData
+from cfp.data.data import TrainingData
 
-__all__ = ["CFSampler"]
+__all__ = ["TrainSampler"]
 
 
-class CFSampler:
-    """Data sampler for :class:`~cfp.data.data.PerturbationData`.
+class TrainSampler:
+    """Data sampler for :class:`~cfp.data.data.TrainingData`.
 
     Parameters
     ----------
-    data : PerturbationData
+    data : TrainingData
         The data object to sample from.
     batch_size : int
         The batch size.
     """
 
-    def __init__(self, data: PerturbationData, batch_size: int = 64):
+    def __init__(self, data: TrainingData, batch_size: int = 64):
         self.data = data
         self.batch_size = batch_size
         self.n_source_dists = data.n_controls

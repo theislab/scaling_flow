@@ -10,7 +10,7 @@ from ott.neural.methods.flows import genot, otfm
 from ott.solvers import utils as solver_utils
 from tqdm import tqdm
 
-from cfp.data.dataloader import CFSampler
+from cfp.data.dataloader import TrainSampler
 from cfp.training.callbacks import CallbackRunner
 
 
@@ -144,7 +144,7 @@ class CellFlowTrainer:
 
     def train(
         self,
-        dataloader: CFSampler,
+        dataloader: TrainSampler,
         num_iterations: int,
         valid_freq: int,
         valid_data: dict[str, dict[str, dict[str, ArrayLike]]] | None = None,
