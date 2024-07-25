@@ -320,32 +320,33 @@ class TrainingData(PerturbationData):
     def load_from_adata(
         cls,
         adata: anndata.AnnData,
-        cell_data: Literal["X"] | dict[str, str],
-        control_data: Sequence[str, Any],
-        split_covariates: Sequence[str],
-        obs_perturbation_covariates: Sequence[tuple[str, ...]],
-        uns_perturbation_covariates: Sequence[dict[str, tuple[str, ...] | str]],
-        # TODO: Having null_value nan can cause problems with matching conditions,
-        # expecially if there are both float and str columns.
-        null_value: Any = None,
-        null_token: Any = 0.0,
+        sample_rep: str,
+        control_key: str,
+        perturbation_covariates: dict[str, Sequence[str]],
+        perturbation_covariate_reps: dict[str, str] | None = None,
+        sample_covariates: Sequence[str] | None = None,
+        sample_covariate_reps: dict[str, str] | None = None,
+        split_covariates: Sequence[str] | None = None,
+        max_combination_length: int | None = None,
+        null_value: float = 0.0,
     ) -> "TrainingData":
         """Load cell data from an AnnData object.
 
         Args:
             adata: An :class:`~anndata.AnnData` object.
-            cell_data: Where to read the cell data from. Either 'X', a key in adata.obsm or a dictionary of the form {attr: key}, where 'attr' is an attribute of the :class:`~anndata.AnnData` object and key is the 'key' in the corresponding key.
-            control_data: Tuple of length 2 with first element defining the column in :class:`~anndata.AnnData` and second element defining the value in `adata.obs[control_data[0]]` used to define all control cells.
-            split_covariates: Covariates in adata.obs to split all control cells into different control populations. The perturbed cells are also split according to these columns, but if an embedding for these covariates should be encoded in the model, the corresponding column should also be used in `obs_perturbation_covariates` or `uns_perturbation_covariates`.
-            obs_perturbation_covariates: Tuples of covariates in adata.obs characterizing the perturbed cells (together with `split_covariates` and `uns_perturbation_covariates`) and encoded by the values as found in `adata.obs`. If a tuple contains more than
-            one element, this is interpreted as a combination of covariates that should be treated as an unordered set.
-            uns_perturbation_covariates: Dictionaries with keys in adata.uns and values columns in adata.obs which characterize the perturbed cells (together with `split_covariates` and `obs_perturbation_covariates`) and encoded by the values as found in `adata.uns[uns_perturbation_covariates.keys()]`. If a value of the dictionary is a tuple with more than one element, this is interpreted as a combination of covariates that should be treated as an unordered set.
-            null_value: Values in :attr:`anndata.AnnData.obs` columns which indicate no treatment with the corresponding covariate. These values will be masked with `null_token`.
-            null_token: Token to use for masking `null_value`.
+            sample_rep: Key in `adata.obsm` where the sample representation is stored or "X" to use `adata.X`.
+            control_key: Key of a boolian column in `adata.obs` that defines the control samples.
+            perturbation_covariates: A dictionary where the keys indicate the name of the covariate group and the values are keys in `adata.obs`. The corresponding columns should be either boolian (presence/abscence of the perturbation) or numeric (concentration or magnitude of the perturbation). If multiple groups are provided, the first is interpreted as the primary perturbation and the others as covariates corresponding to these perturbations, e.g. `{"drug":("drugA", "drugB"), "time":("drugA_time", "drugB_time")}`.
+            perturbation_covariate_reps: A dictionary where the keys indicate the name of the covariate group and the values are keys in `adata.uns` storing a dictionary with the representation of the covariates. E.g. `{"drug":"drug_embeddings"}` with `adata.uns["drug_embeddings"] = {"drugA": np.array, "drugB": np.array}`.
+            sample_covariates: Keys in `adata.obs` indicating sample covatiates to be taken into account for training and prediction, e.g. `["age", "cell_type"]`.
+            sample_covariate_reps: A dictionary where the keys indicate the name of the covariate group and the values are keys in `adata.uns` storing a dictionary with the representation of the covariates. E.g. `{"cell_type": "cell_type_embeddings"}` with `adata.uns["cell_type_embeddings"] = {"cell_typeA": np.array, "cell_typeB": np.array}`.
+            split_covariates: Covariates in adata.obs to split all control cells into different control populations. The perturbed cells are also split according to these columns, but if these covariates should also be encoded in the model, the corresponding column should also be used in `perturbation_covariates` or `sample_covariates`.
+            max_combination_length: Maximum number of combinations of primary `perturbation_covariates`. If `None`, the value is inferred from the provided `perturbation_covariates`.
+            null_value: Value to use for padding to `max_combination_length`.
 
         Returns
         -------
-            PerturbationData: Data container for the perturbation data.
+            TraingingData: Data container for the perturbation data.
         """
         # TODO(@MUCDK): add device to possibly only load to cpu
         if split_covariates is None or len(split_covariates) == 0:
