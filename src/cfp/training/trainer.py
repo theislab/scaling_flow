@@ -1,16 +1,16 @@
 from collections.abc import Callable, Sequence
 from typing import Any
 
-import diffrax
 import jax
 import jax.numpy as jnp
 import numpy as np
 from numpy.typing import ArrayLike
-from ott.neural.methods.flows import genot, otfm
+from ott.neural.methods.flows import genot
 from ott.solvers import utils as solver_utils
 from tqdm import tqdm
 
 from cfp.data.dataloader import TrainSampler
+from cfp.model import otfm
 from cfp.training.callbacks import CallbackRunner
 
 
@@ -85,29 +85,6 @@ class CellFlowTrainer:
         )
         return loss
 
-    def _otfm_step_fn(
-        self,
-        rng: jnp.ndarray,
-        src: jnp.ndarray,
-        tgt: jnp.ndarray,
-        condition: jnp.ndarray,
-    ):
-        """Step function for OTFM solver."""
-        rng_resample, rng_step_fn = jax.random.split(rng, 2)
-        if self.model.match_fn is not None:
-            tmat = self.model.match_fn(src, tgt)
-            src_ixs, tgt_ixs = solver_utils.sample_joint(rng_resample, tmat)
-            src, tgt = src[src_ixs], tgt[tgt_ixs]
-
-        self.model.vf_state, loss = self.model.step_fn(
-            rng_step_fn,
-            self.model.vf_state,
-            src,
-            tgt,
-            condition,
-        )
-        return loss
-
     def _validation_step(
         self,
         batch: dict[str, ArrayLike],
@@ -179,15 +156,7 @@ class CellFlowTrainer:
         for it in pbar:
             rng, rng_step_fn = jax.random.split(rng, 2)
             batch = dataloader.sample(rng)
-
-            src, tgt = batch["src_cell_data"], batch["tgt_cell_data"]
-            condition = batch.get("condition")
-
-            if isinstance(self.model, genot.GENOT):
-                loss = self._genot_step_fn(rng_step_fn, src, tgt, condition)
-            else:
-                loss = self._otfm_step_fn(rng_step_fn, src, tgt, condition)
-
+            loss = self.model.outer_step_fn(rng_step_fn, batch)
             self.training_logs["loss"].append(float(loss))
 
             if ((it - 1) % valid_freq == 0) and (it > 1):
@@ -214,57 +183,3 @@ class CellFlowTrainer:
             train_data, valid_pred_data = self._validation_step(batch, valid_data)
             metrics = crun.on_train_end(train_data, valid_pred_data)
             self._update_logs(metrics)
-
-    def get_condition_embedding(self, condition: ArrayLike) -> ArrayLike:
-        """Encode conditions
-
-        Args:
-            condition: Conditions to encode
-
-        Returns
-        -------
-            Encoded conditions
-        """
-        cond_embed = self.model.vf.apply(
-            {"params": self.model.vf_state.params},
-            condition,
-            method="get_condition_embedding",
-        )
-        return np.array(cond_embed)
-
-    def predict(self, x: ArrayLike, condition: ArrayLike) -> ArrayLike:
-        """Predict
-
-        Args:
-            x: Input data
-            condition: Condition
-
-        Returns
-        -------
-            Predicted output
-        """
-
-        def vf(
-            t: jnp.ndarray, x: jnp.ndarray, cond: dict[str, jnp.ndarray] | None
-        ) -> jnp.ndarray:
-            params = self.model.vf_state.params
-            return self.model.vf_state.apply_fn(
-                {"params": params}, t, x, cond, train=False
-            )
-
-        def solve_ode(x: jnp.ndarray, cond: jnp.ndarray | None) -> jnp.ndarray:
-            ode_term = diffrax.ODETerm(vf)
-            result = diffrax.diffeqsolve(
-                ode_term,
-                t0=0.0,
-                t1=1.0,
-                y0=x,
-                args=cond,
-                dt0=None,
-                solver=diffrax.Tsit5(),
-                stepsize_controller=diffrax.PIDController(rtol=1e-5, atol=1e-5),
-            )
-            return result.ys[0]
-
-        x_pred = jax.jit(jax.vmap(solve_ode, in_axes=[0, None]))(x, condition)
-        return np.array(x_pred)

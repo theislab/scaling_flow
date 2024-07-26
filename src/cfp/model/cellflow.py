@@ -7,11 +7,12 @@ import cloudpickle
 import jax
 import optax
 from numpy.typing import ArrayLike
-from ott.neural.methods.flows import dynamics, genot, otfm
+from ott.neural.methods.flows import dynamics, genot
 from ott.solvers import utils as solver_utils
 
 from cfp.data.data import TrainingData, ValidationData
 from cfp.data.dataloader import TrainSampler
+from cfp.model import otfm
 from cfp.networks.velocity_field import ConditionalVelocityField
 from cfp.training.trainer import CellFlowTrainer
 
