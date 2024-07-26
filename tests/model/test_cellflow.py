@@ -113,8 +113,9 @@ class TestCellFlow:
             == cf.pdata.max_combination_length
         )
 
-    def test_cellflow_with_validation(self, adata_perturbation):
-        cf = cfp.model.cellflow.CellFlow(adata_perturbation, solver="otfm")
+    @pytest.mark.parametrize("solver", ["genot"])
+    def test_cellflow_with_validation(self, adata_perturbation, solver):
+        cf = cfp.model.cellflow.CellFlow(adata_perturbation, solver=solver)
         cf.prepare_data(
             cell_data="X",
             control_key=("drug1", "control"),
@@ -137,10 +138,17 @@ class TestCellFlow:
             == cf.pdata.max_combination_length
         )
 
+        condition_encoder_kwargs = {}
+        if solver=="genot":
+            condition_encoder_kwargs["genot_source_layers"] = (32, 32)
+            condition_encoder_kwargs["genot_source_dim"] = 32
+
+
         cf.prepare_model(
             condition_embedding_dim=32,
             hidden_dims=(32, 32),
             decoder_dims=(32, 32),
+            condition_encoder_kwargs=condition_encoder_kwargs,
         )
         assert cf.trainer is not None
 

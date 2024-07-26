@@ -57,7 +57,7 @@ class OTFlowMatching:
             vf_state: train_state.TrainState,
             source: jnp.ndarray,
             target: jnp.ndarray,
-            source_conditions: jnp.ndarray | None,
+            conditions: dict[str, jnp.ndarray] | None,
         ) -> tuple[Any, Any]:
 
             def loss_fn(
@@ -65,7 +65,7 @@ class OTFlowMatching:
                 t: jnp.ndarray,
                 source: jnp.ndarray,
                 target: jnp.ndarray,
-                source_conditions: jnp.ndarray | None,
+                conditions: dict[str, jnp.ndarray] | None,
                 rng: jax.Array,
             ) -> jnp.ndarray:
                 rng_flow, rng_dropout = jax.random.split(rng, 2)
@@ -74,7 +74,7 @@ class OTFlowMatching:
                     {"params": params},
                     t,
                     x_t,
-                    source_conditions,
+                    conditions,
                     rngs={"dropout": rng_dropout},
                 )
                 u_t = self.flow.compute_ut(t, source, target)
@@ -86,7 +86,7 @@ class OTFlowMatching:
             t = self.time_sampler(key_t, batch_size)
             grad_fn = jax.value_and_grad(loss_fn)
             loss, grads = grad_fn(
-                vf_state.params, t, source, target, source_conditions, key_model
+                vf_state.params, t, source, target, conditions, key_model
             )
             return vf_state.apply_gradients(grads=grads), loss
 
@@ -115,7 +115,7 @@ class OTFlowMatching:
         )
         return loss
 
-    def get_condition_embedding(self, condition: ArrayLike) -> ArrayLike:
+    def get_condition_embedding(self, condition: dict[str, ArrayLike]) -> ArrayLike:
         """Encode conditions
 
         Args:
@@ -132,7 +132,9 @@ class OTFlowMatching:
         )
         return np.asarray(cond_embed)
 
-    def predict(self, x: ArrayLike, condition: ArrayLike, **kwargs: Any) -> ArrayLike:
+    def predict(
+        self, x: ArrayLike, condition: dict[str, ArrayLike], **kwargs: Any
+    ) -> ArrayLike:
         """Predict the push-forward of the data.
 
         TODO: add the option to return the ODE solution
@@ -159,10 +161,8 @@ class OTFlowMatching:
         def vf(
             t: jnp.ndarray, x: jnp.ndarray, cond: dict[str, jnp.ndarray] | None
         ) -> jnp.ndarray:
-            params = self.model.vf_state.params
-            return self.model.vf_state.apply_fn(
-                {"params": params}, t, x, cond, train=False
-            )
+            params = self.vf_state.params
+            return self.vf_state.apply_fn({"params": params}, t, x, cond, train=False)
 
         def solve_ode(x: jnp.ndarray, cond: jnp.ndarray | None) -> jnp.ndarray:
             ode_term = diffrax.ODETerm(vf)

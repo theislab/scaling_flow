@@ -11,6 +11,8 @@ from flax.linen import initializers
 from flax.training import train_state
 from flax.typing import FrozenDict
 
+from cfp._constants import GENOT_CELL_KEY
+
 __all__ = [
     "MLPBlock",
     "SelfAttention",
@@ -331,6 +333,12 @@ class ConditionEncoder(BaseModule):
         Dropout rate for the output layer.
     mask_value : float
         Value for masked elements used in input conditions.
+    genot_source_layers: Sequence[tuple[Literal["mlp", "self-attention"], dict]] | None
+        Only for GENOT: Layers for GENOT source.
+    genot_source_dim: int
+        Only for GENOT: Dimensionality which the cell data should be processed to.
+    genot_source_dropout: float
+        Only for GENOT: Dropout rate for the GENOT source layers.
     """
 
     output_dim: int
@@ -344,6 +352,17 @@ class ConditionEncoder(BaseModule):
     )
     output_dropout: float = 0.0
     mask_value: float = 0.0
+    genot_source_layers: (
+        Sequence[tuple[Literal["mlp", "self-attention"], dict]] | None
+    ) = None
+    genot_source_dim: int = 0
+    genot_source_dropout: float = 0.0
+
+    err = f"`genot_source_layers` must be `None` if and only if `genot_source_dim` is 0, but found `genot_source_dim={genot_source_layers}` and `genot_source_layers={genot_source_layers}`."
+    if genot_source_layers and not genot_source_dim:
+        raise ValueError(err)
+    if not genot_source_layers and genot_source_dim:
+        raise ValueError(err)
 
     def setup(self):
         """Initialize the modules."""
@@ -371,10 +390,19 @@ class ConditionEncoder(BaseModule):
             self.layers_after_pool, self.output_dim, self.output_dropout
         )
 
+        # separate input layers for GENOT
+        if self.genot_source_dim:
+            self.genot_source_modules = self._get_layers(
+                self.genot_source_layers,
+                self.genot_source_dim,
+                self.genot_source_dropout,
+            )
+
     def __call__(
         self,
         conditions: dict[str, jnp.ndarray],
         training: bool = True,
+        return_conditions_only=False,
     ) -> jnp.ndarray:
         """
         Apply the set encoder.
@@ -385,11 +413,14 @@ class ConditionEncoder(BaseModule):
             Dictionary of batch of conditions of shape ``(batch_size, set_size, condition_dim)``.
         training : bool
             Whether the model is in training mode.
+        return_conditions_only : bool
+            Only relevant for GENOT: Whether to return only the encoded conditions.
 
         Returns
         -------
         Encoded conditions of shape ``(batch_size, output_dim)``.
         """
+        genot_cell_data = conditions.pop(GENOT_CELL_KEY, None)
         mask, attention_mask = self._get_masks(conditions)
 
         # apply modules before pooling
@@ -417,6 +448,21 @@ class ConditionEncoder(BaseModule):
         # apply modules after pooling
         conditions = self._apply_modules(
             self.after_pool_modules, conditions, None, training
+        )
+
+        if return_conditions_only or self.genot_source_dim == 0:
+            return conditions
+
+        genot_cell_data = self._apply_modules(
+            self.genot_source_modules, genot_cell_data, None, training
+        )
+        # conditions = jnp.concatenate(
+        #    [jnp.tile(conditions, (genot_cell_data.shape[0], 1)), genot_cell_data],
+        #    axis=-1,
+        # )
+        conditions = jnp.concatenate(
+            [conditions, genot_cell_data],
+            axis=-1,
         )
 
         return conditions
@@ -466,7 +512,7 @@ class ConditionEncoder(BaseModule):
         # mask of shape (batch_size, set_size)
         mask = 1 - jnp.all(
             jnp.array(
-                [jnp.all(c == self.mask_value, axis=-1) for c in conditions.values()]
+                [jnp.all(c == self.mask_value, axis=-1) for c in conditions.values()],
             ),
             axis=0,
         )

@@ -2,15 +2,12 @@ from collections.abc import Callable, Sequence
 from typing import Any
 
 import jax
-import jax.numpy as jnp
 import numpy as np
 from numpy.typing import ArrayLike
-from ott.neural.methods.flows import genot
-from ott.solvers import utils as solver_utils
 from tqdm import tqdm
 
 from cfp.data.dataloader import TrainSampler
-from cfp.model import otfm
+from cfp.model import genot, otfm
 from cfp.training.callbacks import CallbackRunner
 
 
@@ -39,52 +36,6 @@ class CellFlowTrainer:
         self.model = model
         self.training_logs: dict[str, Any] = {}
 
-    def _genot_step_fn(
-        self,
-        rng: jnp.ndarray,
-        src: jnp.ndarray,
-        tgt: jnp.ndarray,
-        condition: jnp.ndarray,
-    ):
-        """Step function for GENOT solver."""
-        rng, rng_resample, rng_noise, rng_time, rng_step_fn = jax.random.split(rng, 5)
-
-        matching_data = (src, tgt)
-        n = src.shape[0]
-
-        time = self.model.time_sampler(rng_time, n * self.model.n_samples_per_src)
-        latent = self.model.latent_noise_fn(
-            rng_noise, (n, self.model.n_samples_per_src)
-        )
-
-        tmat = self.model.data_match_fn(*matching_data)  # (n, m)
-
-        src_ixs, tgt_ixs = solver_utils.sample_conditional(  # (n, k), (m, k)
-            rng_resample,
-            tmat,
-            k=self.model.n_samples_per_src,
-        )
-
-        src, tgt = src[src_ixs], tgt[tgt_ixs]  # (n, k, ...),  # (m, k, ...)
-        if condition is not None:
-            condition = jnp.tile(condition, (src.shape[0], 1, 1))
-
-        if self.model.latent_match_fn is not None:
-            src, condition, tgt = self.model._match_latent(
-                rng, src, condition, latent, tgt
-            )
-
-        src = src.reshape(-1, *src.shape[2:])  # (n * k, ...)
-        tgt = tgt.reshape(-1, *tgt.shape[2:])  # (m * k, ...)
-        latent = latent.reshape(-1, *latent.shape[2:])
-        if condition is not None:
-            condition = condition.reshape(-1, *condition.shape[2:])
-
-        loss, self.model.vf_state = self.model.step_fn(
-            rng_step_fn, self.model.vf_state, time, src, tgt, latent, condition
-        )
-        return loss
-
     def _validation_step(
         self,
         batch: dict[str, ArrayLike],
@@ -102,12 +53,12 @@ class CellFlowTrainer:
                 tgt_dists = vdl.tgt_data[src_dist]
                 for tgt_dist in tgt_dists:
                     condition = vdl.condition_data[src_dist][tgt_dist]
-                    pred = self.predict(src, condition)
+                    pred = self.model.predict(src, condition)
                     valid_pred_data[val_key][src_dist][tgt_dist] = pred
 
         src = batch["src_cell_data"]
         condition = batch.get("condition")
-        train_pred = self.predict(src, condition)
+        train_pred = self.model.predict(src, condition)
         batch["pred_data"] = train_pred
 
         return batch, valid_pred_data
