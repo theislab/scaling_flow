@@ -39,6 +39,31 @@ class CellFlowTrainer:
         self.model = model
         self.training_logs: dict[str, Any] = {}
 
+        @jax.jit
+        def _otfm_step_fn(
+            rng: jnp.ndarray,
+            src: jnp.ndarray,
+            tgt: jnp.ndarray,
+            condition: jnp.ndarray,
+        ):
+            """Step function for OTFM solver."""
+            rng_resample, rng_step_fn = jax.random.split(rng, 2)
+            if self.model.match_fn is not None:
+                tmat = self.model.match_fn(src, tgt)
+                src_ixs, tgt_ixs = solver_utils.sample_joint(rng_resample, tmat)
+                src, tgt = src[src_ixs], tgt[tgt_ixs]
+
+            self.model.vf_state, loss = self.model.step_fn(
+                rng_step_fn,
+                self.model.vf_state,
+                src,
+                tgt,
+                condition,
+            )
+            return loss
+
+        self._otfm_step_fn = _otfm_step_fn
+
     def _genot_step_fn(
         self,
         rng: jnp.ndarray,
@@ -82,29 +107,6 @@ class CellFlowTrainer:
 
         loss, self.model.vf_state = self.model.step_fn(
             rng_step_fn, self.model.vf_state, time, src, tgt, latent, condition
-        )
-        return loss
-
-    def _otfm_step_fn(
-        self,
-        rng: jnp.ndarray,
-        src: jnp.ndarray,
-        tgt: jnp.ndarray,
-        condition: jnp.ndarray,
-    ):
-        """Step function for OTFM solver."""
-        rng_resample, rng_step_fn = jax.random.split(rng, 2)
-        if self.model.match_fn is not None:
-            tmat = self.model.match_fn(src, tgt)
-            src_ixs, tgt_ixs = solver_utils.sample_joint(rng_resample, tmat)
-            src, tgt = src[src_ixs], tgt[tgt_ixs]
-
-        self.model.vf_state, loss = self.model.step_fn(
-            rng_step_fn,
-            self.model.vf_state,
-            src,
-            tgt,
-            condition,
         )
         return loss
 
