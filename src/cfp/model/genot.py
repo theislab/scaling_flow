@@ -180,7 +180,7 @@ class GENOT:
         (src, tgt), matching_data = self._prepare_data(batch)
         n = src.shape[0]
         time = self.time_sampler(rng_time, n)
-        latent = self.latent_noise_fn(rng_noise, (n, 1))
+        latent = self.latent_noise_fn(rng_noise, (n,))
 
         tmat = self.data_match_fn(*matching_data)
         src_ixs, tgt_ixs = solver_utils.sample_joint(
@@ -251,6 +251,5 @@ class GENOT:
             condition[GENOT_CELL_KEY] = source
         else:
             condition = {GENOT_CELL_KEY: source}
-
         x_pred = jax.jit(jax.vmap(solve_ode, in_axes=[0, None]))(latent, condition)
         return np.array(x_pred)

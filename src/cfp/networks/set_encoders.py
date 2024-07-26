@@ -461,7 +461,7 @@ class ConditionEncoder(BaseModule):
         #    axis=-1,
         # )
         conditions = jnp.concatenate(
-            [conditions, genot_cell_data],
+            [jnp.tile(conditions, (genot_cell_data.shape[0], 1)), genot_cell_data],
             axis=-1,
         )
 

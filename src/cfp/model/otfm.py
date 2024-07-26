@@ -164,14 +164,14 @@ class OTFlowMatching:
             params = self.vf_state.params
             return self.vf_state.apply_fn({"params": params}, t, x, cond, train=False)
 
-        def solve_ode(x: jnp.ndarray, cond: jnp.ndarray | None) -> jnp.ndarray:
+        def solve_ode(x: jnp.ndarray, condition: jnp.ndarray | None) -> jnp.ndarray:
             ode_term = diffrax.ODETerm(vf)
             result = diffrax.diffeqsolve(
                 ode_term,
                 t0=0.0,
                 t1=1.0,
                 y0=x,
-                args=cond,
+                args=condition,
                 dt0=None,
                 solver=diffrax.Tsit5(),
                 stepsize_controller=diffrax.PIDController(rtol=1e-5, atol=1e-5),
