@@ -56,6 +56,7 @@ class BaseData(abc.ABC):
         pass
 
 
+@dataclass
 class PerturbationData(BaseData):
     """Base class for perturbation data containers."""
 
@@ -516,6 +517,7 @@ class TrainingData(PerturbationData):
         return f"{self.__class__.__name__}[{self._format_params(repr)}]"
 
 
+@dataclass
 class ValidationData(PerturbationData):
     """Data container for the validation data.
 
