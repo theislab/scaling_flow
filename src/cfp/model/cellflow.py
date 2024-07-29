@@ -7,12 +7,13 @@ import cloudpickle
 import jax
 import optax
 from numpy.typing import ArrayLike
-from ott.neural.methods.flows import dynamics, genot, otfm
+from ott.neural.methods.flows import dynamics
 from ott.solvers import utils as solver_utils
 
 from cfp.data.data import TrainingData, ValidationData
 from cfp.data.dataloader import TrainSampler
 from cfp.networks.velocity_field import ConditionalVelocityField
+from cfp.solvers import genot, otfm
 from cfp.training.trainer import CellFlowTrainer
 
 __all__ = ["CellFlow"]
@@ -227,6 +228,7 @@ class CellFlow:
                 source_dim=self._data_dim,
                 target_dim=self._data_dim,
                 optimizer=optimizer,
+                conditions=self.pdata.condition_data,
                 rng=jax.random.PRNGKey(seed),
                 **solver_kwargs,
             )

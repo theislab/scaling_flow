@@ -9,6 +9,7 @@ from flax import linen as nn
 from flax.training import train_state
 from ott.neural.networks.layers import time_encoder
 
+from cfp._constants import GENOT_CELL_KEY
 from cfp._logging import logger
 from cfp.networks.modules import MLPBlock
 from cfp.networks.set_encoders import ConditionEncoder
@@ -107,11 +108,10 @@ class ConditionalVelocityField(nn.Module):
         t = time_encoder.cyclical_time_encoder(t, n_freqs=1024)
         t = self.time_encoder(t, training=train)
         x = self.x_encoder(x, training=train)
-        condition = (
-            jnp.squeeze(condition, 0)
-            if squeeze
-            else jnp.tile(condition, (x.shape[0], 1))
-        )
+        if squeeze:
+            condition = jnp.squeeze(condition)  # , 0)
+        elif condition.shape[0] != x.shape[0]:
+            condition = jnp.tile(condition, (x.shape[0], 1))
         concatenated = jnp.concatenate((t, x, condition), axis=-1)
         out = self.decoder(concatenated, training=train)
         return self.output_layer(out)
@@ -127,7 +127,9 @@ class ConditionalVelocityField(nn.Module):
             Embedding of the condition.
         """
         if self.encode_conditions:
-            condition = self.condition_encoder(condition, training=False)
+            condition = self.condition_encoder(
+                condition, training=False, return_conditions_only=True
+            )
         else:
             condition = jnp.concatenate(list(condition.values()), axis=-1)
             logger.warning(
@@ -141,6 +143,7 @@ class ConditionalVelocityField(nn.Module):
         optimizer: optax.OptState,
         input_dim: int,
         conditions: dict[str, jnp.ndarray],
+        additional_cond_dim: int = 0,
     ) -> train_state.TrainState:
         """Create the training state.
 
@@ -158,6 +161,8 @@ class ConditionalVelocityField(nn.Module):
             pert_cov: jnp.ones((1, self.max_combination_length, condition.shape[-1]))
             for pert_cov, condition in conditions.items()
         }
+        if additional_cond_dim:
+            cond[GENOT_CELL_KEY] = jnp.ones((1, additional_cond_dim))
         params = self.init(rng, t, x, cond, train=False)["params"]
         return train_state.TrainState.create(
             apply_fn=self.apply, params=params, tx=optimizer
