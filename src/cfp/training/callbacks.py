@@ -1,5 +1,4 @@
 import abc
-from collections.abc import Sequence
 from typing import Any, Literal
 
 import jax.tree as jt
@@ -7,13 +6,7 @@ import numpy as np
 from numpy.typing import ArrayLike
 
 from cfp.data.data import ValidationData
-from cfp.metrics.metrics import (
-    compute_e_distance,
-    compute_r_squared,
-    compute_scalar_mmd,
-    compute_sinkhorn_div,
-)
-from cfp.networks import ConditionalVelocityField
+from cfp.metrics.metrics import compute_e_distance, compute_r_squared, compute_scalar_mmd, compute_sinkhorn_div
 
 
 class BaseCallback(abc.ABC):
@@ -297,6 +290,29 @@ class CallbackRunner:
                 "No computation callbacks defined to compute metrics to log"
             )
 
+    def _sample_validation_data(
+        self, stage: Literal["on_log_iteration", "on_train_end"]
+    ) -> dict[str, ValidationData]:
+        """Sample validation data for computing metrics"""
+        if stage == "on_train_end":
+            n_conditions_to_sample = lambda x: x.n_conditions_on_train_end
+        elif stage == "on_log_iteration":
+            n_conditions_to_sample = lambda x: x.n_conditions_on_log_iteration
+        else:
+            raise ValueError(f"Stage {stage} not supported.")
+        subsampled_validation_data = {}
+        for val_data_name, val_data in self.validation_data.items():
+            if n_conditions_to_sample(val_data) == -1:
+                subsampled_validation_data[val_data_name] = val_data
+            else:
+                idxs = self.rng.choice(
+                    len(val_data), n_conditions_to_sample(val_data), replace=False
+                )
+                subsampled_validation_data[val_data_name] = {
+                    val_data_name[i]: val_data[val_data_name[i]] for i in idxs
+                }
+        return subsampled_validation_data
+
     def on_train_begin(self) -> Any:
         """Called at the beginning of training to initiate callbacks"""
         for callback in self.computation_callbacks:
@@ -316,12 +332,11 @@ class CallbackRunner:
         -------
             dict_to_log: Dictionary containing data to log
         """
+        validation_data = self._sample_validation_data(stage="on_log_iteration")
         dict_to_log: dict[str, Any] = {}
 
         for callback in self.computation_callbacks:
-            results = callback.on_log_iteration(
-                self.validation_data, pred_data, train_data
-            )
+            results = callback.on_log_iteration(validation_data, pred_data, train_data)
             dict_to_log.update(results)
 
         for callback in self.logging_callbacks:
@@ -341,11 +356,10 @@ class CallbackRunner:
             dict_to_log: Dictionary containing data to log
         """
         dict_to_log: dict[str, Any] = {}
+        validation_data = self._sample_validation_data(stage="on_log_iteration")
 
         for callback in self.computation_callbacks:
-            results = callback.on_log_iteration(
-                self.validation_data, pred_data, train_data
-            )
+            results = callback.on_log_iteration(validation_data, pred_data, train_data)
             dict_to_log.update(results)
 
         for callback in self.logging_callbacks:

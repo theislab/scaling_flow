@@ -533,6 +533,10 @@ class ValidationData(PerturbationData):
         Values in :attr:`anndata.AnnData.obs` columns which indicate no treatment with the corresponding covariate. These values will be masked with `null_token`.
     null_token
         Token to use for masking `null_value`.
+    n_conditions_on_log_iterations
+        Number of conditions to use for computation callbacks at each logged iteration.
+    n_conditions_on_train_end
+        Number of conditions to use for computation caomputaion at the end of training.
     """
 
     src_data: dict[int, jnp.ndarray]
@@ -541,6 +545,8 @@ class ValidationData(PerturbationData):
     max_combination_length: int
     null_value: Any
     null_token: Any
+    n_conditions_on_log_iteration: int
+    n_conditions_on_train_end: int
 
     @classmethod
     def load_from_adata(
@@ -556,6 +562,8 @@ class ValidationData(PerturbationData):
         # expecially if there are both float and str columns.
         null_value: Any = None,
         null_token: Any = 0.0,
+        n_conditions_on_log_iteration: int = 0,
+        n_conditions_on_train_end: int = 0,
     ) -> "ValidationData":
         """Load cell data from an AnnData object.
 
@@ -570,6 +578,9 @@ class ValidationData(PerturbationData):
             max_combination_length: Maximum number of covariates in a combination.
             null_value: Values in :attr:`anndata.AnnData.obs` columns which indicate no treatment with the corresponding covariate. These values will be masked with `null_token`.
             null_token: Token to use for masking `null_value`.
+            n_conditions_on_log_iterations: Number of conditions to use for computation callbacks at each logged iteration.
+            n_conditions_on_train_end: Number of conditions to use for computation caomputaion at the end of training.
+
 
         Returns
         -------
@@ -713,4 +724,6 @@ class ValidationData(PerturbationData):
             max_combination_length=max_combination_length,
             null_value=null_value,
             null_token=null_token,
+            n_conditions_on_log_iteration=n_conditions_on_log_iteration,
+            n_conditions_on_train_end=n_conditions_on_train_end,
         )

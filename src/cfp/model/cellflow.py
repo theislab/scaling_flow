@@ -100,14 +100,17 @@ class CellFlow:
     def prepare_validation_data(
         self,
         adata: ad.AnnData,
-        name: str = "validation",
+        name: str,
+        n_conditions_on_log_iteration: int,
+        n_conditions_on_train_end: int,
     ) -> None:
         """Prepare validation data.
 
         Args:
             adata: Anndata object.
             name: Name of the validation data.
-            **kwargs: Keyword arguments.
+            n_conditions_on_log_iterations: Number of conditions to use for computation callbacks at each logged iteration.
+            n_conditions_on_train_end: Number of conditions to use for computation caomputaion at the end of training.
 
         Returns
         -------
@@ -126,6 +129,8 @@ class CellFlow:
             uns_perturbation_covariates=self.uns_perturbation_covariates,
             max_combination_length=self.pdata.max_combination_length,
             null_value=self.null_value,
+            n_conditions_on_log_iteration=n_conditions_on_log_iteration,
+            n_conditions_on_train_end=n_conditions_on_train_end,
             **self.data_kwargs,
         )
         self._validation_data[name] = val_data
