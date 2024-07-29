@@ -12,8 +12,8 @@ from ott.solvers import utils as solver_utils
 
 from cfp.data.data import TrainingData, ValidationData
 from cfp.data.dataloader import TrainSampler
-from cfp.model import genot, otfm
 from cfp.networks.velocity_field import ConditionalVelocityField
+from cfp.solvers import genot, otfm
 from cfp.training.trainer import CellFlowTrainer
 
 __all__ = ["CellFlow"]

@@ -6,7 +6,7 @@ from ott.neural.methods.flows import dynamics
 from ott.solvers import utils as solver_utils
 
 import cfp
-from cfp.model import otfm
+from cfp.solvers import otfm
 
 x_test = jnp.ones((10, 5)) * 10
 t_test = jnp.ones((10, 1))

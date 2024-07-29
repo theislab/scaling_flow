@@ -7,7 +7,7 @@ from numpy.typing import ArrayLike
 from tqdm import tqdm
 
 from cfp.data.dataloader import TrainSampler
-from cfp.model import genot, otfm
+from cfp.solvers import genot, otfm
 from cfp.training.callbacks import CallbackRunner
 
 
