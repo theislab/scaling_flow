@@ -420,7 +420,11 @@ class ConditionEncoder(BaseModule):
         -------
         Encoded conditions of shape ``(batch_size, output_dim)``.
         """
-        genot_cell_data = conditions.pop(GENOT_CELL_KEY, None)
+        genot_cell_data = conditions.get(GENOT_CELL_KEY, None)
+        cond_without_genot = {
+            k: v for k, v in conditions.items() if k != GENOT_CELL_KEY
+        }
+        conditions = cond_without_genot
         mask, attention_mask = self._get_masks(conditions)
 
         # apply modules before pooling
@@ -456,14 +460,19 @@ class ConditionEncoder(BaseModule):
         genot_cell_data = self._apply_modules(
             self.genot_source_modules, genot_cell_data, None, training
         )
-        # conditions = jnp.concatenate(
-        #    [jnp.tile(conditions, (genot_cell_data.shape[0], 1)), genot_cell_data],
-        #    axis=-1,
-        # )
-        conditions = jnp.concatenate(
-            [jnp.tile(conditions, (genot_cell_data.shape[0], 1)), genot_cell_data],
-            axis=-1,
-        )
+        if genot_cell_data.ndim == 2:
+            conditions = jnp.concatenate(
+                [jnp.tile(conditions, (genot_cell_data.shape[0], 1)), genot_cell_data],
+                axis=-1,
+            )
+        else:
+            conditions = jnp.squeeze(
+                jnp.concatenate(
+                    [conditions, jnp.expand_dims(genot_cell_data, 0)],
+                    axis=-1,
+                )
+            )
+            conditions = jnp.expand_dims(conditions, 0)
 
         return conditions
 

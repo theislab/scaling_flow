@@ -108,9 +108,8 @@ class ConditionalVelocityField(nn.Module):
         t = time_encoder.cyclical_time_encoder(t, n_freqs=1024)
         t = self.time_encoder(t, training=train)
         x = self.x_encoder(x, training=train)
-
         if squeeze:
-            condition = jnp.squeeze(condition, 0)
+            condition = jnp.squeeze(condition)  # , 0)
         elif condition.shape[0] != x.shape[0]:
             condition = jnp.tile(condition, (x.shape[0], 1))
         concatenated = jnp.concatenate((t, x, condition), axis=-1)
@@ -129,7 +128,7 @@ class ConditionalVelocityField(nn.Module):
         """
         if self.encode_conditions:
             condition = self.condition_encoder(
-                condition, training=False, return_embedding=True
+                condition, training=False, return_conditions_only=True
             )
         else:
             condition = jnp.concatenate(list(condition.values()), axis=-1)

@@ -225,31 +225,32 @@ class GENOT:
         )
 
         def vf(
-            t: jnp.ndarray, x: jnp.ndarray, condition: dict[str, jnp.ndarray]
+            t: jnp.ndarray, x: jnp.ndarray, cond: dict[str, jnp.ndarray] | None
         ) -> jnp.ndarray:
             params = self.vf_state.params
-            return self.vf_state.apply_fn(
-                {"params": params}, t, x, condition, train=False
-            )
+            return self.vf_state.apply_fn({"params": params}, t, x, cond, train=False)
 
-        def solve_ode(x: jnp.ndarray, condition: dict[str, jnp.ndarray]) -> jnp.ndarray:
+        def solve_ode(
+            x: jnp.ndarray, condition: jnp.ndarray | None, cell_data: jnp.ndarray
+        ) -> jnp.ndarray:
             ode_term = diffrax.ODETerm(vf)
-            sol = diffrax.diffeqsolve(
+            condition[GENOT_CELL_KEY] = cell_data
+            result = diffrax.diffeqsolve(
                 ode_term,
                 t0=0.0,
                 t1=1.0,
                 y0=x,
                 args=condition,
-                **kwargs,
+                dt0=None,
+                solver=diffrax.Tsit5(),
+                stepsize_controller=diffrax.PIDController(rtol=1e-5, atol=1e-5),
             )
-            return sol.ys[0]
+            return result.ys[0]
 
         rng = utils.default_prng_key(rng)
         latent = self.latent_noise_fn(rng, (len(source),))
 
-        if condition is not None:
-            condition[GENOT_CELL_KEY] = source
-        else:
-            condition = {GENOT_CELL_KEY: source}
-        x_pred = jax.jit(jax.vmap(solve_ode, in_axes=[0, None]))(latent, condition)
+        x_pred = jax.jit(jax.vmap(solve_ode, in_axes=[0, None, 0]))(
+            latent, condition, source
+        )
         return np.array(x_pred)

@@ -8,7 +8,7 @@ class TestCellFlow:
         "cell_data",
         ["X", {"obsm": "X_pca"}],
     )
-    @pytest.mark.parametrize("solver", ["otfm", "genot"])
+    @pytest.mark.parametrize("solver", ["genot", "otfm"])
     def test_cellflow_cell_data(
         self,
         adata_perturbation,

@@ -40,10 +40,10 @@ class TestTrainer:
             num_iterations=2,
             valid_freq=valid_freq,
         )
-        x_pred = trainer.predict(x_test, cond)
+        x_pred = model.predict(x_test, cond)
         assert x_pred.shape == x_test.shape
 
-        cond_enc = trainer.get_condition_embedding(cond)
+        cond_enc = model.get_condition_embedding(cond)
         assert cond_enc.shape == (1, 12)
 
     @pytest.mark.parametrize("use_validdata", [True, False])
@@ -84,8 +84,8 @@ class TestTrainer:
         if use_validdata:
             assert f"val_{metric_to_compute}" in trainer.training_logs
 
-        x_pred = trainer.predict(x_test, cond)
+        x_pred = model.predict(x_test, cond)
         assert x_pred.shape == x_test.shape
 
-        cond_enc = trainer.get_condition_embedding(cond)
+        cond_enc = model.get_condition_embedding(cond)
         assert cond_enc.shape == (1, 12)
