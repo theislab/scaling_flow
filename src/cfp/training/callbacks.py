@@ -3,6 +3,7 @@ from typing import Any, Literal
 
 import jax.tree as jt
 import numpy as np
+import jax
 from numpy.typing import ArrayLike
 
 from cfp.data.data import ValidationData
@@ -265,6 +266,7 @@ class CallbackRunner:
         computation_callbacks: List of computation callbacks
         logging_callbacks: List of logging callbacks
         data: Validation data to use for computing metrics
+        seed: Random seed for subsampling the validation data
 
     Returns
     -------
@@ -275,6 +277,7 @@ class CallbackRunner:
         self,
         callbacks: list[ComputationCallback],
         data: dict[str, ValidationData],
+        seed: int = 0,
     ) -> None:
 
         self.validation_data = data
@@ -284,6 +287,7 @@ class CallbackRunner:
         self.logging_callbacks = [
             c for c in callbacks if isinstance(c, LoggingCallback)
         ]
+        self.rng = np.random.default_rng(seed)
 
         if len(self.computation_callbacks) == 0 & len(self.logging_callbacks) != 0:
             raise ValueError(
@@ -306,7 +310,7 @@ class CallbackRunner:
                 subsampled_validation_data[val_data_name] = val_data
             else:
                 idxs = self.rng.choice(
-                    len(val_data), n_conditions_to_sample(val_data), replace=False
+                    len(val_data.condition_data), n_conditions_to_sample(val_data), replace=False
                 )
                 subsampled_validation_data[val_data_name] = {
                     val_data_name[i]: val_data[val_data_name[i]] for i in idxs

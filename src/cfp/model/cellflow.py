@@ -110,7 +110,7 @@ class CellFlow:
             adata: Anndata object.
             name: Name of the validation data.
             n_conditions_on_log_iterations: Number of conditions to use for computation callbacks at each logged iteration.
-            n_conditions_on_train_end: Number of conditions to use for computation caomputaion at the end of training.
+            n_conditions_on_train_end: Number of conditions to use for computation callbacks at the end of training.
 
         Returns
         -------
