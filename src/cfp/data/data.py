@@ -1,4 +1,5 @@
 import abc
+import warnings
 import itertools
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
@@ -81,70 +82,93 @@ class PerturbationData(BaseData):
         return jnp.asarray(getattr(adata, attr)[key])
 
     @staticmethod
-    def _verify_control_data(adata: anndata.AnnData, data: tuple[str, Any]):
-        if not isinstance(data, tuple | list):
-            raise ValueError(f"Control data should be a tuple of length 2, got {data}.")
-        if len(data) != 2:
-            raise ValueError(f"Control data should be a tuple of length 2, got {data}.")
-        if data[0] not in adata.obs:
-            raise ValueError(f"Control column {data[0]} not found in adata.obs.")
-        assert data[0] in adata.obs, f"Control column {data[0]} not found in adata.obs."
-        if not isinstance(adata.obs[data[0]].dtype, pd.CategoricalDtype):
+    def _verify_control_data(adata: anndata.AnnData, key: tuple[str, Any]):
+        if key not in adata.obs:
+            raise ValueError(f"Control column '{key}' not found in adata.obs.")
+        if not isinstance(adata.obs[key].dtype, pd.BooleanDtype):
             try:
-                adata.obs[data[0]] = adata.obs[data[0]].astype("category")
-            except ValueError:
+                adata.obs[key] = adata.obs[key].astype("boolean")
+            except ValueError as e:
                 raise ValueError(
-                    f"Control column {data[0]} could not be converted to categorical."
-                ) from None
-        if data[1] not in adata.obs[data[0]].cat.categories:
-            raise ValueError(f"Control value {data[1]} not found in {data[0]}.")
+                    f"Control column '{key}' could not be converted to boolean."
+                ) from e
+        if adata.obs[key].sum() == 0:
+            raise ValueError(f"No control cells found in adata.")
 
     @classmethod
-    def _verify_obs_perturbation_covariates(
-        cls, adata: anndata.AnnData, data: Any
-    ) -> None:
-        if not isinstance(data, Sequence):
-            raise ValueError(
-                f"Data should be a sequence, found {data} to be of type {type(data)}."
-            )
-        for group in data:
-            if not isinstance(group, tuple | list):
-                raise ValueError(
-                    f"Group should be a tuple, found {group} to be of type {type(group)}."
-                )
-            cls._verify_covariate_data(adata, group)
-
-    @classmethod
-    def _verify_uns_perturbation_covariates(
-        cls, adata: anndata.AnnData, data: Any
-    ) -> None:
+    def _verify_perturbation_covariates(cls, adata: anndata.AnnData, data: Any) -> None:
         if not isinstance(data, dict):
             raise ValueError(
-                f"Data should be a dictionary, found {data} to be of type {type(data)}."
+                f"`perturbation_covariates` should be a dictionary, found {data} to be of type {type(data)}."
             )
-        for key, group in data.items():
+        for key, covars in data.items():
             if not isinstance(key, str):
                 raise ValueError(
-                    f"Key should be a string, found {group} to be of type {type(group)}."
+                    f"Key should be a string, found {key} to be of type {type(key)}."
                 )
-            if not isinstance(group, tuple | list):
+            if not isinstance(covar, tuple | list):
                 raise ValueError(
-                    f"Group should be a tuple, found {group} to be of type {type(group)}."
+                    f"Value should be a tuple, found {covar} to be of type {type(covar)}."
                 )
-            cls._verify_covariate_data(adata, group)
+            cls._verify_covariate_data(adata, covars)
+
+    @classmethod
+    def _verify_sample_covariates(cls, adata: anndata.AnnData, data: Any) -> None:
+        if not isinstance(data, tuple | list):
+            raise ValueError(
+                f"`sample_covariates` should be a tuple or list, found {data} to be of type {type(data)}."
+            )
+        for covar in data:
+            if not isinstance(covar, str):
+                raise ValueError(
+                    f"Key should be a string, found {covar} to be of type {type(covar)}."
+                )
+            cls._verify_covariate_data(adata, _to_list(covar))
 
     @staticmethod
-    def _verify_covariate_data(adata: anndata.AnnData, group: Any) -> None:
-        for covariate in group:
+    def _verify_covariate_data(adata: anndata.AnnData, covars: Any) -> None:
+        for covariate in covars:
             if covariate not in adata.obs:
                 raise ValueError(f"Covariate {covariate} not found in adata.obs.")
             if not isinstance(adata.obs[covariate].dtype, pd.CategoricalDtype):
                 try:
                     adata.obs[covariate] = adata.obs[covariate].astype("category")
-                except ValueError:
+                except ValueError as e:
                     raise ValueError(
                         f"Covariate {covariate} could not be converted to categorical."
-                    ) from None
+                    ) from e
+
+    @staticmethod
+    def _verify_covariate_reps(
+        adata: anndata.AnnData, data: dict[str, str], covariates: Sequence[str]
+    ) -> None:
+        for key, value in data.items():
+            if key not in covariates:
+                raise ValueError(f"Key '{key}' not found in covariates.")
+            if value not in adata.uns:
+                raise ValueError(f"Representation '{value}' not found in `adata.uns`.")
+            if not isinstance(adata.uns[value], dict):
+                raise ValueError(
+                    f"Covariate representation '{value}' in `adata.uns` should be of type `dict`, found {type(adata.uns[value])}."
+                )
+
+    @staticmethod
+    def _get_max_combination_length(
+        perturbation_covariates: dict[str, Sequence[str]],
+        max_combination_length: int | None,
+    ) -> int:
+        obs_max_combination_length = max(
+            len(comb) for comb in perturbation_covariates.values()
+        )
+        if max_combination_length is None:
+            return obs_max_combination_length
+        elif max_combination_length < obs_max_combination_length:
+            warnings.warn(
+                f"Provided `max_combination_length` is smaller than the observed maximum combination length of the perturbation covariates. Setting maximum combination length to {obs_max_combination_length}."
+            )
+            return obs_max_combination_length
+        else:
+            return max_combination_length
 
     @staticmethod
     def _check_shape(arr: float | ArrayLike) -> ArrayLike:
@@ -335,8 +359,8 @@ class TrainingData(PerturbationData):
         Args:
             adata: An :class:`~anndata.AnnData` object.
             sample_rep: Key in `adata.obsm` where the sample representation is stored or "X" to use `adata.X`.
-            control_key: Key of a boolian column in `adata.obs` that defines the control samples.
-            perturbation_covariates: A dictionary where the keys indicate the name of the covariate group and the values are keys in `adata.obs`. The corresponding columns should be either boolian (presence/abscence of the perturbation) or numeric (concentration or magnitude of the perturbation). If multiple groups are provided, the first is interpreted as the primary perturbation and the others as covariates corresponding to these perturbations, e.g. `{"drug":("drugA", "drugB"), "time":("drugA_time", "drugB_time")}`.
+            control_key: Key of a boolean column in `adata.obs` that defines the control samples.
+            perturbation_covariates: A dictionary where the keys indicate the name of the covariate group and the values are keys in `adata.obs`. The corresponding columns should be either boolean (presence/abscence of the perturbation) or numeric (concentration or magnitude of the perturbation). If multiple groups are provided, the first is interpreted as the primary perturbation and the others as covariates corresponding to these perturbations, e.g. `{"drug":("drugA", "drugB"), "time":("drugA_time", "drugB_time")}`.
             perturbation_covariate_reps: A dictionary where the keys indicate the name of the covariate group and the values are keys in `adata.uns` storing a dictionary with the representation of the covariates. E.g. `{"drug":"drug_embeddings"}` with `adata.uns["drug_embeddings"] = {"drugA": np.array, "drugB": np.array}`.
             sample_covariates: Keys in `adata.obs` indicating sample covatiates to be taken into account for training and prediction, e.g. `["age", "cell_type"]`.
             sample_covariate_reps: A dictionary where the keys indicate the name of the covariate group and the values are keys in `adata.uns` storing a dictionary with the representation of the covariates. E.g. `{"cell_type": "cell_type_embeddings"}` with `adata.uns["cell_type_embeddings"] = {"cell_typeA": np.array, "cell_typeB": np.array}`.
@@ -354,25 +378,27 @@ class TrainingData(PerturbationData):
             adata.obs[CONTROL_HELPER] = adata.obs[CONTROL_HELPER].astype("category")
             split_covariates = [CONTROL_HELPER]
 
-        cls._verify_control_data(adata, control_data)
-        obs_perturbation_covariates = [_to_list(c) for c in obs_perturbation_covariates]
-        cls._verify_obs_perturbation_covariates(adata, obs_perturbation_covariates)
-        uns_perturbation_covariates = {
-            k: _to_list(v) for k, v in uns_perturbation_covariates.items()
+        cls._verify_control_data(adata, control_key)
+        perturbation_covariates = {
+            k: _to_list(v) for k, v in perturbation_covariates.items()
         }
-        cls._verify_uns_perturbation_covariates(adata, uns_perturbation_covariates)
+        cls._verify_perturbation_covariates(adata, perturbation_covariates)
+        perturb_covariate_groups = list(perturbation_covariates.keys())
 
-        obs_combination_length = (
-            max(len(comb) for comb in obs_perturbation_covariates)
-            if len(obs_perturbation_covariates)
-            else 0
+        sample_covariates = sample_covariates or []
+        cls._verify_sample_covariates(adata, sample_covariates)
+
+        perturbation_covariate_reps = perturbation_covariate_reps or {}
+        cls._verify_covariate_reps(
+            adata, perturbation_covariate_reps, perturb_covariate_groups
         )
-        uns_combination_length = (
-            max(len(comb) for comb in uns_perturbation_covariates.values())  # type: ignore[attr-defined]
-            if len(uns_perturbation_covariates)
-            else 0
+
+        sample_covariate_reps = sample_covariate_reps or {}
+        cls._verify_covariate_reps(adata, sample_covariate_reps, sample_covariates)
+
+        max_combination_length = cls._get_max_combination_length(
+            perturbation_covariates, max_combination_length
         )
-        max_combination_length = max(obs_combination_length, uns_combination_length)
 
         for covariate in split_covariates:
             if covariate not in adata.obs:
