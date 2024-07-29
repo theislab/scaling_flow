@@ -85,12 +85,16 @@ class TestCellFlow:
         [{"drug": ("drug1", "drug2")}, {"drug": "drug1"}],
     )
     @pytest.mark.parametrize("solver", ["otfm", "genot"])
+    @pytest.mark.parametrize("n_conditions_on_log_iteration", [-1, 0, 3])
+    @pytest.mark.parametrize("n_conditions_on_train_end", [-1, 0, 3])
     def test_cellflow_val_data_loading(
         self,
         adata_perturbation,
         split_covariates,
         uns_perturbation_covariates,
         solver,
+        n_conditions_on_log_iteration,
+        n_conditions_on_train_end,
     ):
         cf = cfp.model.cellflow.CellFlow(adata_perturbation, solver=solver)
         cf.prepare_data(
@@ -115,6 +119,8 @@ class TestCellFlow:
         cf.prepare_validation_data(
             adata_perturbation,
             name="val",
+            n_conditions_on_log_iteration=n_conditions_on_log_iteration,
+            n_conditions_on_train_end=n_conditions_on_train_end,
         )
         assert "val" in cf._validation_data
         assert cf._validation_data["val"].src_data is not None
@@ -133,6 +139,14 @@ class TestCellFlow:
         assert (
             cf._validation_data["val"].condition_data[0][0]["dosage"].shape[1]
             == cf.pdata.max_combination_length
+        )
+        assert (
+            n_conditions_on_log_iteration
+            == cf._validation_data["val"].n_conditions_on_log_iteration
+        )
+        assert (
+            n_conditions_on_train_end
+            == cf._validation_data["val"].n_conditions_on_train_end
         )
 
     @pytest.mark.parametrize("solver", ["otfm", "genot"])

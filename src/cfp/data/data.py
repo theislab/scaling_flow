@@ -547,8 +547,8 @@ class ValidationData(PerturbationData):
     max_combination_length: int
     null_value: Any
     null_token: Any
-    n_conditions_on_log_iteration: int
-    n_conditions_on_train_end: int
+    n_conditions_on_log_iteration: int = (0,)
+    n_conditions_on_train_end: int = (0,)
 
     @classmethod
     def load_from_adata(
