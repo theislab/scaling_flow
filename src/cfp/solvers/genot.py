@@ -87,12 +87,12 @@ class GENOT:
             additional_cond_dim=source_dim,
             **kwargs,
         )
-        self.step_fn = self._get_step_fn()
+        self.vf_step_fn = self._get_vf_step_fn()
 
-    def _get_step_fn(self) -> Callable:
+    def _get_vf_step_fn(self) -> Callable:
 
         @jax.jit
-        def step_fn(
+        def vf_step_fn(
             rng: jax.Array,
             vf_state: train_state.TrainState,
             time: jnp.ndarray,
@@ -136,7 +136,7 @@ class GENOT:
 
             return loss, vf_state.apply_gradients(grads=grads)
 
-        return step_fn
+        return vf_step_fn
 
     @staticmethod
     def _prepare_data(batch: dict[str, jnp.ndarray]) -> tuple[
@@ -163,7 +163,7 @@ class GENOT:
 
         return (src, tgt), arrs
 
-    def outer_step_fn(
+    def step_fn(
         self,
         rng: jnp.ndarray,
         batch: dict[str, ArrayLike],
@@ -189,7 +189,7 @@ class GENOT:
         )
 
         src, tgt = src[src_ixs], tgt[tgt_ixs]
-        loss, self.vf_state = self.step_fn(
+        loss, self.vf_state = self.vf_step_fn(
             rng_step_fn, self.vf_state, time, src, tgt, latent, condition
         )
         return loss

@@ -47,12 +47,12 @@ class OTFlowMatching:
         self.vf_state = self.vf.create_train_state(
             input_dim=self.vf.output_dims[-1], **kwargs
         )
-        self.step_fn = self._get_step_fn()
+        self.vf_step_fn = self._get_vf_step_fn()
 
-    def _get_step_fn(self) -> Callable:
+    def _get_vf_step_fn(self) -> Callable:
 
         @jax.jit
-        def step_fn(
+        def vf_step_fn(
             rng: jax.Array,
             vf_state: train_state.TrainState,
             source: jnp.ndarray,
@@ -90,9 +90,9 @@ class OTFlowMatching:
             )
             return vf_state.apply_gradients(grads=grads), loss
 
-        return step_fn
+        return vf_step_fn
 
-    def outer_step_fn(
+    def step_fn(
         self,
         rng: jnp.ndarray,
         batch: dict[str, ArrayLike],
@@ -106,7 +106,7 @@ class OTFlowMatching:
             src_ixs, tgt_ixs = solver_utils.sample_joint(rng_resample, tmat)
             src, tgt = src[src_ixs], tgt[tgt_ixs]
 
-        self.vf_state, loss = self.step_fn(
+        self.vf_state, loss = self.vf_step_fn(
             rng_step_fn,
             self.vf_state,
             src,
