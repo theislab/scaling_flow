@@ -76,7 +76,7 @@ class GENOT:
     ):
         self.vf = vf
         self.flow = flow
-        self.data_match_fn = data_match_fn
+        self.data_match_fn = jax.jit(data_match_fn)
         self.time_sampler = time_sampler
         if latent_noise_fn is None:
             latent_noise_fn = functools.partial(_multivariate_normal, dim=target_dim)

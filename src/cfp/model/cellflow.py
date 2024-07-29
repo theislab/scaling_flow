@@ -210,7 +210,6 @@ class CellFlow:
             raise NotImplementedError(
                 f"The key of `flow` must be `constant_noise` or `bridge` but found {flow.keys()[0]}."
             )
-        match_fn = jax.jit(match_fn)
         if self.solver == "otfm":
             self._solver = otfm.OTFlowMatching(
                 vf=vf,

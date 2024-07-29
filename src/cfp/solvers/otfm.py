@@ -42,7 +42,7 @@ class OTFlowMatching:
         self.vf = vf
         self.flow = flow
         self.time_sampler = time_sampler
-        self.match_fn = match_fn
+        self.match_fn = jax.jit(match_fn)
 
         self.vf_state = self.vf.create_train_state(
             input_dim=self.vf.output_dims[-1], **kwargs
