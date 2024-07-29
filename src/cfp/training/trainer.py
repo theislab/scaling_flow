@@ -85,6 +85,7 @@ class CellFlowTrainer:
         )
         return loss
 
+    @jax.jit
     def _otfm_step_fn(
         self,
         rng: jnp.ndarray,
