@@ -79,13 +79,16 @@ class CellFlowTrainer:
         src_data = {}
         tgt_data = {}
         condition_data = {}
-        for src_idx in val_data.src_data.keys():
-            src_data[src_idx] = val_data.src_data[src_idx]
-            for idx in condition_idxs:
+        for cond_idx in condition_idxs:
+            for src_idx in val_data.src_data.keys():
+                src_data[src_idx] = val_data.src_data[src_idx]
+
                 tgt_data[src_idx] = {}
-                if src_idx in val_data.tgt_data:
-                    tgt_data[src_idx][idx] = val_data.tgt_data[src_idx][idx]
-                    condition_data[idx] = val_data.condition_data[idx]
+                if cond_idx in val_data.tgt_data[src_idx]:
+                    print("src_idx", src_idx)
+                    print("idx", cond_idx)
+                    tgt_data[src_idx][cond_idx] = val_data.tgt_data[src_idx][cond_idx]
+                    condition_data[cond_idx] = val_data.condition_data[cond_idx]
 
         return ValidationData(
             src_data=src_data,

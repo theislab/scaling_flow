@@ -1,5 +1,6 @@
 import jax
 import jax.numpy as jnp
+import numpy as np
 import optax
 import pytest
 from ott.neural.methods.flows import dynamics
@@ -89,3 +90,40 @@ class TestTrainer:
 
         cond_enc = model.get_condition_embedding(cond)
         assert cond_enc.shape == (1, 12)
+
+    @pytest.mark.parametrize("n_conditions_on_log_iteration", [0, 2, 19])
+    @pytest.mark.parametrize("n_conditions_on_train_end", [0, 2, 19])
+    def test_subsampling_validation_data(
+        self,
+        adata_perturbation,
+        big_validdata,
+        n_conditions_on_log_iteration,
+        n_conditions_on_train_end,
+    ):
+        cf = cfp.model.cellflow.CellFlow(adata_perturbation, solver="otfm")
+        cf.prepare_data(
+            cell_data="X",
+            control_key=("drug1", "control"),
+            obs_perturbation_covariates=[("dosage",)],
+            uns_perturbation_covariates={"drug": ("drug1",)},
+        )
+        big_validdata.n_conditions_on_log_iteration = n_conditions_on_log_iteration
+        big_validdata.n_conditions_on_train_end = n_conditions_on_train_end
+
+        rng = np.random.default_rng(111)
+        cond_indices = rng.choice(n_conditions_on_log_iteration, replace=False)
+
+        out = cf.trainer._extract_subsampled_validation_data(
+            big_validdata["big_val"], cond_indices
+        )
+        assert isinstance(out, cfp.data.data.ValidationData)
+        assert len(out.condition_data) == n_conditions_on_log_iteration
+        out2 = cf.trainer._sample_validation_data(big_validdata, "on_log_iteration")
+        assert isinstance(out2, dict)
+        assert "big_val" in out2
+        assert len(out2.condition_data) == n_conditions_on_log_iteration
+
+        out3 = cf.trainer._sample_validation_data(big_validdata, "on_train_end")
+        assert isinstance(out3, dict)
+        assert "big_val" in out3
+        assert len(out3.condition_data) == n_conditions_on_train_end

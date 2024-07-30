@@ -85,8 +85,8 @@ class TestCellFlow:
         [{"drug": ("drug1", "drug2")}, {"drug": "drug1"}],
     )
     @pytest.mark.parametrize("solver", ["otfm", "genot"])
-    @pytest.mark.parametrize("n_conditions_on_log_iteration", [-1, 0, 3])
-    @pytest.mark.parametrize("n_conditions_on_train_end", [-1, 0, 3])
+    @pytest.mark.parametrize("n_conditions_on_log_iteration", [-1, 0, 2])
+    @pytest.mark.parametrize("n_conditions_on_train_end", [-1, 0, 2])
     def test_cellflow_val_data_loading(
         self,
         adata_perturbation,
@@ -150,8 +150,8 @@ class TestCellFlow:
         )
 
     @pytest.mark.parametrize("solver", ["otfm", "genot"])
-    @pytest.mark.parametrize("n_conditions_on_log_iteration", [-1, 0, 3])
-    @pytest.mark.parametrize("n_conditions_on_train_end", [-1, 0, 3])
+    @pytest.mark.parametrize("n_conditions_on_log_iteration", [-1, 0, 2])
+    @pytest.mark.parametrize("n_conditions_on_train_end", [-1, 0, 2])
     def test_cellflow_with_validation(
         self,
         adata_perturbation,
