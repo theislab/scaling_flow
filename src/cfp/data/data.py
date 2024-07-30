@@ -520,6 +520,7 @@ class TrainingData(PerturbationData):
         perturbation_covariates_mask = np.full((adata.n_obs,), -1, dtype=jnp.int32)
         perturbation_idx_to_covariates = {}
         condition_data: dict[int, list] = {i: [] for i in covar_to_idx.keys()}
+        control_mask = np.array(adata.obs[control_key], dtype=int)
 
         src_counter = 0
         tgt_counter = 0
@@ -528,7 +529,9 @@ class TrainingData(PerturbationData):
             split_cov_mask = (
                 adata.obs[list(filter_dict.keys())] == list(filter_dict.values())
             ).all(axis=1)
-            split_covariates_mask[split_cov_mask] = src_counter
+            mask = control_mask * split_cov_mask
+
+            split_covariates_mask[mask] = src_counter
             split_idx_to_covariates[src_counter] = split_combination
 
             conditional_distributions = []
@@ -538,6 +541,7 @@ class TrainingData(PerturbationData):
                 tgt_cond = tgt_cond[perturb_covar_keys]
                 mask = (
                     (adata.obs[perturb_covar_keys] == list(tgt_cond.values)).all(axis=1)
+                    * (1 - control_mask)
                     * split_cov_mask
                 ) == 1
 
@@ -714,7 +718,8 @@ class ValidationData(PerturbationData):
 
         src_data: dict[int, jax.Array] = {}
         tgt_data: dict[int, dict[int, jax.Array]] = {}
-        condition_data: dict[int, list] = {i: [] for i in covar_to_idx.keys()}
+        condition_data: dict[int, dict[int, list]] = {}
+        control_mask = np.array(adata.obs[control_key], dtype=int)
 
         src_counter = 0
         tgt_counter = 0
@@ -723,6 +728,7 @@ class ValidationData(PerturbationData):
             split_cov_mask = (
                 adata.obs[list(filter_dict.keys())] == list(filter_dict.values())
             ).all(axis=1)
+            mask = control_mask * split_cov_mask
 
             src_data[src_counter] = cls._get_cell_data(adata[mask], sample_rep)
             tgt_data[src_counter] = {}
@@ -730,10 +736,9 @@ class ValidationData(PerturbationData):
 
             pbar = tqdm(perturb_covar_df.iterrows(), total=perturb_covar_df.shape[0])
             for _, tgt_cond in pbar:
+                tgt_cond = tgt_cond[perturb_covar_keys]
                 mask = (
-                    (adata.obs[list(tgt_dist_obs.keys())] == list(tgt_combination)).all(
-                        axis=1
-                    )
+                    (adata.obs[perturb_covar_keys] == list(tgt_cond.values)).all(axis=1)
                     * (1 - control_mask)
                     * split_cov_mask
                 ) == 1
@@ -759,8 +764,7 @@ class ValidationData(PerturbationData):
 
                 condition_data[src_counter][tgt_counter] = {}
                 for pert_cov, emb in embedding.items():
-                    pert_key = pert_embedding_idx_to_covariates[pert_cov]
-                    condition_data[src_counter][tgt_counter][pert_key] = (
+                    condition_data[src_counter][tgt_counter][pert_cov] = (
                         jnp.expand_dims(emb, 0)
                     )
 
