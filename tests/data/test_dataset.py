@@ -5,18 +5,15 @@ import pytest
 
 
 class TestTrainingData:
-    @pytest.mark.parametrize(
-        "cell_data",
-        ["X", "X_pca", {"obsm": "X_pca"}, {"layers": "my_counts"}],
-    )
+    @pytest.mark.parametrize("sample_rep", ["X", "X_pca"])
     @pytest.mark.parametrize("split_covariates", [[], ["cell_type"]])
-    @pytest.mark.parametrize("control_data", [("drug1", "control")])
+    @pytest.mark.parametrize("control_data", "control")
     @pytest.mark.parametrize("obs_perturbation_covariates", [[], [("dosage",)]])
     @pytest.mark.parametrize("uns_perturbation_covariates", [{}, {"drug": ("drug1",)}])
     def test_load_from_adata_no_combinations(
         self,
         adata_perturbation: ad.AnnData,
-        cell_data,
+        sample_rep,
         split_covariates,
         control_data,
         obs_perturbation_covariates,
@@ -26,7 +23,7 @@ class TestTrainingData:
 
         pdata = TrainingData.load_from_adata(
             adata_perturbation,
-            cell_data=cell_data,
+            sample_rep=sample_rep,
             split_covariates=split_covariates,
             control_data=control_data,
             obs_perturbation_covariates=obs_perturbation_covariates,
