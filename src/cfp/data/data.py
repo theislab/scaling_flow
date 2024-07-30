@@ -62,7 +62,7 @@ class PerturbationData(BaseData):
     """Base class for perturbation data containers."""
 
     @staticmethod
-    def _get_sample_data(
+    def _get_cell_data(
         adata: anndata.AnnData, sample_rep: Literal["X"] | dict[str, str]
     ) -> jax.Array:
         error_message = "`sample_rep` should be either `X`, a key in `adata.obsm` or a dictionary of the form {`attr`: `key`}."
@@ -148,53 +148,30 @@ class PerturbationData(BaseData):
     @staticmethod
     def _verify_covariate_data(adata: anndata.AnnData, covars: Any) -> None:
         for covariate in covars:
-            if covariate not in adata.obs:
+            if covariate is not None and covariate not in adata.obs:
                 raise ValueError(f"Covariate {covariate} not found in adata.obs.")
 
     @classmethod
     def _get_linked_covariates(
-        cls, adata: anndata.AnnData, perturbation_covariates: dict[str, Sequence[str]]
+        cls, adata: anndata.AnnData, perturb_covariates: dict[str, Sequence[str]]
     ) -> dict[str, Sequence[str]]:
-        cls._verify_linked_covars(perturbation_covariates)
+        cls._verify_linked_covars(perturb_covariates)
 
-        primary_to_linked = {}
-        for linked_covars in zip(*perturbation_covariates.values()):
-            primary, *linked = linked_covars
-            primary_to_linked[primary] = linked
+        primary_group, primary_covars = list(perturb_covariates.items())[0]
+        primary_to_linked = {k: {} for k in primary_covars}
+        for cov_group, covars in list(perturb_covariates.items())[1:]:
+            for primary_cov, linked_cov in zip(primary_covars, covars):
+                primary_to_linked[primary_cov][cov_group] = linked_cov
 
         return primary_to_linked
 
     @staticmethod
-    def _verify_linked_covars(perturbation_covariates: dict[str, str]) -> None:
-        lengths = [len(covs) for covs in perturbation_covariates.values()]
+    def _verify_linked_covars(perturb_covariates: dict[str, str]) -> None:
+        lengths = [len(covs) for covs in perturb_covariates.values()]
         if len(set(lengths)) != 1:
             raise ValueError(
                 f"Length of perturbation covariate groups must match, found {lengths}."
             )
-
-    @staticmethod
-    def _get_covariate_type(adata: anndata.AnnData, covars: dict[str, str]) -> bool:
-        col_is_cat = []
-        for covariate in covars:
-            try:
-                adata.obs[covariate] = adata.obs[covariate].astype(float)
-            except ValueError:
-                try:
-                    adata.obs[covariate] = adata.obs[covariate].astype(str)
-                    col_is_cat.append(True)
-                except ValueError:
-                    raise ValueError(
-                        f"Perturbation covariates `{covariate}` should be either numeric/boolean or categorical."
-                    ) from e
-            else:
-                col_is_cat.append(False)
-
-        if max(col_is_cat) != min(col_is_cat):
-            raise ValueError(
-                f"Groups of perturbation covariates `{covariate}` should be either all numeric/boolean or all categorical."
-            )
-
-        return max(col_is_cat)
 
     @staticmethod
     def _verify_covariate_reps(
@@ -228,22 +205,75 @@ class PerturbationData(BaseData):
         else:
             return max_combination_length
 
+    @classmethod
+    def _get_primary_covar_encoder(
+        cls,
+        adata: anndata.AnnData,
+        perturbation_covariates: dict[str, Sequence[str]],
+        perturbation_covariate_reps: dict[str, str],
+    ) -> preprocessing.OneHotEncoder:
+        primary_group, primary_covars = list(perturbation_covariates.items())[0]
+        is_categorical = cls._check_covariate_type(adata, primary_covars)
+
+        if primary_group in perturbation_covariate_reps:
+            return None
+
+        if is_categorical:
+            encoder = preprocessing.OneHotEncoder(sparse_output=False)
+            all_values = np.unique(adata.obs[primary_covars].values.flatten())
+            encoder.fit(all_values.reshape(-1, 1))
+            return encoder
+
+        encoder = preprocessing.OneHotEncoder(sparse_output=False)
+        encoder.fit(np.array(primary_covars).reshape(-1, 1))
+        return encoder, is_categorical
+
+    @staticmethod
+    def _check_covariate_type(adata: anndata.AnnData, covars: dict[str, str]) -> bool:
+        col_is_cat = []
+        for covariate in covars:
+            try:
+                adata.obs[covariate] = adata.obs[covariate].astype(float)
+            except ValueError:
+                try:
+                    adata.obs[covariate] = adata.obs[covariate].astype("category")
+                    col_is_cat.append(True)
+                except ValueError:
+                    raise ValueError(
+                        f"Perturbation covariates `{covariate}` should be either numeric/boolean or categorical."
+                    ) from e
+            else:
+                col_is_cat.append(False)
+
+        if max(col_is_cat) != min(col_is_cat):
+            raise ValueError(
+                f"Groups of perturbation covariates `{covariate}` should be either all numeric/boolean or all categorical."
+            )
+
+        return max(col_is_cat)
+
     @staticmethod
     def _check_shape(arr: float | ArrayLike) -> ArrayLike:
         if not hasattr(arr, "shape") or len(arr.shape) == 0:
-            return np.ones((1, 1)) * arr
+            return jnp.ones((1, 1)) * arr
         if arr.ndim == 1:  # type: ignore[union-attr]
-            return np.expand_dims(arr, 0)  # type: ignore[return-value]
+            return jnp.expand_dims(arr, 0)  # type: ignore[return-value]
         elif arr.ndim == 2:  # type: ignore[union-attr]
             if arr.shape[0] == 1:
                 return arr  # type: ignore[return-value]
             if arr.shape[1] == 1:
-                return np.transpose(arr)
-            raise ValueError("TODO, wrong shape.")
+                return jnp.transpose(arr)
+            raise ValueError(
+                "Condition representation has an unexpected shape. Should be (1, n_features) or (n_features, )."
+            )
         elif arr.ndim > 2:  # type: ignore[union-attr]
-            raise ValueError("TODO. Too many dimensions.")
+            raise ValueError(
+                "Condition representation has too many dimensions. Should be 1 or 2."
+            )
 
-        raise ValueError("TODO. wrong data for embedding.")
+        raise ValueError(
+            "Condition representation as an unexpected format. Expected an array of shape (1, n_features) or (n_features, )."
+        )
 
     @staticmethod
     def _get_idx_to_covariate(
@@ -256,19 +286,15 @@ class PerturbationData(BaseData):
         return idx_to_covar, covar_to_idx
 
     @staticmethod
-    def _get_covar_encoders(
-        adata: anndata.AnnData,
-        covariate_groups: dict[str, bool],
-        cov_is_cat: dict[str, bool],
-    ) -> dict[str, preprocessing.OneHotEncoder]:
-        covar_encoders = {}
-        cat_covars = [covar for covar, is_cat in cov_is_cat.items() if is_cat]
-        cat_covar_groups = {covar: covariate_groups[covar] for covar in cat_covars}
-        for cov_group, cov_keys in cat_covar_groups.items():
-            encoder = preprocessing.OneHotEncoder(sparse=False, handle_unknown="ignore")
-            encoder.fit(adata.obs[cov_keys])
-            covar_encoders[cov_group] = encoder
-        return covar_encoders
+    def _pad_to_max_length(
+        arr: jax.Array, max_combination_length: int, null_value: Any
+    ) -> jax.Array:
+        if arr.shape[0] < max_combination_length:
+            null_arr = jnp.full(
+                (max_combination_length - arr.shape[0], arr.shape[1]), null_value
+            )
+            arr = jnp.concatenate([arr, null_arr], axis=0)
+        return arr
 
     @classmethod
     def _get_perturbation_covariates(
@@ -279,97 +305,83 @@ class PerturbationData(BaseData):
         sample_covariates: dict[str, Sequence[str]],
         covariate_reps: dict[str, str],
         primary_to_linked: dict[str, Sequence[str]],
-        covar_is_cat: dict[str, bool],
-        covar_encoders: dict[str, preprocessing.OneHotEncoder],
+        primary_encoder: preprocessing.OneHotEncoder,
         max_combination_length: int,
         null_value: Any = 0.0,
     ) -> dict[int, jax.Array]:
         embeddings = {}
 
-        primary_cov = list(perturb_covariates.keys())[0]
-        primary_keys = perturb_covariates[primary_cov]
-        primary_is_cat = covar_is_cat[primary_cov]
+        primary_group, primary_covars = list(perturb_covariates.items())[0]
+        primary_encoder, primary_is_cat = primary_encoder
 
-        covar_reps = {}
-        for prim_key in primary_keys:
-            value = condition_data[prim_key].values[0]
+        perturb_covar_emb = {group: [] for group in perturb_covariates}
+        for primary_cov in primary_covars:
+            value = condition_data[primary_cov]
 
-            rep_key = value if primary_is_cat else prim_key
+            cov_name = value if primary_is_cat else primary_cov
 
-            if rep_key in covariate_reps:
-                prim_arr = jnp.asarray(rep_dict[primary_cov][rep_key])
+            if primary_group in covariate_reps:
+                if cov_name not in rep_dict[primary_group]:
+                    raise ValueError(
+                        f"Representation for '{cov_name}' not found in `adata.uns['{primary_group}']`."
+                    )
+                prim_arr = jnp.asarray(rep_dict[primary_group][cov_name])
             else:
-                prim_arr = covar_encoders[primary_cov].transform([[value]])
+                prim_arr = jnp.asarray(
+                    primary_encoder.transform(np.array(cov_name).reshape(-1, 1))
+                )
 
             if not primary_is_cat:
                 prim_arr *= value
 
             prim_arr = cls._check_shape(prim_arr)
+            perturb_covar_emb[primary_group].append(prim_arr)
 
-            linked_emb = []
-            for linked_key in primary_to_linked[primary_cov]:
-                linked_is_cat = covar_is_cat[linked_cov]
+            for linked_covar in primary_to_linked[primary_cov].items():
+                linked_group, linked_cov = list(linked_covar)
 
-                if linked_cov in covariate_reps:
-                    linked_arr = jnp.asarray(
-                        rep_dict[linked_cov][condition_data[linked_key].values[0]]
-                    )
-                elif linked_is_cat:
-                    linked_arr = covar_encoders[linked_cov].transform(
-                        [[condition_data[linked_key].values[0]]]
-                    )
+                if linked_cov is None:
+                    linked_arr = jnp.full((1, 1), null_value)
+                    linked_arr = cls._check_shape(linked_arr)
+                    perturb_covar_emb[linked_group].append(linked_arr)
+                    continue
+
+                cov_name = condition_data[linked_cov]
+
+                if linked_group in covariate_reps:
+                    if cov_name not in rep_dict[linked_group]:
+                        raise ValueError(
+                            f"Representation for '{cov_name}' not found in `adata.uns['{linked_group}']`."
+                        )
+                    linked_arr = jnp.asarray(rep_dict[linked_group][cov_name])
                 else:
-                    linked_arr = jnp.asarray(condition_data[linked_key].values[0])
+                    linked_arr = jnp.asarray(condition_data[linked_cov])
 
-                linked_emb.append(linked_arr)
-
-            if len(linked_emb) > 0:
-                linked_arr = jnp.concatenate(linked_emb, axis=1)
                 linked_arr = cls._check_shape(linked_arr)
-                prim_arr = jnp.concatenate([prim_arr, linked_arr], axis=1)
+                perturb_covar_emb[linked_group].append(linked_arr)
 
-            covar_reps.append(prim_arr)
-            perturb_covar_arr = jnp.concatenate(covar_reps, axis=0)
+        perturb_covar_emb = {
+            k: cls._pad_to_max_length(
+                jnp.concatenate(v, axis=0), max_combination_length, null_value
+            )
+            for k, v in perturb_covar_emb.items()
+        }
 
-            # Pad with null_value to reach max_combination_length
-            if perturb_covar_arr.shape[0] < max_combination_length:
-                null_arr = jnp.full(
-                    (
-                        max_combination_length - perturb_covar_arr.shape[0],
-                        perturb_covar_arr.shape[1],
-                    ),
-                    null_value,
-                )
-                perturb_covar_arr = jnp.concatenate(
-                    [perturb_covar_arr, null_arr], axis=0
-                )
-
-        sample_covar_rep = []
+        sample_covar_emb = {}
         for sample_cov in sample_covariates:
-            cov_is_cat = covar_is_cat[sample_cov]
-
             if sample_cov in covariate_reps:
                 cov_arr = jnp.asarray(
                     rep_dict[sample_cov][condition_data[sample_cov].values[0]]
                 )
-            elif cov_is_cat:
-                cov_arr = covar_encoders[sample_cov].transform(
-                    [[condition_data[cov_key].values[0]]]
-                )
             else:
-                cov_arr = jnp.asarray(condition_data[cov_key].values[0])
+                cov_arr = jnp.asarray(condition_data[sample_cov])
 
-            sample_covar_rep.append(cov_arr)
-
-        if len(sample_covar_rep) > 0:
-            sample_covar_arr = jnp.concatenate(sample_covar_rep, axis=1)
-            sample_covar_arr = cls._check_shape(sample_covar_arr)
-            sample_covar_arr = jnp.tile(sample_covar_arr, (max_combination_length, 1))
-            perturb_covar_arr = jnp.concatenate(
-                [perturb_covar_arr, sample_covar_arr], axis=1
+            cov_arr = cls._check_shape(cov_arr)
+            sample_covar_emb[sample_cov] = jnp.tile(
+                cov_arr, (max_combination_length, 1)
             )
 
-        return perturb_covar_arr
+        return perturb_covar_emb | sample_covar_emb
 
 
 class TrainingData(PerturbationData):
@@ -464,20 +476,8 @@ class TrainingData(PerturbationData):
 
         primary_to_linked = cls._get_linked_covariates(adata, perturbation_covariates)
 
-        pert_cov_is_cat = {
-            k: cls._get_covariate_type(adata, v)
-            for k, v in perturbation_covariates.items()
-        }
-
         sample_covariates = sample_covariates or []
         cls._verify_sample_covariates(adata, sample_covariates)
-
-        sample_cov_is_cat = {
-            covar: cls._get_covariate_type(adata, _to_list(covar))
-            for covar in sample_covariates
-        }
-
-        cov_is_cat = pert_cov_is_cat | sample_cov_is_cat
 
         perturbation_covariate_reps = perturbation_covariate_reps or {}
         sample_covariate_reps = sample_covariate_reps or {}
@@ -496,7 +496,9 @@ class TrainingData(PerturbationData):
 
         idx_to_covar, covar_to_idx = cls._get_idx_to_covariate(covariate_groups)
 
-        covar_encoders = cls._get_covar_encoders(adata, covariate_groups, cov_is_cat)
+        primary_encoder = cls._get_primary_covar_encoder(
+            adata, perturbation_covariates, perturbation_covariate_reps
+        )
 
         src_counter = 0
         tgt_counter = 0
@@ -509,10 +511,10 @@ class TrainingData(PerturbationData):
         perturb_covar_keys = _flatten_list(perturbation_covariates.values()) + list(
             sample_covariates
         )
+        perturb_covar_keys = [k for k in perturb_covar_keys if k is not None]
         perturb_covar_df = adata.obs[perturb_covar_keys].drop_duplicates().reset_index()
 
         control_to_perturbation: dict[int, int] = {}
-        sample_rep = cls._get_sample_data(adata, sample_rep)
         split_covariates_mask = np.full((adata.n_obs,), -1, dtype=jnp.int32)
         split_idx_to_covariates = {}
         perturbation_covariates_mask = np.full((adata.n_obs,), -1, dtype=jnp.int32)
@@ -537,12 +539,13 @@ class TrainingData(PerturbationData):
                     (adata.obs[perturb_covar_keys] == list(tgt_cond.values)).all(axis=1)
                     * split_cov_mask
                 ) == 1
+
                 if mask.sum() == 0:
                     continue
+
+                conditional_distributions.append(tgt_counter)
                 perturbation_covariates_mask[mask] = tgt_counter
                 perturbation_idx_to_covariates[tgt_counter] = tgt_cond.values
-                control_to_perturbation[src_counter] = tgt_counter
-                tgt_counter += 1
 
                 embedding = cls._get_perturbation_covariates(
                     condition_data=tgt_cond,
@@ -551,26 +554,24 @@ class TrainingData(PerturbationData):
                     sample_covariates=sample_covariates,
                     covariate_reps=covariate_reps,
                     primary_to_linked=primary_to_linked,
-                    covar_is_cat=cov_is_cat,
-                    covar_encoders=covar_encoders,
+                    primary_encoder=primary_encoder,
                     max_combination_length=max_combination_length,
                     null_value=null_value,
                 )
 
                 for pert_cov, emb in embedding.items():
-                    pert_key = pert_embedding_idx_to_covariates[pert_cov]
-                    condition_data[pert_key].append(emb)
+                    condition_data[pert_cov].append(emb)
 
                 tgt_counter += 1
+
             control_to_perturbation[src_counter] = np.array(conditional_distributions)
             src_counter += 1
 
-        if condition_data is not None:
-            for pert_cov, emb in condition_data.items():
-                condition_data[pert_cov] = jnp.array(emb)
+        for pert_cov, emb in condition_data.items():
+            condition_data[pert_cov] = jnp.array(emb)
 
         return cls(
-            sample_rep=sample_rep,
+            cell_data=cls._get_cell_data(adata, sample_rep),
             split_covariates_mask=jnp.asarray(split_covariates_mask),
             split_idx_to_covariates=split_idx_to_covariates,
             perturbation_covariates_mask=jnp.asarray(perturbation_covariates_mask),
@@ -579,7 +580,6 @@ class TrainingData(PerturbationData):
             control_to_perturbation=control_to_perturbation,
             max_combination_length=max_combination_length,
             null_value=null_value,
-            null_token=null_token,
         )
 
     @property
