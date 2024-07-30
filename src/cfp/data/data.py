@@ -222,7 +222,7 @@ class PerturbationData(BaseData):
             encoder = preprocessing.OneHotEncoder(sparse_output=False)
             all_values = np.unique(adata.obs[primary_covars].values.flatten())
             encoder.fit(all_values.reshape(-1, 1))
-            return encoder
+            return encoder, is_categorical
 
         encoder = preprocessing.OneHotEncoder(sparse_output=False)
         encoder.fit(np.array(primary_covars).reshape(-1, 1))
@@ -480,6 +480,7 @@ class TrainingData(PerturbationData):
         primary_to_linked = cls._get_linked_covariates(adata, perturbation_covariates)
 
         sample_covariates = sample_covariates or []
+        sample_covariates = _to_list(sample_covariates)
         cls._verify_sample_covariates(adata, sample_covariates)
 
         perturbation_covariate_reps = perturbation_covariate_reps or {}
@@ -520,7 +521,7 @@ class TrainingData(PerturbationData):
         perturbation_covariates_mask = np.full((adata.n_obs,), -1, dtype=jnp.int32)
         perturbation_idx_to_covariates = {}
         condition_data: dict[int, list] = {i: [] for i in covar_to_idx.keys()}
-        control_mask = np.array(adata.obs[control_key], dtype=int)
+        control_mask = adata.obs[control_key]
 
         src_counter = 0
         tgt_counter = 0
@@ -529,7 +530,7 @@ class TrainingData(PerturbationData):
             split_cov_mask = (
                 adata.obs[list(filter_dict.keys())] == list(filter_dict.values())
             ).all(axis=1)
-            mask = control_mask * split_cov_mask
+            mask = np.array(control_mask * split_cov_mask)
 
             split_covariates_mask[mask] = src_counter
             split_idx_to_covariates[src_counter] = split_combination
@@ -539,11 +540,9 @@ class TrainingData(PerturbationData):
             pbar = tqdm(perturb_covar_df.iterrows(), total=perturb_covar_df.shape[0])
             for _, tgt_cond in pbar:
                 tgt_cond = tgt_cond[perturb_covar_keys]
-                mask = (
-                    (adata.obs[perturb_covar_keys] == list(tgt_cond.values)).all(axis=1)
-                    * (1 - control_mask)
-                    * split_cov_mask
-                ) == 1
+                mask = (adata.obs[perturb_covar_keys] == tgt_cond.values).all(axis=1)
+                mask *= (1 - control_mask) * split_cov_mask
+                mask = np.array(mask == 1)
 
                 if mask.sum() == 0:
                     continue
@@ -682,6 +681,7 @@ class ValidationData(PerturbationData):
         primary_to_linked = cls._get_linked_covariates(adata, perturbation_covariates)
 
         sample_covariates = sample_covariates or []
+        sample_covariates = _to_list(sample_covariates)
         cls._verify_sample_covariates(adata, sample_covariates)
 
         perturbation_covariate_reps = perturbation_covariate_reps or {}
@@ -719,7 +719,7 @@ class ValidationData(PerturbationData):
         src_data: dict[int, jax.Array] = {}
         tgt_data: dict[int, dict[int, jax.Array]] = {}
         condition_data: dict[int, dict[int, list]] = {}
-        control_mask = np.array(adata.obs[control_key], dtype=int)
+        control_mask = adata.obs[control_key]
 
         src_counter = 0
         tgt_counter = 0
@@ -728,26 +728,25 @@ class ValidationData(PerturbationData):
             split_cov_mask = (
                 adata.obs[list(filter_dict.keys())] == list(filter_dict.values())
             ).all(axis=1)
-            mask = control_mask * split_cov_mask
+            mask = np.array(control_mask * split_cov_mask)
 
-            src_data[src_counter] = cls._get_cell_data(adata[mask], sample_rep)
+            src_data[src_counter] = cls._get_cell_data(adata[mask, :], sample_rep)
             tgt_data[src_counter] = {}
             condition_data[src_counter] = {}
 
             pbar = tqdm(perturb_covar_df.iterrows(), total=perturb_covar_df.shape[0])
             for _, tgt_cond in pbar:
                 tgt_cond = tgt_cond[perturb_covar_keys]
-                mask = (
-                    (adata.obs[perturb_covar_keys] == list(tgt_cond.values)).all(axis=1)
-                    * (1 - control_mask)
-                    * split_cov_mask
-                ) == 1
+
+                mask = (adata.obs[perturb_covar_keys] == tgt_cond.values).all(axis=1)
+                mask *= (1 - control_mask) * split_cov_mask
+                mask = np.array(mask == 1)
 
                 if mask.sum() == 0:
                     continue
 
                 tgt_data[src_counter][tgt_counter] = cls._get_cell_data(
-                    adata[mask], sample_rep
+                    adata[mask, :], sample_rep
                 )
 
                 embedding = cls._get_perturbation_covariates(

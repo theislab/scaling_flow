@@ -85,22 +85,19 @@ def adata_perturbation() -> ad.AnnData:
 
     adata.obs["control"] = adata.obs["drug1"] == "control"
     adata.obs["drug_a"] = (
-        adata.obs["drug1"]
-        == "drug_a" | adata.obs["drug2"]
-        == "drug_a" | adata.obs["drug3"]
-        == "drug_a"
+        (adata.obs["drug1"] == "drug_a")
+        | (adata.obs["drug2"] == "drug_a")
+        | (adata.obs["drug3"] == "drug_a")
     )
     adata.obs["drug_b"] = (
-        adata.obs["drug1"]
-        == "drug_b" | adata.obs["drug2"]
-        == "drug_b" | adata.obs["drug3"]
-        == "drug_b"
+        (adata.obs["drug1"] == "drug_b")
+        | (adata.obs["drug2"] == "drug_b")
+        | (adata.obs["drug3"] == "drug_b")
     )
     adata.obs["drug_c"] = (
-        adata.obs["drug1"]
-        == "drug_c" | adata.obs["drug2"]
-        == "drug_c" | adata.obs["drug3"]
-        == "drug_c"
+        (adata.obs["drug1"] == "drug_c")
+        | (adata.obs["drug2"] == "drug_c")
+        | (adata.obs["drug3"] == "drug_c")
     )
 
     for col in adata.obs.columns:
@@ -142,19 +139,22 @@ def adata_perturbation_with_nulls(adata_perturbation: ad.AnnData) -> ad.AnnData:
 
 @pytest.fixture()
 def pdata(adata_perturbation: ad.AnnData) -> TrainingData:
-    cell_data = "X"
+    sample_rep = "X"
     split_covariates = ["cell_type"]
-    control_data = ("drug1", "control")
-    obs_perturbation_covariates = [("dosage",)]
-    uns_perturbation_covariates = {"drug": ("drug1", "drug2")}
+    control_key = "control"
+    perturbation_covariates = {
+        "drug": ("drug1", "drug2"),
+        "dosage": ("dosage_a", "dosage_b"),
+    }
+    perturbation_covariate_reps = {"drug": "drug"}
 
     pdata = TrainingData.load_from_adata(
         adata_perturbation,
-        cell_data=cell_data,
+        sample_rep=sample_rep,
         split_covariates=split_covariates,
-        control_data=control_data,
-        obs_perturbation_covariates=obs_perturbation_covariates,
-        uns_perturbation_covariates=uns_perturbation_covariates,
+        control_key=control_key,
+        perturbation_covariates=perturbation_covariates,
+        perturbation_covariate_reps=perturbation_covariate_reps,
     )
 
     return pdata
