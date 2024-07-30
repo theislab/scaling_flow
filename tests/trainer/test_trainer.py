@@ -2,10 +2,11 @@ import jax
 import jax.numpy as jnp
 import optax
 import pytest
-from ott.neural.methods.flows import dynamics, otfm
+from ott.neural.methods.flows import dynamics
 from ott.solvers import utils as solver_utils
 
 import cfp
+from cfp.solvers import otfm
 
 x_test = jnp.ones((10, 5)) * 10
 t_test = jnp.ones((10, 1))
@@ -39,10 +40,10 @@ class TestTrainer:
             num_iterations=2,
             valid_freq=valid_freq,
         )
-        x_pred = trainer.predict(x_test, cond)
+        x_pred = model.predict(x_test, cond)
         assert x_pred.shape == x_test.shape
 
-        cond_enc = trainer.get_condition_embedding(cond)
+        cond_enc = model.get_condition_embedding(cond)
         assert cond_enc.shape == (1, 12)
 
     @pytest.mark.parametrize("use_validdata", [True, False])
@@ -83,8 +84,8 @@ class TestTrainer:
         if use_validdata:
             assert f"val_{metric_to_compute}" in trainer.training_logs
 
-        x_pred = trainer.predict(x_test, cond)
+        x_pred = model.predict(x_test, cond)
         assert x_pred.shape == x_test.shape
 
-        cond_enc = trainer.get_condition_embedding(cond)
+        cond_enc = model.get_condition_embedding(cond)
         assert cond_enc.shape == (1, 12)

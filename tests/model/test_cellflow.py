@@ -8,12 +8,14 @@ class TestCellFlow:
         "cell_data",
         ["X", {"obsm": "X_pca"}],
     )
+    @pytest.mark.parametrize("solver", ["genot", "otfm"])
     def test_cellflow_cell_data(
         self,
         adata_perturbation,
         cell_data,
+        solver,
     ):
-        cf = cfp.model.cellflow.CellFlow(adata_perturbation, solver="otfm")
+        cf = cfp.model.cellflow.CellFlow(adata_perturbation, solver=solver)
         cf.prepare_data(
             cell_data=cell_data,
             control_key=("drug1", "control"),
@@ -23,23 +25,33 @@ class TestCellFlow:
         assert cf.pdata is not None
         assert hasattr(cf, "_data_dim")
 
+        condition_encoder_kwargs = {}
+        if solver == "genot":
+            condition_encoder_kwargs["genot_source_layers"] = (
+                ("mlp", {"dims": (32, 32)}),
+            )
+            condition_encoder_kwargs["genot_source_dim"] = 32
+
         cf.prepare_model(
             condition_embedding_dim=32,
             hidden_dims=(32, 32),
             decoder_dims=(32, 32),
+            condition_encoder_kwargs=condition_encoder_kwargs,
         )
         assert cf.trainer is not None
 
         cf.train(num_iterations=2)
         assert cf.dataloader is not None
 
+    @pytest.mark.parametrize("solver", ["otfm", "genot"])
     @pytest.mark.parametrize("uns_perturbation_covariates", [{}, {"drug": ("drug1",)}])
     def test_cellflow_uns_covar(
         self,
         adata_perturbation,
         uns_perturbation_covariates,
+        solver,
     ):
-        cf = cfp.model.cellflow.CellFlow(adata_perturbation, solver="otfm")
+        cf = cfp.model.cellflow.CellFlow(adata_perturbation, solver=solver)
         cf.prepare_data(
             cell_data="X",
             control_key=("drug1", "control"),
@@ -49,10 +61,18 @@ class TestCellFlow:
         assert cf.pdata is not None
         assert hasattr(cf, "_data_dim")
 
+        condition_encoder_kwargs = {}
+        if solver == "genot":
+            condition_encoder_kwargs["genot_source_layers"] = (
+                ("mlp", {"dims": (32, 32)}),
+            )
+            condition_encoder_kwargs["genot_source_dim"] = 32
+
         cf.prepare_model(
             condition_embedding_dim=32,
             hidden_dims=(32, 32),
             decoder_dims=(32, 32),
+            condition_encoder_kwargs=condition_encoder_kwargs,
         )
         assert cf.trainer is not None
 
@@ -64,13 +84,15 @@ class TestCellFlow:
         "uns_perturbation_covariates",
         [{"drug": ("drug1", "drug2")}, {"drug": "drug1"}],
     )
+    @pytest.mark.parametrize("solver", ["otfm", "genot"])
     def test_cellflow_val_data_loading(
         self,
         adata_perturbation,
         split_covariates,
         uns_perturbation_covariates,
+        solver,
     ):
-        cf = cfp.model.cellflow.CellFlow(adata_perturbation, solver="otfm")
+        cf = cfp.model.cellflow.CellFlow(adata_perturbation, solver=solver)
         cf.prepare_data(
             cell_data="X",
             control_key=("drug1", "control"),
@@ -113,8 +135,9 @@ class TestCellFlow:
             == cf.pdata.max_combination_length
         )
 
-    def test_cellflow_with_validation(self, adata_perturbation):
-        cf = cfp.model.cellflow.CellFlow(adata_perturbation, solver="otfm")
+    @pytest.mark.parametrize("solver", ["otfm", "genot"])
+    def test_cellflow_with_validation(self, adata_perturbation, solver):
+        cf = cfp.model.cellflow.CellFlow(adata_perturbation, solver=solver)
         cf.prepare_data(
             cell_data="X",
             control_key=("drug1", "control"),
@@ -137,10 +160,18 @@ class TestCellFlow:
             == cf.pdata.max_combination_length
         )
 
+        condition_encoder_kwargs = {}
+        if solver == "genot":
+            condition_encoder_kwargs["genot_source_layers"] = (
+                ("mlp", {"dims": (32, 32)}),
+            )
+            condition_encoder_kwargs["genot_source_dim"] = 32
+
         cf.prepare_model(
             condition_embedding_dim=32,
             hidden_dims=(32, 32),
             decoder_dims=(32, 32),
+            condition_encoder_kwargs=condition_encoder_kwargs,
         )
         assert cf.trainer is not None
 
