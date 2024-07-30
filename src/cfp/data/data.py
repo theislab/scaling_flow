@@ -412,9 +412,7 @@ class TrainingData(PerturbationData):
     max_combination_length
         Maximum number of covariates in a combination.
     null_value
-        Values in :attr:`anndata.AnnData.obs` columns which indicate no treatment with the corresponding covariate. These values will be masked with `null_token`.
-    null_token
-        Token to use for masking `null_value`.
+        Value to use for masking `null_value`..
     """
 
     cell_data: jax.Array  # (n_cells, n_features)
@@ -438,7 +436,6 @@ class TrainingData(PerturbationData):
     ]  # mapping from control idx to target distribution idcs
     max_combination_length: int
     null_value: Any
-    null_token: Any
 
     @classmethod
     def load_from_adata(
@@ -506,9 +503,6 @@ class TrainingData(PerturbationData):
             adata, perturbation_covariates, perturbation_covariate_reps
         )
 
-        src_counter = 0
-        tgt_counter = 0
-
         if len(split_covariates) > 0:
             split_cov_combs = adata.obs[split_covariates].drop_duplicates().values
         else:
@@ -527,6 +521,8 @@ class TrainingData(PerturbationData):
         perturbation_idx_to_covariates = {}
         condition_data: dict[int, list] = {i: [] for i in covar_to_idx.keys()}
 
+        src_counter = 0
+        tgt_counter = 0
         for split_combination in split_cov_combs:
             filter_dict = dict(zip(split_covariates, split_combination, strict=False))
             split_cov_mask = (
@@ -534,7 +530,6 @@ class TrainingData(PerturbationData):
             ).all(axis=1)
             split_covariates_mask[split_cov_mask] = src_counter
             split_idx_to_covariates[src_counter] = split_combination
-            src_counter += 1
 
             conditional_distributions = []
 
@@ -644,130 +639,97 @@ class ValidationData(PerturbationData):
     def load_from_adata(
         cls,
         adata: anndata.AnnData,
-        sample_rep: Literal["X"] | dict[str, str],
-        control_data: Sequence[str, Any],
-        split_covariates: Sequence[str],
-        obs_perturbation_covariates: Sequence[tuple[str, ...]],
-        uns_perturbation_covariates: Sequence[dict[str, tuple[str, ...] | str]],
-        max_combination_length: int,
-        # TODO: Having null_value nan can cause problems with matching conditions,
-        # expecially if there are both float and str columns.
-        null_value: Any = None,
-        null_token: Any = 0.0,
+        sample_rep: str,
+        control_key: str,
+        perturbation_covariates: dict[str, Sequence[str]],
+        perturbation_covariate_reps: dict[str, str] | None = None,
+        sample_covariates: Sequence[str] | None = None,
+        sample_covariate_reps: dict[str, str] | None = None,
+        split_covariates: Sequence[str] | None = None,
+        max_combination_length: int | None = None,
+        null_value: float = 0.0,
     ) -> "ValidationData":
         """Load cell data from an AnnData object.
 
         Args:
             adata: An :class:`~anndata.AnnData` object.
-            cell_data: Where to read the cell data from. Either 'X', a key in adata.obsm or a dictionary of the form {attr: key}, where 'attr' is an attribute of the :class:`~anndata.AnnData` object and key is the 'key' in the corresponding key.
-            control_data: Tuple of length 2 with first element defining the column in :class:`~anndata.AnnData` and second element defining the value in `adata.obs[control_data[0]]` used to define all control cells.
-            split_covariates: Covariates in adata.obs to split all control cells into different control populations. The perturbed cells are also split according to these columns, but if an embedding for these covariates should be encoded in the model, the corresponding column should also be used in `obs_perturbation_covariates` or `uns_perturbation_covariates`.
-            obs_perturbation_covariates: Tuples of covariates in adata.obs characterizing the perturbed cells (together with `split_covariates` and `uns_perturbation_covariates`) and encoded by the values as found in `adata.obs`. If a tuple contains more than
-            one element, this is interpreted as a combination of covariates that should be treated as an unordered set.
-            uns_perturbation_covariates: Dictionaries with keys in adata.uns and values columns in adata.obs which characterize the perturbed cells (together with `split_covariates` and `obs_perturbation_covariates`) and encoded by the values as found in `adata.uns[uns_perturbation_covariates.keys()]`. If a value of the dictionary is a tuple with more than one element, this is interpreted as a combination of covariates that should be treated as an unordered set.
-            max_combination_length: Maximum number of covariates in a combination.
-            null_value: Values in :attr:`anndata.AnnData.obs` columns which indicate no treatment with the corresponding covariate. These values will be masked with `null_token`.
-            null_token: Token to use for masking `null_value`.
+            sample_rep: Key in `adata.obsm` where the sample representation is stored or "X" to use `adata.X`.
+            control_key: Key of a boolean column in `adata.obs` that defines the control samples.
+            perturbation_covariates: A dictionary where the keys indicate the name of the covariate group and the values are keys in `adata.obs`. The corresponding columns should be either boolean (presence/abscence of the perturbation) or numeric (concentration or magnitude of the perturbation). If multiple groups are provided, the first is interpreted as the primary perturbation and the others as covariates corresponding to these perturbations, e.g. `{"drug":("drugA", "drugB"), "time":("drugA_time", "drugB_time")}`.
+            perturbation_covariate_reps: A dictionary where the keys indicate the name of the covariate group and the values are keys in `adata.uns` storing a dictionary with the representation of the covariates. E.g. `{"drug":"drug_embeddings"}` with `adata.uns["drug_embeddings"] = {"drugA": np.array, "drugB": np.array}`.
+            sample_covariates: Keys in `adata.obs` indicating sample covatiates to be taken into account for training and prediction, e.g. `["age", "cell_type"]`.
+            sample_covariate_reps: A dictionary where the keys indicate the name of the covariate group and the values are keys in `adata.uns` storing a dictionary with the representation of the covariates. E.g. `{"cell_type": "cell_type_embeddings"}` with `adata.uns["cell_type_embeddings"] = {"cell_typeA": np.array, "cell_typeB": np.array}`.
+            split_covariates: Covariates in adata.obs to split all control cells into different control populations. The perturbed cells are also split according to these columns, but if these covariates should also be encoded in the model, the corresponding column should also be used in `perturbation_covariates` or `sample_covariates`.
+            max_combination_length: Maximum number of combinations of primary `perturbation_covariates`. If `None`, the value is inferred from the provided `perturbation_covariates`.
+            null_value: Value to use for padding to `max_combination_length`.
 
         Returns
         -------
-            PerturbationData: Data container for the perturbation data.
+            ValidationData: Data container for the perturbation data.
         """
-        # TODO(@MUCDK): add device to possibly only load to cpu
-        if split_covariates is None or len(split_covariates) == 0:
-            adata.obs[CONTROL_HELPER] = True
-            adata.obs[CONTROL_HELPER] = adata.obs[CONTROL_HELPER].astype("category")
-            split_covariates = [CONTROL_HELPER]
-
-        # Check if control cells are present in the data
-        cls._verify_control_data(adata, control_data)
-        obs_perturbation_covariates = [_to_list(c) for c in obs_perturbation_covariates]
-        cls._verify_obs_perturbation_covariates(adata, obs_perturbation_covariates)
-        uns_perturbation_covariates = {
-            k: _to_list(v) for k, v in uns_perturbation_covariates.items()
+        # TODO: add device to possibly only load to cpu
+        cls._verify_control_data(adata, control_key)
+        perturbation_covariates = {
+            k: _to_list(v) for k, v in perturbation_covariates.items()
         }
-        cls._verify_uns_perturbation_covariates(adata, uns_perturbation_covariates)
 
-        obs_combination_length = (
-            max(len(comb) for comb in obs_perturbation_covariates)
-            if len(obs_perturbation_covariates)
-            else 0
+        cls._verify_perturbation_covariates(adata, perturbation_covariates)
+
+        primary_to_linked = cls._get_linked_covariates(adata, perturbation_covariates)
+
+        sample_covariates = sample_covariates or []
+        cls._verify_sample_covariates(adata, sample_covariates)
+
+        perturbation_covariate_reps = perturbation_covariate_reps or {}
+        sample_covariate_reps = sample_covariate_reps or {}
+
+        sample_cov_groups = {covar: _to_list(covar) for covar in sample_covariates}
+        covariate_groups = perturbation_covariates | sample_cov_groups
+        covariate_reps = perturbation_covariate_reps | sample_covariate_reps
+        cls._verify_covariate_reps(adata, covariate_reps, covariate_groups)
+
+        split_covariates = split_covariates or []
+        cls._verify_split_covariates(adata, split_covariates)
+
+        max_combination_length = cls._get_max_combination_length(
+            perturbation_covariates, max_combination_length
         )
-        uns_combination_length = (
-            max(len(comb) for comb in uns_perturbation_covariates.values())  # type: ignore[attr-defined]
-            if len(uns_perturbation_covariates)
-            else 0
+
+        idx_to_covar, covar_to_idx = cls._get_idx_to_covariate(covariate_groups)
+
+        primary_encoder = cls._get_primary_covar_encoder(
+            adata, perturbation_covariates, perturbation_covariate_reps
         )
 
-        observed_combination_length = max(
-            obs_combination_length, uns_combination_length
+        if len(split_covariates) > 0:
+            split_cov_combs = adata.obs[split_covariates].drop_duplicates().values
+        else:
+            split_cov_combs = [[]]
+
+        perturb_covar_keys = _flatten_list(perturbation_covariates.values()) + list(
+            sample_covariates
         )
-        if observed_combination_length > max_combination_length:
-            raise ValueError(
-                f"Observed combination length of the validation data({observed_combination_length}) is larger than the provided maximum combination length of the training data ({max_combination_length})."
-            )
-
-        for covariate in split_covariates:
-            if covariate not in adata.obs:
-                raise ValueError(f"Split covariate {covariate} not found in adata.obs.")
-            if adata.obs[covariate].dtype.name != "category":
-                adata.obs[covariate] = adata.obs[covariate].astype("category")
-
-        pert_embedding_idx_to_covariates = cls._get_idx_to_covariate(
-            obs_perturbation_covariates, uns_perturbation_covariates
-        )
-        pert_embedding_idx_to_covariates_reversed = {
-            v: k for k, v in pert_embedding_idx_to_covariates.items()
-        }
-
-        src_dist = {
-            covariate: adata.obs[covariate].cat.categories
-            for covariate in split_covariates
-        }
-        tgt_dist_obs = {
-            covariate: adata.obs[covariate].cat.categories
-            for group in obs_perturbation_covariates
-            for covariate in group
-        }
-        tgt_dist_uns = {
-            covariate: adata.obs[covariate].cat.categories
-            for emb_covariates in uns_perturbation_covariates.values()  # type: ignore[attr-defined]
-            for covariate in emb_covariates
-        }
-        tgt_dist_obs.update(tgt_dist_uns)
+        perturb_covar_keys = [k for k in perturb_covar_keys if k is not None]
+        perturb_covar_df = adata.obs[perturb_covar_keys].drop_duplicates().reset_index()
 
         src_data: dict[int, jax.Array] = {}
         tgt_data: dict[int, dict[int, jax.Array]] = {}
-        condition_data: dict[int, dict[int, list]] | None = (
-            None
-            if (
-                len(obs_perturbation_covariates) == 0
-                and len(uns_perturbation_covariates) == 0
-            )
-            else {}
-        )
+        condition_data: dict[int, list] = {i: [] for i in covar_to_idx.keys()}
 
         src_counter = 0
-        src_dists = list(itertools.product(*src_dist.values()))
-        observed_tgt_combs = (
-            adata.obs[list(tgt_dist_obs.keys())].drop_duplicates().values
-        )
-        control_mask = (adata.obs[control_data[0]] == control_data[1]) == 1
-        for src_combination in src_dists:
-            filter_dict = dict(zip(split_covariates, src_combination, strict=False))
+        tgt_counter = 0
+        for split_combination in split_cov_combs:
+            filter_dict = dict(zip(split_covariates, split_combination, strict=False))
             split_cov_mask = (
                 adata.obs[list(filter_dict.keys())] == list(filter_dict.values())
             ).all(axis=1)
-            mask = split_cov_mask * control_mask
-            if mask.sum() == 0:
-                continue
 
-            src_data[src_counter] = cls._get_sample_data(adata[mask], cell_data)
+            src_data[src_counter] = cls._get_cell_data(adata[mask], sample_rep)
             tgt_data[src_counter] = {}
             condition_data[src_counter] = {}
 
-            tgt_counter = 0
-            for tgt_combination in tqdm(observed_tgt_combs):
+            pbar = tqdm(perturb_covar_df.iterrows(), total=perturb_covar_df.shape[0])
+            for _, tgt_cond in pbar:
                 mask = (
                     (adata.obs[list(tgt_dist_obs.keys())] == list(tgt_combination)).all(
                         axis=1
@@ -775,31 +737,32 @@ class ValidationData(PerturbationData):
                     * (1 - control_mask)
                     * split_cov_mask
                 ) == 1
+
                 if mask.sum() == 0:
                     continue
 
-                tgt_data[src_counter][tgt_counter] = cls._get_sample_data(
-                    adata[mask], cell_data
+                tgt_data[src_counter][tgt_counter] = cls._get_cell_data(
+                    adata[mask], sample_rep
                 )
 
-                if condition_data is not None:
-                    embedding = cls._get_perturbation_covariates(
-                        adata=adata[mask],
-                        embedding_dict=adata.uns,
-                        obs_perturbation_covariates=obs_perturbation_covariates,
-                        uns_perturbation_covariates=uns_perturbation_covariates,
-                        max_combination_length=max_combination_length,
-                        pert_embedding_idx_to_covariates_reversed=pert_embedding_idx_to_covariates_reversed,
-                        null_value=null_value,
-                        null_token=null_token,
-                    )
+                embedding = cls._get_perturbation_covariates(
+                    condition_data=tgt_cond,
+                    rep_dict=adata.uns,
+                    perturb_covariates=perturbation_covariates,
+                    sample_covariates=sample_covariates,
+                    covariate_reps=covariate_reps,
+                    primary_to_linked=primary_to_linked,
+                    primary_encoder=primary_encoder,
+                    max_combination_length=max_combination_length,
+                    null_value=null_value,
+                )
 
-                    condition_data[src_counter][tgt_counter] = {}
-                    for pert_cov, emb in embedding.items():
-                        pert_key = pert_embedding_idx_to_covariates[pert_cov]
-                        condition_data[src_counter][tgt_counter][pert_key] = (
-                            jnp.expand_dims(emb, 0)
-                        )
+                condition_data[src_counter][tgt_counter] = {}
+                for pert_cov, emb in embedding.items():
+                    pert_key = pert_embedding_idx_to_covariates[pert_cov]
+                    condition_data[src_counter][tgt_counter][pert_key] = (
+                        jnp.expand_dims(emb, 0)
+                    )
 
                 tgt_counter += 1
             src_counter += 1
@@ -810,5 +773,4 @@ class ValidationData(PerturbationData):
             condition_data=condition_data,
             max_combination_length=max_combination_length,
             null_value=null_value,
-            null_token=null_token,
         )
