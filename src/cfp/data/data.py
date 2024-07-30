@@ -719,6 +719,21 @@ class ValidationData(PerturbationData):
                 tgt_counter += 1
             src_counter += 1
 
+        if n_conditions_on_log_iteration > 0 or n_conditions_on_train_end > 0:
+            if condition_data is None:
+                raise ValueError(
+                    f"Number of conditions for computation callbacks provided with `n_conditions_on_log_iteration`={n_conditions_on_log_iteration} and `n_conditions_on_train_end`={n_conditions_on_train_end}, but no conditions found in the data."
+                )
+        n_conditions = len(pert_embedding_idx_to_covariates)
+        if n_conditions_on_log_iteration > n_conditions:
+            raise ValueError(
+                f"Number of conditions for computation callbacks provided with `n_conditions_on_log_iteration`={n_conditions_on_log_iteration} is larger than the number of conditions found in the data ({n_conditions})."
+            )
+        if n_conditions_on_train_end > n_conditions:
+            raise ValueError(
+                f"Number of conditions for computation callbacks provided with `n_conditions_on_train_end`={n_conditions_on_train_end} is larger than the number of conditions found in the data ({n_conditions})."
+            )
+
         return cls(
             tgt_data=tgt_data,
             src_data=src_data,

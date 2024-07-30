@@ -32,8 +32,9 @@ def validdata():
             self.src_data = {0: jnp.ones((10, 5)) * 10}
             self.tgt_data = {0: {0: jnp.ones((10, 5))}}
             self.condition_data = {0: {0: {"pert1": jnp.ones((1, 2, 3))}}}
-            self.n_conditions_on_log_iteration = 3
-            self.n_conditions_on_train_end = 3
+            self.n_conditions_on_log_iteration = 1
+            self.n_conditions_on_train_end = 1
+            self.max_combination_length = 2
 
     return {"val": ValidData()}
 
