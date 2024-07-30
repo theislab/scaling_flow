@@ -152,7 +152,13 @@ class TestCellFlow:
     @pytest.mark.parametrize("solver", ["otfm", "genot"])
     @pytest.mark.parametrize("n_conditions_on_log_iteration", [-1, 0, 3])
     @pytest.mark.parametrize("n_conditions_on_train_end", [-1, 0, 3])
-    def test_cellflow_with_validation(self, adata_perturbation, solver, n_conditions_on_log_iteration, n_conditions_on_train_end):
+    def test_cellflow_with_validation(
+        self,
+        adata_perturbation,
+        solver,
+        n_conditions_on_log_iteration,
+        n_conditions_on_train_end,
+    ):
         cf = cfp.model.cellflow.CellFlow(adata_perturbation, solver=solver)
         cf.prepare_data(
             cell_data="X",

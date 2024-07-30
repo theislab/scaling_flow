@@ -3,7 +3,6 @@ from typing import Any, Literal
 
 import jax.tree as jt
 import numpy as np
-import jax
 from numpy.typing import ArrayLike
 
 from cfp.data.data import ValidationData
@@ -138,6 +137,7 @@ class ComputeMetrics(ComputationCallback):
                 )
 
     def on_train_begin(self, *args: Any, **kwargs: Any) -> Any:
+        """Called at the beginning of training."""
         pass
 
     def on_log_iteration(
@@ -212,13 +212,13 @@ class WandbLogger(LoggingCallback):
     except ImportError:
         raise ImportError(
             "wandb is not installed, please install it via `pip install wandb`"
-        )
+        ) from None
     try:
         import omegaconf
     except ImportError:
         raise ImportError(
             "omegaconf is not installed, please install it via `pip install omegaconf`"
-        )
+        ) from None
 
     def __init__(
         self,
@@ -235,13 +235,13 @@ class WandbLogger(LoggingCallback):
     def on_train_begin(self) -> Any:
         """Called at the beginning of training to initiate WandB logging"""
         if isinstance(self.config, dict):
-            config = omegaconf.OmegaConf.create(self.config)
-        wandb.login()
-        wandb.init(
-            project=wandb_project,
-            config=omegaconf.OmegaConf.to_container(config, resolve=True),
-            dir=out_dir,
-            settings=wandb.Settings(
+            config = omegaconf.OmegaConf.create(self.config)  # noqa: F821
+        wandb.login()  # noqa: F821
+        wandb.init(  # noqa: F821
+            project=self.project,
+            config=omegaconf.OmegaConf.to_container(config, resolve=True),  # noqa: F821
+            dir=self.out_dir,
+            settings=wandb.Settings(  # noqa: F821
                 start_method=self.kwargs.pop("start_method", "thread")
             ),
         )
@@ -252,11 +252,11 @@ class WandbLogger(LoggingCallback):
         **_: Any,
     ) -> Any:
         """Called at each validation/log iteration to log data to WandB"""
-        wandb.log(dict_to_log)
+        wandb.log(dict_to_log)  # noqa: F821
 
     def on_train_end(self, dict_to_log: dict[str, float]) -> Any:
         """Called at the end of training to log data to WandB"""
-        wandb.log(dict_to_log)
+        wandb.log(dict_to_log)  # noqa: F821
 
 
 class CallbackRunner:
@@ -265,7 +265,6 @@ class CallbackRunner:
     Args:
         computation_callbacks: List of computation callbacks
         logging_callbacks: List of logging callbacks
-        data: Validation data to use for computing metrics
         seed: Random seed for subsampling the validation data
 
     Returns
@@ -276,46 +275,19 @@ class CallbackRunner:
     def __init__(
         self,
         callbacks: list[ComputationCallback],
-        data: dict[str, ValidationData],
-        seed: int = 0,
     ) -> None:
 
-        self.validation_data = data
         self.computation_callbacks = [
             c for c in callbacks if isinstance(c, ComputationCallback)
         ]
         self.logging_callbacks = [
             c for c in callbacks if isinstance(c, LoggingCallback)
         ]
-        self.rng = np.random.default_rng(seed)
 
         if len(self.computation_callbacks) == 0 & len(self.logging_callbacks) != 0:
             raise ValueError(
                 "No computation callbacks defined to compute metrics to log"
             )
-
-    def _sample_validation_data(
-        self, stage: Literal["on_log_iteration", "on_train_end"]
-    ) -> dict[str, ValidationData]:
-        """Sample validation data for computing metrics"""
-        if stage == "on_train_end":
-            n_conditions_to_sample = lambda x: x.n_conditions_on_train_end
-        elif stage == "on_log_iteration":
-            n_conditions_to_sample = lambda x: x.n_conditions_on_log_iteration
-        else:
-            raise ValueError(f"Stage {stage} not supported.")
-        subsampled_validation_data = {}
-        for val_data_name, val_data in self.validation_data.items():
-            if n_conditions_to_sample(val_data) == -1:
-                subsampled_validation_data[val_data_name] = val_data
-            else:
-                idxs = self.rng.choice(
-                    len(val_data.condition_data), n_conditions_to_sample(val_data), replace=False
-                )
-                subsampled_validation_data[val_data_name] = {
-                    val_data_name[i]: val_data[val_data_name[i]] for i in idxs
-                }
-        return subsampled_validation_data
 
     def on_train_begin(self) -> Any:
         """Called at the beginning of training to initiate callbacks"""
@@ -325,7 +297,7 @@ class CallbackRunner:
         for callback in self.logging_callbacks:
             callback.on_train_begin()
 
-    def on_log_iteration(self, train_data, pred_data) -> dict[str, Any]:
+    def on_log_iteration(self, valid_data, train_data, pred_data) -> dict[str, Any]:
         """Called at each validation/log iteration to run callbacks. First computes metrics with computation callbacks and then logs data with logging callbacks.
 
         Args:
@@ -336,11 +308,10 @@ class CallbackRunner:
         -------
             dict_to_log: Dictionary containing data to log
         """
-        validation_data = self._sample_validation_data(stage="on_log_iteration")
         dict_to_log: dict[str, Any] = {}
 
         for callback in self.computation_callbacks:
-            results = callback.on_log_iteration(validation_data, pred_data, train_data)
+            results = callback.on_log_iteration(valid_data, pred_data, train_data)
             dict_to_log.update(results)
 
         for callback in self.logging_callbacks:
@@ -348,7 +319,7 @@ class CallbackRunner:
 
         return dict_to_log
 
-    def on_train_end(self, train_data, pred_data) -> dict[str, Any]:
+    def on_train_end(self, valid_data, train_data, pred_data) -> dict[str, Any]:
         """Called at the end of training to run callbacks. First computes metrics with computation callbacks and then logs data with logging callbacks.
 
         Args:
@@ -360,10 +331,9 @@ class CallbackRunner:
             dict_to_log: Dictionary containing data to log
         """
         dict_to_log: dict[str, Any] = {}
-        validation_data = self._sample_validation_data(stage="on_log_iteration")
 
         for callback in self.computation_callbacks:
-            results = callback.on_log_iteration(validation_data, pred_data, train_data)
+            results = callback.on_log_iteration(valid_data, pred_data, train_data)
             dict_to_log.update(results)
 
         for callback in self.logging_callbacks:
