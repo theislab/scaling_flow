@@ -116,14 +116,15 @@ class CellFlow:
             )
         val_data = ValidationData.load_from_adata(
             adata,
-            cell_data=self.cell_data,
+            sample_rep=self.sample_rep,
+            control_key=self.control_key,
+            perturbation_covariates=self.perturbation_covariates,
+            perturbation_covariate_reps=self.perturbation_covariate_reps,
+            sample_covariates=self.sample_covariates,
+            sample_covariate_reps=self.sample_covariate_reps,
             split_covariates=self.split_covariates,
-            control_data=self.control_data,
-            obs_perturbation_covariates=self.obs_perturbation_covariates,
-            uns_perturbation_covariates=self.uns_perturbation_covariates,
-            max_combination_length=self.pdata.max_combination_length,
+            max_combination_length=self.max_combination_length,
             null_value=self.null_value,
-            **self.data_kwargs,
         )
         self._validation_data[name] = val_data
 
