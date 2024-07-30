@@ -216,7 +216,7 @@ class PerturbationData(BaseData):
         is_categorical = cls._check_covariate_type(adata, primary_covars)
 
         if primary_group in perturbation_covariate_reps:
-            return None
+            return None, is_categorical
 
         if is_categorical:
             encoder = preprocessing.OneHotEncoder(sparse_output=False)
@@ -321,11 +321,12 @@ class PerturbationData(BaseData):
             cov_name = value if primary_is_cat else primary_cov
 
             if primary_group in covariate_reps:
-                if cov_name not in rep_dict[primary_group]:
+                rep_key = covariate_reps[primary_group]
+                if cov_name not in rep_dict[rep_key]:
                     raise ValueError(
                         f"Representation for '{cov_name}' not found in `adata.uns['{primary_group}']`."
                     )
-                prim_arr = jnp.asarray(rep_dict[primary_group][cov_name])
+                prim_arr = jnp.asarray(rep_dict[rep_key][cov_name])
             else:
                 prim_arr = jnp.asarray(
                     primary_encoder.transform(np.array(cov_name).reshape(-1, 1))
@@ -349,11 +350,12 @@ class PerturbationData(BaseData):
                 cov_name = condition_data[linked_cov]
 
                 if linked_group in covariate_reps:
-                    if cov_name not in rep_dict[linked_group]:
+                    rep_key = covariate_reps[linked_group]
+                    if cov_name not in rep_dict[rep_key]:
                         raise ValueError(
                             f"Representation for '{cov_name}' not found in `adata.uns['{linked_group}']`."
                         )
-                    linked_arr = jnp.asarray(rep_dict[linked_group][cov_name])
+                    linked_arr = jnp.asarray(rep_dict[rep_key][cov_name])
                 else:
                     linked_arr = jnp.asarray(condition_data[linked_cov])
 
@@ -369,12 +371,16 @@ class PerturbationData(BaseData):
 
         sample_covar_emb = {}
         for sample_cov in sample_covariates:
+            value = condition_data[sample_cov]
             if sample_cov in covariate_reps:
-                cov_arr = jnp.asarray(
-                    rep_dict[sample_cov][condition_data[sample_cov].values[0]]
-                )
+                rep_key = covariate_reps[sample_cov]
+                if value not in rep_dict[rep_key]:
+                    raise ValueError(
+                        f"Representation for '{value}' not found in `adata.uns['{sample_cov}']`."
+                    )
+                cov_arr = jnp.asarray(rep_dict[sample_cov][value])
             else:
-                cov_arr = jnp.asarray(condition_data[sample_cov])
+                cov_arr = jnp.asarray(value)
 
             cov_arr = cls._check_shape(cov_arr)
             sample_covar_emb[sample_cov] = jnp.tile(
