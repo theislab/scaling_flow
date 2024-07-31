@@ -1,5 +1,4 @@
 import abc
-import warnings
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from typing import Any
@@ -15,6 +14,7 @@ import sklearn.preprocessing as preprocessing
 from tqdm import tqdm
 
 from cfp._types import ArrayLike
+from cfp._logging import logger
 
 from .utils import _flatten_list, _to_list
 
@@ -222,7 +222,7 @@ class PerturbationData(BaseData):
         if max_combination_length is None:
             return obs_max_combination_length
         elif max_combination_length < obs_max_combination_length:
-            warnings.warn(
+            logger.warning(
                 f"Provided `max_combination_length` is smaller than the observed maximum combination length of the perturbation covariates. Setting maximum combination length to {obs_max_combination_length}.",
                 stacklevel=2,
             )
