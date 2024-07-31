@@ -100,30 +100,47 @@ class TestTrainer:
         n_conditions_on_log_iteration,
         n_conditions_on_train_end,
     ):
-        cf = cfp.model.cellflow.CellFlow(adata_perturbation, solver="otfm")
-        cf.prepare_data(
-            cell_data="X",
-            control_key=("drug1", "control"),
-            obs_perturbation_covariates=[("dosage",)],
-            uns_perturbation_covariates={"drug": ("drug1",)},
+        opt = optax.adam(1e-3)
+        vf = cfp.networks.ConditionalVelocityField(
+            output_dim=5,
+            max_combination_length=2,
+            condition_embedding_dim=12,
+            hidden_dims=(32, 32),
+            decoder_dims=(32, 32),
         )
-        big_validdata.n_conditions_on_log_iteration = n_conditions_on_log_iteration
-        big_validdata.n_conditions_on_train_end = n_conditions_on_train_end
+        model = otfm.OTFlowMatching(
+            vf=vf,
+            match_fn=solver_utils.match_linear,
+            flow=dynamics.ConstantNoiseFlow(0.0),
+            optimizer=opt,
+            conditions=cond,
+            rng=vf_rng,
+        )
+
+        trainer = cfp.training.CellFlowTrainer(model=model)
+        big_validdata["big_val"].n_conditions_on_log_iteration = (
+            n_conditions_on_log_iteration
+        )
+        big_validdata["big_val"].n_conditions_on_train_end = n_conditions_on_train_end
 
         rng = np.random.default_rng(111)
-        cond_indices = rng.choice(n_conditions_on_log_iteration, replace=False)
+        cond_indices = rng.choice(
+            n_conditions_on_log_iteration,
+            size=n_conditions_on_log_iteration,
+            replace=False,
+        )
 
-        out = cf.trainer._extract_subsampled_validation_data(
+        out = trainer._extract_subsampled_validation_data(
             big_validdata["big_val"], cond_indices
         )
         assert isinstance(out, cfp.data.data.ValidationData)
         assert len(out.condition_data) == n_conditions_on_log_iteration
-        out2 = cf.trainer._sample_validation_data(big_validdata, "on_log_iteration")
+        out2 = trainer._sample_validation_data(big_validdata, "on_log_iteration")
         assert isinstance(out2, dict)
         assert "big_val" in out2
-        assert len(out2.condition_data) == n_conditions_on_log_iteration
+        assert len(out2["big_val"].condition_data) == n_conditions_on_log_iteration
 
-        out3 = cf.trainer._sample_validation_data(big_validdata, "on_train_end")
+        out3 = trainer._sample_validation_data(big_validdata, "on_train_end")
         assert isinstance(out3, dict)
         assert "big_val" in out3
-        assert len(out3.condition_data) == n_conditions_on_train_end
+        assert len(out3["big_val"].condition_data) == n_conditions_on_train_end

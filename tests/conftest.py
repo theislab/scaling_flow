@@ -39,6 +39,7 @@ def validdata():
     return {"val": ValidData()}
 
 
+@pytest.fixture
 def big_validdata():
     class ValidDataToSubsample:
 
@@ -50,10 +51,11 @@ def big_validdata():
             self.src_data = {i: jnp.ones((10, 5)) * 10 for i in range(N_SOURCE)}
             for i in range(N_SOURCE):
                 self.tgt_data[i] = {
-                    i * 20 + j: jnp.ones((10, 5)) for j in range(N_COND_TARGET)
+                    i * N_COND_TARGET + j: jnp.ones((10, 5))
+                    for j in range(N_COND_TARGET)
                 }
                 for j in range(N_COND_TARGET):
-                    self.condition_data[i * 20 + j] = {
+                    self.condition_data[i * N_COND_TARGET + j] = {
                         "pert1": jnp.ones((i + j, i + j * 2, 2 * i + j))
                     }
             self.n_conditions_on_log_iteration = 4
