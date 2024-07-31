@@ -1,9 +1,8 @@
 import abc
 import warnings
-import itertools
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
-from typing import Any, Literal
+from typing import Any
 
 import anndata
 import jax
@@ -14,10 +13,9 @@ import scipy.sparse as sp
 import sklearn.preprocessing as preprocessing
 from tqdm import tqdm
 
-from cfp._constants import CONTROL_HELPER
 from cfp._types import ArrayLike
 
-from .utils import _to_list, _flatten_list
+from .utils import _flatten_list, _to_list
 
 __all__ = ["TrainingData", "ValidationData"]
 
@@ -63,7 +61,7 @@ class PerturbationData(BaseData):
 
     @staticmethod
     def _get_cell_data(
-        adata: anndata.AnnData, sample_rep: Literal["X"] | dict[str, str]
+        adata: anndata.AnnData, sample_rep: str | dict[str, str]
     ) -> jax.Array:
         error_message = "`sample_rep` should be either `X`, a key in `adata.obsm` or a dictionary of the form {`attr`: `key`}."
         if sample_rep == "X":
@@ -83,7 +81,7 @@ class PerturbationData(BaseData):
         return jnp.asarray(getattr(adata, attr)[key])
 
     @staticmethod
-    def _verify_control_data(adata: anndata.AnnData, key: tuple[str, Any]):
+    def _verify_control_data(adata: anndata.AnnData, key: str):
         if key not in adata.obs:
             raise ValueError(f"Control column '{key}' not found in adata.obs.")
         if not isinstance(adata.obs[key].dtype, pd.BooleanDtype):
@@ -94,7 +92,7 @@ class PerturbationData(BaseData):
                     f"Control column '{key}' could not be converted to boolean."
                 ) from e
         if adata.obs[key].sum() == 0:
-            raise ValueError(f"No control cells found in adata.")
+            raise ValueError("No control cells found in adata.")
 
     @classmethod
     def _verify_perturbation_covariates(cls, adata: anndata.AnnData, data: Any) -> None:
@@ -111,7 +109,7 @@ class PerturbationData(BaseData):
                 )
             if not isinstance(covars, tuple | list):
                 raise ValueError(
-                    f"Value should be a tuple, found {covar} to be of type {type(covar)}."
+                    f"Value should be a tuple, found {covars} to be of type {type(covars)}."
                 )
             if len(covars) == 0:
                 raise ValueError(
@@ -154,19 +152,19 @@ class PerturbationData(BaseData):
     @classmethod
     def _get_linked_covariates(
         cls, adata: anndata.AnnData, perturb_covariates: dict[str, Sequence[str]]
-    ) -> dict[str, Sequence[str]]:
+    ) -> dict[str, dict[Any, Any]]:
         cls._verify_linked_covars(perturb_covariates)
 
         primary_group, primary_covars = list(perturb_covariates.items())[0]
-        primary_to_linked = {k: {} for k in primary_covars}
+        primary_to_linked: dict[str, dict[Any, Any]] = {k: {} for k in primary_covars}
         for cov_group, covars in list(perturb_covariates.items())[1:]:
-            for primary_cov, linked_cov in zip(primary_covars, covars):
+            for primary_cov, linked_cov in zip(primary_covars, covars, strict=False):
                 primary_to_linked[primary_cov][cov_group] = linked_cov
 
         return primary_to_linked
 
     @staticmethod
-    def _verify_linked_covars(perturb_covariates: dict[str, str]) -> None:
+    def _verify_linked_covars(perturb_covariates: dict[str, Sequence[str]]) -> None:
         lengths = [len(covs) for covs in perturb_covariates.values()]
         if len(set(lengths)) != 1:
             raise ValueError(
@@ -175,7 +173,9 @@ class PerturbationData(BaseData):
 
     @staticmethod
     def _verify_covariate_reps(
-        adata: anndata.AnnData, data: dict[str, str], covariates: Sequence[str]
+        adata: anndata.AnnData,
+        data: dict[str, str],
+        covariates: dict[str, Sequence[str]],
     ) -> None:
         for key, value in data.items():
             if key not in covariates:
@@ -199,7 +199,8 @@ class PerturbationData(BaseData):
             return obs_max_combination_length
         elif max_combination_length < obs_max_combination_length:
             warnings.warn(
-                f"Provided `max_combination_length` is smaller than the observed maximum combination length of the perturbation covariates. Setting maximum combination length to {obs_max_combination_length}."
+                f"Provided `max_combination_length` is smaller than the observed maximum combination length of the perturbation covariates. Setting maximum combination length to {obs_max_combination_length}.",
+                stacklevel=2,
             )
             return obs_max_combination_length
         else:
@@ -229,7 +230,7 @@ class PerturbationData(BaseData):
         return encoder, is_categorical
 
     @staticmethod
-    def _check_covariate_type(adata: anndata.AnnData, covars: dict[str, str]) -> bool:
+    def _check_covariate_type(adata: anndata.AnnData, covars: Sequence[str]) -> bool:
         col_is_cat = []
         for covariate in covars:
             try:
@@ -238,7 +239,7 @@ class PerturbationData(BaseData):
                 try:
                     adata.obs[covariate] = adata.obs[covariate].astype("category")
                     col_is_cat.append(True)
-                except ValueError:
+                except ValueError as e:
                     raise ValueError(
                         f"Perturbation covariates `{covariate}` should be either numeric/boolean or categorical."
                     ) from e
@@ -278,7 +279,7 @@ class PerturbationData(BaseData):
     @staticmethod
     def _get_idx_to_covariate(
         covariate_groups: dict[str, Sequence[str]]
-    ) -> dict[int, str]:
+    ) -> tuple[dict[int, str], dict[str, int]]:
         idx_to_covar = {}
         for idx, cov_group in enumerate(covariate_groups):
             idx_to_covar[idx] = cov_group
@@ -304,17 +305,17 @@ class PerturbationData(BaseData):
         perturb_covariates: dict[str, Sequence[str]],
         sample_covariates: dict[str, Sequence[str]],
         covariate_reps: dict[str, str],
-        primary_to_linked: dict[str, Sequence[str]],
+        primary_to_linked: dict[str, dict[str, str]],
         primary_encoder: preprocessing.OneHotEncoder,
         max_combination_length: int,
         null_value: Any = 0.0,
-    ) -> dict[int, jax.Array]:
-        embeddings = {}
-
+    ) -> dict[str, jax.Array]:
         primary_group, primary_covars = list(perturb_covariates.items())[0]
         primary_encoder, primary_is_cat = primary_encoder
 
-        perturb_covar_emb = {group: [] for group in perturb_covariates}
+        perturb_covar_emb: dict[str, list[jax.Array]] = {
+            group: [] for group in perturb_covariates
+        }
         for primary_cov in primary_covars:
             value = condition_data[primary_cov]
 
@@ -369,7 +370,7 @@ class PerturbationData(BaseData):
             for k, v in perturb_covar_emb.items()
         }
 
-        sample_covar_emb = {}
+        sample_covar_emb: dict[str, jax.Array] = {}
         for sample_cov in sample_covariates:
             value = condition_data[sample_cov]
             if sample_cov in covariate_reps:
@@ -428,9 +429,9 @@ class TrainingData(PerturbationData):
     perturbation_idx_to_covariates: dict[
         int, tuple[str, ...]
     ]  # (n_targets,), dictionary explaining perturbation_covariates_mask
-    condition_data: (
-        dict[str, jnp.ndarray] | None
-    )  # (n_targets,) all embeddings for conditions
+    condition_data: dict[
+        str | int, jnp.ndarray
+    ]  # (n_targets,) all embeddings for conditions
     control_to_perturbation: dict[
         int, jax.Array
     ]  # mapping from control idx to target distribution idcs
@@ -470,6 +471,7 @@ class TrainingData(PerturbationData):
             TraingingData: Data container for the perturbation data.
         """
         # TODO: add device to possibly only load to cpu
+        # TODO: check if covariates are duplicates and raise error if so
         cls._verify_control_data(adata, control_key)
         perturbation_covariates = {
             k: _to_list(v) for k, v in perturbation_covariates.items()
@@ -520,7 +522,9 @@ class TrainingData(PerturbationData):
         split_idx_to_covariates = {}
         perturbation_covariates_mask = np.full((adata.n_obs,), -1, dtype=jnp.int32)
         perturbation_idx_to_covariates = {}
-        condition_data: dict[int, list] = {i: [] for i in covar_to_idx.keys()}
+        condition_data: dict[int | str, list[jnp.ndarray]] = {
+            i: [] for i in covar_to_idx.keys()
+        }
         control_mask = adata.obs[control_key]
 
         src_counter = 0
@@ -633,7 +637,7 @@ class ValidationData(PerturbationData):
 
     src_data: dict[int, jnp.ndarray]
     tgt_data: dict[int, dict[int, jnp.ndarray]]
-    condition_data: dict[int, jnp.ndarray] | None
+    condition_data: dict[int | str, jnp.ndarray] | None
     max_combination_length: int
     null_value: Any
     null_token: Any
@@ -718,7 +722,7 @@ class ValidationData(PerturbationData):
 
         src_data: dict[int, jax.Array] = {}
         tgt_data: dict[int, dict[int, jax.Array]] = {}
-        condition_data: dict[int, dict[int, list]] = {}
+        condition_data: dict[int | str, dict[int, list]] = {}
         control_mask = adata.obs[control_key]
 
         src_counter = 0

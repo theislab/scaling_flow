@@ -1,6 +1,8 @@
-from typing import Any, Sequence
-import numpy as np
+from collections.abc import Iterable, Sequence
+from typing import Any
+
 import anndata as ad
+import numpy as np
 import sklearn.preprocessing as preprocessing
 
 __all__ = ["encode_onehot"]
@@ -13,7 +15,7 @@ def _to_list(x: Any) -> list | tuple:
     return [x]
 
 
-def _flatten_list(x: list | tuple) -> list:
+def _flatten_list(x: Iterable[Iterable]) -> list:
     """Flattens a list of lists."""
     return [item for sublist in x for item in sublist]
 
@@ -43,7 +45,7 @@ def encode_onehot(
     encodings = encoder.fit_transform(all_values)
 
     adata.uns[uns_key] = {}
-    for value, encoding in zip(all_values, encodings):
+    for value, encoding in zip(all_values, encodings, strict=False):
         adata.uns[uns_key][value[0]] = encoding
 
     if copy:
