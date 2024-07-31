@@ -156,12 +156,14 @@ class PerturbationData(BaseData):
         cls._verify_perturbation_covars(perturb_covariates)
 
         primary_group, primary_covars = next(iter(perturb_covariates.items()))
-        primary_to_linked: dict[str, dict[Any, Any]] = {k: {} for k in primary_covars}
+        linked_perturb_covars: dict[str, dict[Any, Any]] = {
+            k: {} for k in primary_covars
+        }
         for cov_group, covars in list(perturb_covariates.items())[1:]:
             for primary_cov, linked_cov in zip(primary_covars, covars):
-                primary_to_linked[primary_cov][cov_group] = linked_cov
+                linked_perturb_covars[primary_cov][cov_group] = linked_cov
 
-        return primary_to_linked
+        return linked_perturb_covars
 
     @staticmethod
     def _verify_perturbation_covars(
@@ -329,7 +331,7 @@ class PerturbationData(BaseData):
         perturb_covariates: dict[str, Sequence[str]],
         sample_covariates: dict[str, Sequence[str]],
         covariate_reps: dict[str, str],
-        primary_to_linked: dict[str, dict[str, str]],
+        linked_perturb_covars: dict[str, dict[str, str]],
         primary_encoder: preprocessing.OneHotEncoder,
         primary_is_cat: bool,
         max_combination_length: int,
@@ -363,7 +365,7 @@ class PerturbationData(BaseData):
             prim_arr = cls._check_shape(prim_arr)
             perturb_covar_emb[primary_group].append(prim_arr)
 
-            for linked_covar in primary_to_linked[primary_cov].items():
+            for linked_covar in linked_perturb_covars[primary_cov].items():
                 linked_group, linked_cov = list(linked_covar)
 
                 if linked_cov is None:
@@ -503,7 +505,7 @@ class TrainingData(PerturbationData):
 
         cls._verify_perturbation_covariates(adata, perturbation_covariates)
 
-        primary_to_linked = cls._get_linked_perturbation_covariates(
+        linked_perturb_covars = cls._get_linked_perturbation_covariates(
             adata, perturbation_covariates
         )
 
@@ -593,7 +595,7 @@ class TrainingData(PerturbationData):
                     perturb_covariates=perturbation_covariates,
                     sample_covariates=sample_covariates,
                     covariate_reps=covariate_reps,
-                    primary_to_linked=primary_to_linked,
+                    linked_perturb_covars=linked_perturb_covars,
                     primary_encoder=primary_encoder,
                     primary_is_cat=primary_is_cat,
                     max_combination_length=max_combination_length,
@@ -715,7 +717,7 @@ class ValidationData(PerturbationData):
 
         cls._verify_perturbation_covariates(adata, perturbation_covariates)
 
-        primary_to_linked = cls._get_linked_perturbation_covariates(
+        linked_perturb_covars = cls._get_linked_perturbation_covariates(
             adata, perturbation_covariates
         )
 
@@ -800,7 +802,7 @@ class ValidationData(PerturbationData):
                     perturb_covariates=perturbation_covariates,
                     sample_covariates=sample_covariates,
                     covariate_reps=covariate_reps,
-                    primary_to_linked=primary_to_linked,
+                    linked_perturb_covars=linked_perturb_covars,
                     primary_encoder=primary_encoder,
                     primary_is_cat=primary_is_cat,
                     max_combination_length=max_combination_length,
