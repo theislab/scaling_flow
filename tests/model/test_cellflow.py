@@ -150,8 +150,8 @@ class TestCellFlow:
         )
 
     @pytest.mark.parametrize("solver", ["otfm", "genot"])
-    @pytest.mark.parametrize("n_conditions_on_log_iteration", [-1, 0, 2])
-    @pytest.mark.parametrize("n_conditions_on_train_end", [-1, 0, 2])
+    @pytest.mark.parametrize("n_conditions_on_log_iteration", [-1, 0, 1])
+    @pytest.mark.parametrize("n_conditions_on_train_end", [-1, 0, 1])
     def test_cellflow_with_validation(
         self,
         adata_perturbation,
@@ -159,6 +159,7 @@ class TestCellFlow:
         n_conditions_on_log_iteration,
         n_conditions_on_train_end,
     ):
+        # TODO(@MUCDK) after PR #33 check for larger n_conditions_on...
         cf = cfp.model.cellflow.CellFlow(adata_perturbation, solver=solver)
         cf.prepare_data(
             cell_data="X",

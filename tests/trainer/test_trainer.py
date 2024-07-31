@@ -95,7 +95,6 @@ class TestTrainer:
     @pytest.mark.parametrize("n_conditions_on_train_end", [0, 2, 19])
     def test_subsampling_validation_data(
         self,
-        adata_perturbation,
         big_validdata,
         n_conditions_on_log_iteration,
         n_conditions_on_train_end,
@@ -129,7 +128,6 @@ class TestTrainer:
             size=n_conditions_on_log_iteration,
             replace=False,
         )
-
         out = trainer._extract_subsampled_validation_data(
             big_validdata["big_val"], cond_indices
         )
