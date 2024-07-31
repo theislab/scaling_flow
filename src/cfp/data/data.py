@@ -9,6 +9,7 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 import pandas as pd
+from pandas.api.types import is_numeric_dtype
 import scipy.sparse as sp
 import sklearn.preprocessing as preprocessing
 from tqdm import tqdm
@@ -76,8 +77,7 @@ class PerturbationData(BaseData):
             return jnp.asarray(adata.obsm[sample_rep])
         if not isinstance(sample_rep, dict):
             raise ValueError(error_message)
-        attr = list(sample_rep.keys())[0]
-        key = list(sample_rep.values())[0]
+        attr, key = next(iter(sample_rep.items()))
         return jnp.asarray(getattr(adata, attr)[key])
 
     @staticmethod
@@ -150,29 +150,31 @@ class PerturbationData(BaseData):
                 raise ValueError(f"Covariate {covariate} not found in adata.obs.")
 
     @classmethod
-    def _get_linked_covariates(
+    def _get_linked_perturbation_covariates(
         cls, adata: anndata.AnnData, perturb_covariates: dict[str, Sequence[str]]
     ) -> dict[str, dict[Any, Any]]:
-        cls._verify_linked_covars(perturb_covariates)
+        cls._verify_perturbation_covars(perturb_covariates)
 
-        primary_group, primary_covars = list(perturb_covariates.items())[0]
+        primary_group, primary_covars = next(iter(perturb_covariates.items()))
         primary_to_linked: dict[str, dict[Any, Any]] = {k: {} for k in primary_covars}
         for cov_group, covars in list(perturb_covariates.items())[1:]:
-            for primary_cov, linked_cov in zip(primary_covars, covars, strict=False):
+            for primary_cov, linked_cov in zip(primary_covars, covars):
                 primary_to_linked[primary_cov][cov_group] = linked_cov
 
         return primary_to_linked
 
     @staticmethod
-    def _verify_linked_covars(perturb_covariates: dict[str, Sequence[str]]) -> None:
+    def _verify_perturbation_covars(
+        perturb_covariates: dict[str, Sequence[str]]
+    ) -> None:
         lengths = [len(covs) for covs in perturb_covariates.values()]
         if len(set(lengths)) != 1:
             raise ValueError(
-                f"Length of perturbation covariate groups must match, found {lengths}."
+                f"Length of perturbation covariate groups must match, found lengths {lengths}."
             )
 
     @staticmethod
-    def _verify_covariate_reps(
+    def _verify_perturbation_covariate_reps(
         adata: anndata.AnnData,
         data: dict[str, str],
         covariates: dict[str, Sequence[str]],
@@ -181,10 +183,30 @@ class PerturbationData(BaseData):
             if key not in covariates:
                 raise ValueError(f"Key '{key}' not found in covariates.")
             if value not in adata.uns:
-                raise ValueError(f"Representation '{value}' not found in `adata.uns`.")
+                raise ValueError(
+                    f"Perturbation covariate representation '{value}' not found in `adata.uns`."
+                )
             if not isinstance(adata.uns[value], dict):
                 raise ValueError(
-                    f"Covariate representation '{value}' in `adata.uns` should be of type `dict`, found {type(adata.uns[value])}."
+                    f"Perturbation covariate representation '{value}' in `adata.uns` should be of type `dict`, found {type(adata.uns[value])}."
+                )
+
+    @staticmethod
+    def _verify_sample_covariate_reps(
+        adata: anndata.AnnData,
+        data: dict[str, str],
+        covariates: dict[str, Sequence[str]],
+    ) -> None:
+        for key, value in data.items():
+            if key not in covariates:
+                raise ValueError(f"Key '{key}' not found in covariates.")
+            if value not in adata.uns:
+                raise ValueError(
+                    f"Sample covariate representation '{value}' not found in `adata.uns`."
+                )
+            if not isinstance(adata.uns[value], dict):
+                raise ValueError(
+                    f"Sample covariate representation '{value}' in `adata.uns` should be of type `dict`, found {type(adata.uns[value])}."
                 )
 
     @staticmethod
@@ -212,8 +234,8 @@ class PerturbationData(BaseData):
         adata: anndata.AnnData,
         perturbation_covariates: dict[str, Sequence[str]],
         perturbation_covariate_reps: dict[str, str],
-    ) -> preprocessing.OneHotEncoder:
-        primary_group, primary_covars = list(perturbation_covariates.items())[0]
+    ) -> tuple[preprocessing.OneHotEncoder | None, bool]:
+        primary_group, primary_covars = next(iter(perturbation_covariates.items()))
         is_categorical = cls._check_covariate_type(adata, primary_covars)
 
         if primary_group in perturbation_covariate_reps:
@@ -233,18 +255,20 @@ class PerturbationData(BaseData):
     def _check_covariate_type(adata: anndata.AnnData, covars: Sequence[str]) -> bool:
         col_is_cat = []
         for covariate in covars:
-            try:
-                adata.obs[covariate] = adata.obs[covariate].astype(float)
-            except ValueError:
-                try:
-                    adata.obs[covariate] = adata.obs[covariate].astype("category")
-                    col_is_cat.append(True)
-                except ValueError as e:
-                    raise ValueError(
-                        f"Perturbation covariates `{covariate}` should be either numeric/boolean or categorical."
-                    ) from e
-            else:
+            if is_numeric_dtype(adata.obs[covariate]):
                 col_is_cat.append(False)
+                continue
+            if adata.obs[covariate].isin(["True", "False", True, False]).all():
+                adata.obs[covariate] = adata.obs[covariate].astype(int)
+                col_is_cat.append(False)
+                continue
+            try:
+                adata.obs[covariate] = adata.obs[covariate].astype("category")
+                col_is_cat.append(True)
+            except ValueError as e:
+                raise ValueError(
+                    f"Perturbation covariates `{covariate}` should be either numeric/boolean or categorical."
+                ) from e
 
         if max(col_is_cat) != min(col_is_cat):
             raise ValueError(
@@ -307,11 +331,11 @@ class PerturbationData(BaseData):
         covariate_reps: dict[str, str],
         primary_to_linked: dict[str, dict[str, str]],
         primary_encoder: preprocessing.OneHotEncoder,
+        primary_is_cat: bool,
         max_combination_length: int,
         null_value: Any = 0.0,
     ) -> dict[str, jax.Array]:
-        primary_group, primary_covars = list(perturb_covariates.items())[0]
-        primary_encoder, primary_is_cat = primary_encoder
+        primary_group, primary_covars = next(iter(perturb_covariates.items()))
 
         perturb_covar_emb: dict[str, list[jax.Array]] = {
             group: [] for group in perturb_covariates
@@ -413,7 +437,7 @@ class TrainingData(PerturbationData):
     max_combination_length
         Maximum number of covariates in a combination.
     null_value
-        Value to use for masking `null_value`..
+        Value to use for masking `null_value`.
     """
 
     cell_data: jax.Array  # (n_cells, n_features)
@@ -468,7 +492,7 @@ class TrainingData(PerturbationData):
 
         Returns
         -------
-            TraingingData: Data container for the perturbation data.
+            TrainingData: Data container for the perturbation data.
         """
         # TODO: add device to possibly only load to cpu
         # TODO: check if covariates are duplicates and raise error if so
@@ -479,19 +503,27 @@ class TrainingData(PerturbationData):
 
         cls._verify_perturbation_covariates(adata, perturbation_covariates)
 
-        primary_to_linked = cls._get_linked_covariates(adata, perturbation_covariates)
+        primary_to_linked = cls._get_linked_perturbation_covariates(
+            adata, perturbation_covariates
+        )
 
         sample_covariates = sample_covariates or []
         sample_covariates = _to_list(sample_covariates)
         cls._verify_sample_covariates(adata, sample_covariates)
 
         perturbation_covariate_reps = perturbation_covariate_reps or {}
-        sample_covariate_reps = sample_covariate_reps or {}
+        cls._verify_perturbation_covariate_reps(
+            adata, perturbation_covariate_reps, perturbation_covariates
+        )
 
+        sample_covariate_reps = sample_covariate_reps or {}
         sample_cov_groups = {covar: _to_list(covar) for covar in sample_covariates}
+        cls._verify_sample_covariate_reps(
+            adata, sample_covariate_reps, sample_cov_groups
+        )
+
         covariate_groups = perturbation_covariates | sample_cov_groups
         covariate_reps = perturbation_covariate_reps | sample_covariate_reps
-        cls._verify_covariate_reps(adata, covariate_reps, covariate_groups)
 
         split_covariates = split_covariates or []
         cls._verify_split_covariates(adata, split_covariates)
@@ -502,7 +534,7 @@ class TrainingData(PerturbationData):
 
         idx_to_covar, covar_to_idx = cls._get_idx_to_covariate(covariate_groups)
 
-        primary_encoder = cls._get_primary_covar_encoder(
+        primary_encoder, primary_is_cat = cls._get_primary_covar_encoder(
             adata, perturbation_covariates, perturbation_covariate_reps
         )
 
@@ -563,6 +595,7 @@ class TrainingData(PerturbationData):
                     covariate_reps=covariate_reps,
                     primary_to_linked=primary_to_linked,
                     primary_encoder=primary_encoder,
+                    primary_is_cat=primary_is_cat,
                     max_combination_length=max_combination_length,
                     null_value=null_value,
                 )
@@ -682,19 +715,27 @@ class ValidationData(PerturbationData):
 
         cls._verify_perturbation_covariates(adata, perturbation_covariates)
 
-        primary_to_linked = cls._get_linked_covariates(adata, perturbation_covariates)
+        primary_to_linked = cls._get_linked_perturbation_covariates(
+            adata, perturbation_covariates
+        )
 
         sample_covariates = sample_covariates or []
         sample_covariates = _to_list(sample_covariates)
         cls._verify_sample_covariates(adata, sample_covariates)
 
         perturbation_covariate_reps = perturbation_covariate_reps or {}
-        sample_covariate_reps = sample_covariate_reps or {}
+        cls._verify_perturbation_covariate_reps(
+            adata, perturbation_covariate_reps, perturbation_covariates
+        )
 
+        sample_covariate_reps = sample_covariate_reps or {}
         sample_cov_groups = {covar: _to_list(covar) for covar in sample_covariates}
+        cls._verify_sample_covariate_reps(
+            adata, sample_covariate_reps, sample_cov_groups
+        )
+
         covariate_groups = perturbation_covariates | sample_cov_groups
         covariate_reps = perturbation_covariate_reps | sample_covariate_reps
-        cls._verify_covariate_reps(adata, covariate_reps, covariate_groups)
 
         split_covariates = split_covariates or []
         cls._verify_split_covariates(adata, split_covariates)
@@ -705,7 +746,7 @@ class ValidationData(PerturbationData):
 
         idx_to_covar, covar_to_idx = cls._get_idx_to_covariate(covariate_groups)
 
-        primary_encoder = cls._get_primary_covar_encoder(
+        primary_encoder, primary_is_cat = cls._get_primary_covar_encoder(
             adata, perturbation_covariates, perturbation_covariate_reps
         )
 
@@ -761,6 +802,7 @@ class ValidationData(PerturbationData):
                     covariate_reps=covariate_reps,
                     primary_to_linked=primary_to_linked,
                     primary_encoder=primary_encoder,
+                    primary_is_cat=primary_is_cat,
                     max_combination_length=max_combination_length,
                     null_value=null_value,
                 )

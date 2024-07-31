@@ -83,12 +83,15 @@ def adata_perturbation() -> ad.AnnData:
     for col in ["drug1", "drug2", "drug3"]:
         adata.obs.loc[[str(idx) for idx in control_idcs], col] = "control"
 
-    adata.obs["control"] = adata.obs["drug1"] == "control"
     adata.obs["drug_a"] = (
         (adata.obs["drug1"] == "drug_a")
         | (adata.obs["drug2"] == "drug_a")
         | (adata.obs["drug3"] == "drug_a")
     )
+
+    for col in adata.obs.columns:
+        adata.obs[col] = adata.obs[col].astype("category")
+
     adata.obs["drug_b"] = (
         (adata.obs["drug1"] == "drug_b")
         | (adata.obs["drug2"] == "drug_b")
@@ -99,9 +102,7 @@ def adata_perturbation() -> ad.AnnData:
         | (adata.obs["drug2"] == "drug_c")
         | (adata.obs["drug3"] == "drug_c")
     )
-
-    for col in adata.obs.columns:
-        adata.obs[col] = adata.obs[col].astype("category")
+    adata.obs["control"] = adata.obs["drug1"] == "control"
 
     drug_emb = {}
     for drug in adata.obs["drug1"].cat.categories:

@@ -162,7 +162,7 @@ class TestTrainingData:
         if el_to_delete == "cell_line_a":
             del adata_perturbation.uns["cell_type"]["cell_line_a"]
 
-        with pytest.raises(KeyError):
+        with pytest.raises(KeyError, match=r"Representation.*not found.*"):
             _ = TrainingData.load_from_adata(
                 adata_perturbation,
                 sample_rep=sample_rep,
@@ -191,7 +191,9 @@ class TestTrainingData:
         if el_to_delete == "cell_line_a":
             perturbation_covariates["dosage"] = ["dosage_b"]
 
-        with pytest.raises(ValueError):
+        with pytest.raises(
+            ValueError, match=r".*perturbation covariate groups must match.*"
+        ):
             _ = TrainingData.load_from_adata(
                 adata_perturbation,
                 sample_rep=sample_rep,
@@ -213,7 +215,7 @@ class TestTrainingData:
         perturbation_covariate_reps = {"drug": "drug"}
 
         if max_combination_length == 0:
-            with pytest.warns(UserWarning):
+            with pytest.warns(UserWarning, match=r".*max_combination_length.*"):
                 pdata = TrainingData.load_from_adata(
                     adata,
                     sample_rep=sample_rep,
@@ -309,7 +311,7 @@ class TestValidationData:
         perturbation_covariate_reps = {"drug": "drug"}
 
         if max_combination_length == 0:
-            with pytest.warns(UserWarning):
+            with pytest.warns(UserWarning, match=r".*max_combination_length.*"):
                 pdata = ValidationData.load_from_adata(
                     adata,
                     sample_rep=sample_rep,
