@@ -470,7 +470,7 @@ class TrainingData(PerturbationData):
         adata: anndata.AnnData,
         sample_rep: str,
         control_key: str,
-        perturbation_covariates: dict[str, Sequence[str]],
+        perturbation_covariates: dict[str, Sequence[str]] | None = None,
         perturbation_covariate_reps: dict[str, str] | None = None,
         sample_covariates: Sequence[str] | None = None,
         sample_covariate_reps: dict[str, str] | None = None,
@@ -499,6 +499,8 @@ class TrainingData(PerturbationData):
         # TODO: add device to possibly only load to cpu
         # TODO: check if covariates are duplicates and raise error if so
         cls._verify_control_data(adata, control_key)
+
+        perturbation_covariates = perturbation_covariates or {}
         perturbation_covariates = {
             k: _to_list(v) for k, v in perturbation_covariates.items()
         }
@@ -556,9 +558,12 @@ class TrainingData(PerturbationData):
         split_idx_to_covariates = {}
         perturbation_covariates_mask = np.full((adata.n_obs,), -1, dtype=jnp.int32)
         perturbation_idx_to_covariates = {}
-        condition_data: dict[int | str, list[jnp.ndarray]] = {
-            i: [] for i in covar_to_idx.keys()
-        }
+
+        conditional = (len(perturbation_covariates) > 0) or (len(sample_covariates) > 0)
+        condition_data: dict[int | str, list[jnp.ndarray]] | None = (
+            {i: [] for i in covar_to_idx.keys()} if conditional else None
+        )
+
         control_mask = adata.obs[control_key]
 
         src_counter = 0
@@ -589,29 +594,31 @@ class TrainingData(PerturbationData):
                 perturbation_covariates_mask[mask] = tgt_counter
                 perturbation_idx_to_covariates[tgt_counter] = tgt_cond.values
 
-                embedding = cls._get_perturbation_covariates(
-                    condition_data=tgt_cond,
-                    rep_dict=adata.uns,
-                    perturb_covariates=perturbation_covariates,
-                    sample_covariates=sample_covariates,
-                    covariate_reps=covariate_reps,
-                    linked_perturb_covars=linked_perturb_covars,
-                    primary_encoder=primary_encoder,
-                    primary_is_cat=primary_is_cat,
-                    max_combination_length=max_combination_length,
-                    null_value=null_value,
-                )
+                if conditional:
+                    embedding = cls._get_perturbation_covariates(
+                        condition_data=tgt_cond,
+                        rep_dict=adata.uns,
+                        perturb_covariates=perturbation_covariates,
+                        sample_covariates=sample_covariates,
+                        covariate_reps=covariate_reps,
+                        linked_perturb_covars=linked_perturb_covars,
+                        primary_encoder=primary_encoder,
+                        primary_is_cat=primary_is_cat,
+                        max_combination_length=max_combination_length,
+                        null_value=null_value,
+                    )
 
-                for pert_cov, emb in embedding.items():
-                    condition_data[pert_cov].append(emb)
+                    for pert_cov, emb in embedding.items():
+                        condition_data[pert_cov].append(emb)
 
                 tgt_counter += 1
 
             control_to_perturbation[src_counter] = np.array(conditional_distributions)
             src_counter += 1
 
-        for pert_cov, emb in condition_data.items():
-            condition_data[pert_cov] = jnp.array(emb)
+        if conditional:
+            for pert_cov, emb in condition_data.items():
+                condition_data[pert_cov] = jnp.array(emb)
 
         return cls(
             cell_data=cls._get_cell_data(adata, sample_rep),
@@ -765,7 +772,11 @@ class ValidationData(PerturbationData):
 
         src_data: dict[int, jax.Array] = {}
         tgt_data: dict[int, dict[int, jax.Array]] = {}
-        condition_data: dict[int | str, dict[int, list]] = {}
+
+        conditional = (len(perturbation_covariates) > 0) or (len(sample_covariates) > 0)
+        condition_data: dict[int | str, dict[int, list]] | None = (
+            {} if conditional else None
+        )
         control_mask = adata.obs[control_key]
 
         src_counter = 0
@@ -779,7 +790,9 @@ class ValidationData(PerturbationData):
 
             src_data[src_counter] = cls._get_cell_data(adata[mask, :], sample_rep)
             tgt_data[src_counter] = {}
-            condition_data[src_counter] = {}
+
+            if conditional:
+                condition_data[src_counter] = {}
 
             pbar = tqdm(perturb_covar_df.iterrows(), total=perturb_covar_df.shape[0])
             for _, tgt_cond in pbar:
@@ -796,24 +809,25 @@ class ValidationData(PerturbationData):
                     adata[mask, :], sample_rep
                 )
 
-                embedding = cls._get_perturbation_covariates(
-                    condition_data=tgt_cond,
-                    rep_dict=adata.uns,
-                    perturb_covariates=perturbation_covariates,
-                    sample_covariates=sample_covariates,
-                    covariate_reps=covariate_reps,
-                    linked_perturb_covars=linked_perturb_covars,
-                    primary_encoder=primary_encoder,
-                    primary_is_cat=primary_is_cat,
-                    max_combination_length=max_combination_length,
-                    null_value=null_value,
-                )
-
-                condition_data[src_counter][tgt_counter] = {}
-                for pert_cov, emb in embedding.items():
-                    condition_data[src_counter][tgt_counter][pert_cov] = (
-                        jnp.expand_dims(emb, 0)
+                if conditional:
+                    embedding = cls._get_perturbation_covariates(
+                        condition_data=tgt_cond,
+                        rep_dict=adata.uns,
+                        perturb_covariates=perturbation_covariates,
+                        sample_covariates=sample_covariates,
+                        covariate_reps=covariate_reps,
+                        linked_perturb_covars=linked_perturb_covars,
+                        primary_encoder=primary_encoder,
+                        primary_is_cat=primary_is_cat,
+                        max_combination_length=max_combination_length,
+                        null_value=null_value,
                     )
+
+                    condition_data[src_counter][tgt_counter] = {}
+                    for pert_cov, emb in embedding.items():
+                        condition_data[src_counter][tgt_counter][pert_cov] = (
+                            jnp.expand_dims(emb, 0)
+                        )
 
                 tgt_counter += 1
             src_counter += 1
