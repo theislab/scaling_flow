@@ -213,4 +213,4 @@ class TestCellFlow:
 
         cf.train(num_iterations=3, callbacks=[metrics_callback], valid_freq=1)
         assert cf.dataloader is not None
-        assert f"val_{metric_to_compute}" in cf.trainer.training_logs
+        assert f"val_{metric_to_compute}_mean" in cf.trainer.training_logs

@@ -126,10 +126,12 @@ class ComputeMetrics(ComputationCallback):
     def __init__(
         self,
         metrics: list[Literal["r_squared", "mmd", "sinkhorn_div", "e_distance"]],
-        metric_aggregation: list[Literal["mean", "median"]] = "mean",
+        metric_aggregations: list[Literal["mean", "median"]] = None,
     ):
         self.metrics = metrics
-        self.metric_aggregation = metric_aggregation
+        self.metric_aggregation = (
+            ["mean"] if metric_aggregations is None else metric_aggregations
+        )
         for metric in metrics:
             # TODO: support custom callables as metrics
             if metric not in metric_to_func:

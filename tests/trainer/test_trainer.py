@@ -82,7 +82,7 @@ class TestTrainer:
 
         assert "loss" in trainer.training_logs
         if use_validdata:
-            assert f"val_{metric_to_compute}" in trainer.training_logs
+            assert f"val_{metric_to_compute}_mean" in trainer.training_logs
 
         x_pred = model.predict(x_test, cond)
         assert x_pred.shape == x_test.shape
