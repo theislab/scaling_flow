@@ -8,13 +8,13 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 import pandas as pd
-from pandas.api.types import is_numeric_dtype
 import scipy.sparse as sp
 import sklearn.preprocessing as preprocessing
+from pandas.api.types import is_numeric_dtype
 from tqdm import tqdm
 
-from cfp._types import ArrayLike
 from cfp._logging import logger
+from cfp._types import ArrayLike
 
 from .utils import _flatten_list, _to_list
 
@@ -57,6 +57,7 @@ class BaseData(abc.ABC):
         pass
 
 
+@dataclass
 class PerturbationData(BaseData):
     """Base class for perturbation data containers."""
 
@@ -160,7 +161,7 @@ class PerturbationData(BaseData):
             k: {} for k in primary_covars
         }
         for cov_group, covars in list(perturb_covariates.items())[1:]:
-            for primary_cov, linked_cov in zip(primary_covars, covars):
+            for primary_cov, linked_cov in zip(primary_covars, covars, strict=False):
                 linked_perturb_covars[primary_cov][cov_group] = linked_cov
 
         return linked_perturb_covars
@@ -658,6 +659,7 @@ class TrainingData(PerturbationData):
         return f"{self.__class__.__name__}[{self._format_params(repr)}]"
 
 
+@dataclass
 class ValidationData(PerturbationData):
     """Data container for the validation data.
 
@@ -675,6 +677,12 @@ class ValidationData(PerturbationData):
         Values in :attr:`anndata.AnnData.obs` columns which indicate no treatment with the corresponding covariate. These values will be masked with `null_token`.
     null_token
         Token to use for masking `null_value`.
+    n_conditions_on_log_iterations
+        Number of conditions to use for computation callbacks at each logged iteration.
+        If :obj:`None`, use all conditions.
+    n_conditions_on_train_end
+        Number of conditions to use for computation callbacks at the end of training.
+        If :obj:`None`, use all conditions.
     """
 
     src_data: dict[int, jnp.ndarray]
@@ -683,6 +691,8 @@ class ValidationData(PerturbationData):
     max_combination_length: int
     null_value: Any
     null_token: Any
+    n_conditions_on_log_iteration: int | None = None
+    n_conditions_on_train_end: int | None = None
 
     @classmethod
     def load_from_adata(
@@ -697,6 +707,8 @@ class ValidationData(PerturbationData):
         split_covariates: Sequence[str] | None = None,
         max_combination_length: int | None = None,
         null_value: float = 0.0,
+        n_conditions_on_log_iteration: int = 0,
+        n_conditions_on_train_end: int = 0,
     ) -> "ValidationData":
         """Load cell data from an AnnData object.
 
@@ -711,6 +723,9 @@ class ValidationData(PerturbationData):
             split_covariates: Covariates in adata.obs to split all control cells into different control populations. The perturbed cells are also split according to these columns, but if these covariates should also be encoded in the model, the corresponding column should also be used in `perturbation_covariates` or `sample_covariates`.
             max_combination_length: Maximum number of combinations of primary `perturbation_covariates`. If `None`, the value is inferred from the provided `perturbation_covariates`.
             null_value: Value to use for padding to `max_combination_length`.
+            n_conditions_on_log_iterations: Number of conditions to use for computation callbacks at each logged iteration.
+            n_conditions_on_train_end: Number of conditions to use for computation callbacks at the end of training.
+
 
         Returns
         -------
@@ -832,10 +847,27 @@ class ValidationData(PerturbationData):
                 tgt_counter += 1
             src_counter += 1
 
+        if n_conditions_on_log_iteration > 0 or n_conditions_on_train_end > 0:
+            if condition_data is None:
+                raise ValueError(
+                    f"Number of conditions for computation callbacks provided with `n_conditions_on_log_iteration`={n_conditions_on_log_iteration} and `n_conditions_on_train_end`={n_conditions_on_train_end}, but no conditions found in the data."
+                )
+        n_conditions = len(next(iter(condition_data.values())))
+        if n_conditions_on_log_iteration > n_conditions:
+            raise ValueError(
+                f"Number of conditions for computation callbacks provided with `n_conditions_on_log_iteration`={n_conditions_on_log_iteration} is larger than the number of conditions found in the data ({n_conditions})."
+            )
+        if n_conditions_on_train_end > n_conditions:
+            raise ValueError(
+                f"Number of conditions for computation callbacks provided with `n_conditions_on_train_end`={n_conditions_on_train_end} is larger than the number of conditions found in the data ({n_conditions})."
+            )
+
         return cls(
             tgt_data=tgt_data,
             src_data=src_data,
             condition_data=condition_data,
             max_combination_length=max_combination_length,
             null_value=null_value,
+            n_conditions_on_log_iteration=n_conditions_on_log_iteration,
+            n_conditions_on_train_end=n_conditions_on_train_end,
         )

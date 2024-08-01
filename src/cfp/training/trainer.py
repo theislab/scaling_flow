@@ -1,11 +1,12 @@
 from collections.abc import Callable, Sequence
-from typing import Any
+from typing import Any, Literal
 
 import jax
 import numpy as np
 from numpy.typing import ArrayLike
 from tqdm import tqdm
 
+from cfp.data.data import ValidationData
 from cfp.data.dataloader import TrainSampler
 from cfp.solvers import genot, otfm
 from cfp.training.callbacks import CallbackRunner
@@ -17,7 +18,7 @@ class CellFlowTrainer:
     Args:
         dataloader: Data sampler.
         model: OTFM/GENOT model with a conditional velocity field.
-
+        seed: Random seed for subsampling validation data.
 
     Returns
     -------
@@ -27,6 +28,7 @@ class CellFlowTrainer:
     def __init__(
         self,
         model: otfm.OTFlowMatching | genot.GENOT,
+        seed: int = 0,
     ):
         if not isinstance(model, (otfm.OTFlowMatching | genot.GENOT)):
             raise NotImplementedError(
@@ -34,34 +36,96 @@ class CellFlowTrainer:
             )
 
         self.model = model
+        self.rng_subsampling = np.random.default_rng(seed)
         self.training_logs: dict[str, Any] = {}
+
+    def _sample_validation_data(
+        self,
+        valid_data: dict[str, ValidationData],
+        stage: Literal["on_log_iteration", "on_train_end"],
+    ) -> dict[str, ValidationData]:
+        """Sample validation data for computing metrics"""
+        if stage == "on_train_end":
+            n_conditions_to_sample = lambda x: x.n_conditions_on_train_end
+        elif stage == "on_log_iteration":
+            n_conditions_to_sample = lambda x: x.n_conditions_on_log_iteration
+        else:
+            raise ValueError(f"Stage {stage} not supported.")
+
+        subsampled_validation_data = {}
+        for val_data_name, val_data in valid_data.items():
+            n = n_conditions_to_sample(val_data)
+            if n is not None and n < 0:
+                raise ValueError(
+                    f"Number of conditions to sample {stage} must be a non-negative integer or `None`, got {n}"
+                )
+            if n is None:
+                subsampled_validation_data[val_data_name] = val_data
+            else:
+                condition_idxs = self.rng_subsampling.choice(
+                    len(val_data.condition_data),
+                    n,
+                    replace=False,
+                )
+                subsampled_validation_data[val_data_name] = (
+                    self._extract_subsampled_validation_data(
+                        val_data,
+                        condition_idxs,
+                    )
+                )
+
+        return subsampled_validation_data
+
+    def _extract_subsampled_validation_data(
+        self,
+        val_data: ValidationData,
+        condition_idxs: ArrayLike,
+    ) -> ValidationData:
+        """Extract subsampled validation data."""
+        src_data = {}
+        tgt_data = {}
+        condition_data = {}
+        for src_idx in val_data.src_data.keys():
+            src_data[src_idx] = val_data.src_data[src_idx]
+            tgt_data[src_idx] = {}
+            for tgt_idx in val_data.tgt_data[src_idx].keys():
+                if tgt_idx in condition_idxs:
+                    tgt_data[src_idx][tgt_idx] = val_data.tgt_data[src_idx][tgt_idx]
+                    condition_data[tgt_idx] = val_data.condition_data[tgt_idx]
+
+        return ValidationData(
+            src_data=src_data,
+            tgt_data=tgt_data,
+            condition_data=condition_data,
+            max_combination_length=val_data.max_combination_length,
+        )
 
     def _validation_step(
         self,
-        batch: dict[str, ArrayLike],
         val_data: dict[str, dict[str, dict[str, ArrayLike]]],
     ) -> dict[str, dict[str, dict[str, ArrayLike]]]:
         """Compute predictions for validation data."""
         # TODO: Sample fixed number of conditions to validate on
 
         valid_pred_data: dict[str, dict[str, ArrayLike]] = {}
+        valid_true_data: dict[str, dict[str, ArrayLike]] = {}
         for val_key, vdl in val_data.items():
             valid_pred_data[val_key] = {}
+            valid_true_data[val_key] = {}
             for src_dist in vdl.src_data:
                 valid_pred_data[val_key][src_dist] = {}
+                valid_true_data[val_key][src_dist] = {}
                 src = vdl.src_data[src_dist]
                 tgt_dists = vdl.tgt_data[src_dist]
                 for tgt_dist in tgt_dists:
                     condition = vdl.condition_data[src_dist][tgt_dist]
                     pred = self.model.predict(src, condition)
+                    valid_true_data[val_key][src_dist][tgt_dist] = vdl.tgt_data[
+                        src_dist
+                    ][tgt_dist]
                     valid_pred_data[val_key][src_dist][tgt_dist] = pred
 
-        src = batch["src_cell_data"]
-        condition = batch.get("condition")
-        train_pred = self.model.predict(src, condition)
-        batch["pred_data"] = train_pred
-
-        return batch, valid_pred_data
+        return valid_true_data, valid_pred_data
 
     def _update_logs(self, logs: dict[str, Any]) -> None:
         """Update training logs."""
@@ -99,7 +163,6 @@ class CellFlowTrainer:
         valid_data = valid_data or {}
         crun = CallbackRunner(
             callbacks=callbacks,
-            data=valid_data,
         )
         crun.on_train_begin()
 
@@ -111,13 +174,18 @@ class CellFlowTrainer:
             self.training_logs["loss"].append(float(loss))
 
             if ((it - 1) % valid_freq == 0) and (it > 1):
-                # TODO: Accumulate tran data over multiple iterations
+                # Subsample validation data
+                valid_data_subsampled = self._sample_validation_data(
+                    valid_data, stage="on_log_iteration"
+                )
 
                 # Get predictions from validation data
-                train_data, valid_pred_data = self._validation_step(batch, valid_data)
+                valid_true_data, valid_pred_data = self._validation_step(
+                    valid_data_subsampled
+                )
 
                 # Run callbacks
-                metrics = crun.on_log_iteration(train_data, valid_pred_data)
+                metrics = crun.on_log_iteration(valid_true_data, valid_pred_data)
                 self._update_logs(metrics)
 
                 # Update progress bar
@@ -130,7 +198,13 @@ class CellFlowTrainer:
                 pbar.set_postfix(postfix_dict)
 
         if num_iterations > 0:
+            valid_data_subsampled = self._sample_validation_data(
+                valid_data, stage="on_train_end"
+            )
+
             # Val step and callbacks at the end of training
-            train_data, valid_pred_data = self._validation_step(batch, valid_data)
-            metrics = crun.on_train_end(train_data, valid_pred_data)
+            valid_true_data, valid_pred_data = self._validation_step(
+                valid_data_subsampled
+            )
+            metrics = crun.on_train_end(valid_true_data, valid_pred_data)
             self._update_logs(metrics)
