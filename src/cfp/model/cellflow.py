@@ -40,59 +40,56 @@ class CellFlow:
 
     def prepare_data(
         self,
-        cell_data: Literal["X"] | dict[str, str],
-        control_key: str | Sequence[str, Any],
-        obs_perturbation_covariates: Sequence[tuple[str, ...]] | None = None,
-        uns_perturbation_covariates: (
-            Sequence[dict[str, Sequence[str] | str]] | None
-        ) = None,
+        sample_rep: str,
+        control_key: str,
+        perturbation_covariates: dict[str, Sequence[str]],
+        perturbation_covariate_reps: dict[str, str] | None = None,
+        sample_covariates: Sequence[str] | None = None,
+        sample_covariate_reps: dict[str, str] | None = None,
         split_covariates: Sequence[str] | None = None,
+        max_combination_length: int | None = None,
         null_value: float = 0.0,
-        **kwargs,
     ) -> None:
         """Prepare dataloader for training from anndata object.
 
         Args:
             adata: An :class:`~anndata.AnnData` object.
-            cell_data: Where to read the cell data from. Either 'X', a key in adata.obsm or a dictionary of the form {attr: key}, where 'attr' is an attribute of the :class:`~anndata.AnnData` object and key is the 'key' in the corresponding key.
-            control_key: Tuple of length 2 with first element defining the column in :class:`~anndata.AnnData` and second element defining the value in `adata.obs[control_data[0]]` used to define all control cells.
-            split_covariates: Covariates in adata.obs to split all control cells into different control populations. The perturbed cells are also split according to these columns, but if an embedding for these covariates should be encoded in the model, the corresponding column should also be used in `obs_perturbation_covariates` or `uns_perturbation_covariates`.
-            obs_perturbation_covariates: Tuples of covariates in adata.obs characterizing the perturbed cells (together with `split_covariates` and `uns_perturbation_covariates`) and encoded by the values as found in `adata.obs`. If a tuple contains more than
-            one element, this is interpreted as a combination of covariates that should be treated as an unordered set.
-            uns_perturbation_covariates: Dictionaries with keys in adata.uns[`UNS_KEY_CONDITION`] and values columns in adata.obs which characterize the perturbed cells (together with `split_covariates` and `obs_perturbation_covariates`) and encoded by the values as found in `adata.uns[`UNS_KEY_CONDITION`][uns_perturbation_covariates.keys()]`. If a value of the dictionary is a tuple with more than one element, this is interpreted as a combination of covariates that should be treated as an unordered set.
-            null_value: Value to use indication the lack of a covariate in the data.
+            sample_rep: Key in `adata.obsm` where the sample representation is stored or "X" to use `adata.X`.
+            control_key: Key of a boolean column in `adata.obs` that defines the control samples.
+            perturbation_covariates: A dictionary where the keys indicate the name of the covariate group and the values are keys in `adata.obs`. The corresponding columns should be either boolean (presence/abscence of the perturbation) or numeric (concentration or magnitude of the perturbation). If multiple groups are provided, the first is interpreted as the primary perturbation and the others as covariates corresponding to these perturbations, e.g. `{"drug":("drugA", "drugB"), "time":("drugA_time", "drugB_time")}`.
+            perturbation_covariate_reps: A dictionary where the keys indicate the name of the covariate group and the values are keys in `adata.uns` storing a dictionary with the representation of the covariates. E.g. `{"drug":"drug_embeddings"}` with `adata.uns["drug_embeddings"] = {"drugA": np.array, "drugB": np.array}`.
+            sample_covariates: Keys in `adata.obs` indicating sample covatiates to be taken into account for training and prediction, e.g. `["age", "cell_type"]`.
+            sample_covariate_reps: A dictionary where the keys indicate the name of the covariate group and the values are keys in `adata.uns` storing a dictionary with the representation of the covariates. E.g. `{"cell_type": "cell_type_embeddings"}` with `adata.uns["cell_type_embeddings"] = {"cell_typeA": np.array, "cell_typeB": np.array}`.
+            split_covariates: Covariates in adata.obs to split all control cells into different control populations. The perturbed cells are also split according to these columns, but if these covariates should also be encoded in the model, the corresponding column should also be used in `perturbation_covariates` or `sample_covariates`.
+            max_combination_length: Maximum number of combinations of primary `perturbation_covariates`. If `None`, the value is inferred from the provided `perturbation_covariates`.
+            null_value: Value to use for padding to `max_combination_length`.
 
         Returns
         -------
             None
 
         """
-        obs_perturbation_covariates = obs_perturbation_covariates or []
-        self.obs_perturbation_covariates = obs_perturbation_covariates
-
-        uns_perturbation_covariates = uns_perturbation_covariates or {}
-        self.uns_perturbation_covariates = uns_perturbation_covariates
-
-        split_covariates = split_covariates or []
+        self.sample_rep = sample_rep
+        self.control_key = control_key
+        self.perturbation_covariates = perturbation_covariates
+        self.perturbation_covariate_reps = perturbation_covariate_reps
+        self.sample_covariates = sample_covariates
+        self.sample_covariate_reps = sample_covariate_reps
         self.split_covariates = split_covariates
-
-        control_data = (
-            control_key if isinstance(control_key, tuple) else (control_key, True)
-        )
-        self.control_data = control_data
-        self.cell_data = cell_data
+        self.max_combination_length = max_combination_length
         self.null_value = null_value
-        self.data_kwargs = kwargs
 
         self.pdata = TrainingData.load_from_adata(
             self.adata,
-            cell_data=cell_data,
-            split_covariates=split_covariates,
-            control_data=control_data,
-            obs_perturbation_covariates=obs_perturbation_covariates,
-            uns_perturbation_covariates=uns_perturbation_covariates,
-            null_value=null_value,
-            **kwargs,
+            sample_rep=self.sample_rep,
+            control_key=self.control_key,
+            perturbation_covariates=self.perturbation_covariates,
+            perturbation_covariate_reps=self.perturbation_covariate_reps,
+            sample_covariates=self.sample_covariates,
+            sample_covariate_reps=self.sample_covariate_reps,
+            split_covariates=self.split_covariates,
+            max_combination_length=self.max_combination_length,
+            null_value=self.null_value,
         )
 
         self._data_dim = self.pdata.cell_data.shape[-1]
@@ -122,12 +119,14 @@ class CellFlow:
             )
         val_data = ValidationData.load_from_adata(
             adata,
-            cell_data=self.cell_data,
+            sample_rep=self.sample_rep,
+            control_key=self.control_key,
+            perturbation_covariates=self.perturbation_covariates,
+            perturbation_covariate_reps=self.perturbation_covariate_reps,
+            sample_covariates=self.sample_covariates,
+            sample_covariate_reps=self.sample_covariate_reps,
             split_covariates=self.split_covariates,
-            control_data=self.control_data,
-            obs_perturbation_covariates=self.obs_perturbation_covariates,
-            uns_perturbation_covariates=self.uns_perturbation_covariates,
-            max_combination_length=self.pdata.max_combination_length,
+            max_combination_length=self.max_combination_length,
             null_value=self.null_value,
             n_conditions_on_log_iteration=n_conditions_on_log_iteration,
             n_conditions_on_train_end=n_conditions_on_train_end,

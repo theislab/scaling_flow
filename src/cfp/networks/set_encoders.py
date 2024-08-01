@@ -538,8 +538,10 @@ class ConditionEncoder(BaseModule):
         for module in modules:
             if isinstance(module, SelfAttention):
                 conditions = module(conditions, attention_mask, training)
-            if isinstance(module, nn.Dense):
+            elif isinstance(module, nn.Dense):
                 conditions = module(conditions)
+            elif isinstance(module, nn.Dropout):
+                conditions = module(conditions, deterministic=not training)
             else:
                 conditions = module(conditions, training)
         return conditions
