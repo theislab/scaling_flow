@@ -92,8 +92,8 @@ class TestCellFlow:
         "perturbation_covariates", perturbation_covariate_comb_args
     )
     @pytest.mark.parametrize("solver", ["otfm", "genot"])
-    @pytest.mark.parametrize("n_conditions_on_log_iteration", [-1, 0, 2])
-    @pytest.mark.parametrize("n_conditions_on_train_end", [-1, 0, 2])
+    @pytest.mark.parametrize("n_conditions_on_log_iteration", [None, 0, 2])
+    @pytest.mark.parametrize("n_conditions_on_train_end", [None, 0, 2])
     def test_cellflow_val_data_loading(
         self,
         adata_perturbation,
@@ -150,8 +150,8 @@ class TestCellFlow:
             assert cond_data[k].shape[0] == 1
 
     @pytest.mark.parametrize("solver", ["otfm", "genot"])
-    @pytest.mark.parametrize("n_conditions_on_log_iteration", [-1, 0, 1])
-    @pytest.mark.parametrize("n_conditions_on_train_end", [-1, 0, 1])
+    @pytest.mark.parametrize("n_conditions_on_log_iteration", [None, 0, 1])
+    @pytest.mark.parametrize("n_conditions_on_train_end", [None, 0, 1])
     def test_cellflow_with_validation(
         self,
         adata_perturbation,
