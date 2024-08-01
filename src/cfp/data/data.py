@@ -679,8 +679,10 @@ class ValidationData(PerturbationData):
         Token to use for masking `null_value`.
     n_conditions_on_log_iterations
         Number of conditions to use for computation callbacks at each logged iteration.
+        If :obj:`None`, use all conditions.
     n_conditions_on_train_end
         Number of conditions to use for computation callbacks at the end of training.
+        If :obj:`None`, use all conditions.
     """
 
     src_data: dict[int, jnp.ndarray]
@@ -689,8 +691,8 @@ class ValidationData(PerturbationData):
     max_combination_length: int
     null_value: Any
     null_token: Any
-    n_conditions_on_log_iteration: int = 0
-    n_conditions_on_train_end: int = 0
+    n_conditions_on_log_iteration: int | None = None
+    n_conditions_on_train_end: int | None = None
 
     @classmethod
     def load_from_adata(

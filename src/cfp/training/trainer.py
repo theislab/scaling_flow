@@ -46,19 +46,23 @@ class CellFlowTrainer:
     ) -> dict[str, ValidationData]:
         """Sample validation data for computing metrics"""
         if stage == "on_train_end":
-            n_conditions_to_sample = lambda x: x.n_conditions_on_train_end
+            n = valid_data.n_conditions_on_train_end
         elif stage == "on_log_iteration":
-            n_conditions_to_sample = lambda x: x.n_conditions_on_log_iteration
+            n = valid_data.n_conditions_on_log_iteration
         else:
             raise ValueError(f"Stage {stage} not supported.")
+        if n is not None and n < 0:
+            raise ValueError(
+                f"Number of conditions to sample {stage} must be a non-negative integer or `None`, got {n}"
+            )
         subsampled_validation_data = {}
         for val_data_name, val_data in valid_data.items():
-            if n_conditions_to_sample(val_data) == -1:
+            if n is None:
                 subsampled_validation_data[val_data_name] = val_data
             else:
                 condition_idxs = self.rng_subsampling.choice(
                     len(val_data.condition_data),
-                    n_conditions_to_sample(val_data),
+                    n,
                     replace=False,
                 )
                 subsampled_validation_data[val_data_name] = (

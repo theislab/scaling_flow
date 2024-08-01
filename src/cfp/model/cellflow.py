@@ -98,16 +98,16 @@ class CellFlow:
         self,
         adata: ad.AnnData,
         name: str,
-        n_conditions_on_log_iteration: int,
-        n_conditions_on_train_end: int,
+        n_conditions_on_log_iteration: int | None = None,
+        n_conditions_on_train_end: int | None = None,
     ) -> None:
         """Prepare validation data.
 
         Args:
             adata: Anndata object.
             name: Name of the validation data.
-            n_conditions_on_log_iterations: Number of conditions to use for computation callbacks at each logged iteration.
-            n_conditions_on_train_end: Number of conditions to use for computation callbacks at the end of training.
+            n_conditions_on_log_iterations: Number of conditions to use for computation callbacks at each logged iteration. If :obj:`None`, use all conditions.
+            n_conditions_on_train_end: Number of conditions to use for computation callbacks at the end of training. If :obj:`None`, use all conditions.
 
         Returns
         -------
