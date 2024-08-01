@@ -892,17 +892,30 @@ class PredictionData(PerturbationData):
         covariate_data: pd.DataFrame, perturb_covar_keys: Sequence[str]
     ) -> None:
         for covar in perturb_covar_keys:
-            if covar not in covariate_data.columns:
+            if covar is not None and covar not in covariate_data.columns:
                 raise ValueError(
                     f"Covariate '{covar}' is required for prediction but was not found in provided data."
                 )
 
+    @staticmethod
+    def _verify_condition_id_key(
+        covariate_data: pd.DataFrame, condition_id_key: str | None
+    ) -> None:
+        if (
+            condition_id_key is not None
+            and condition_id_key not in covariate_data.columns
+        ):
+            raise ValueError(
+                f"Condition id key '{condition_id_key}' is required for prediction but was not found in provided data."
+            )
+
     @classmethod
     def load_from_adata(
         cls,
-        covariate_data: pd.DataFrame,
-        adata: anndata.AnnData | None = None,
+        adata: anndata.AnnData,
         sample_rep: str | None = None,
+        covariate_data: pd.DataFrame | None = None,
+        condition_id_key: str | None = None,
         perturbation_covariates: dict[str, Sequence[str]] | None = None,
         perturbation_covariate_reps: dict[str, str] | None = None,
         sample_covariates: Sequence[str] | None = None,
@@ -917,7 +930,8 @@ class PredictionData(PerturbationData):
         Args:
             adata: An :class:`~anndata.AnnData` object.
             sample_rep: Key in `adata.obsm` where the sample representation is stored or "X" to use `adata.X`.
-            control_key: Key of a boolean column in `adata.obs` that defines the control samples.
+            covariate_data: Dataframe with covariates. If `None`, `adata.obs` is used.
+            condition_id_key: Key in `adata.obs` that defines the condition id.
             perturbation_covariates: A dictionary where the keys indicate the name of the covariate group and the values are keys in `adata.obs`. The corresponding columns should be either boolean (presence/abscence of the perturbation) or numeric (concentration or magnitude of the perturbation). If multiple groups are provided, the first is interpreted as the primary perturbation and the others as covariates corresponding to these perturbations, e.g. `{"drug":("drugA", "drugB"), "time":("drugA_time", "drugB_time")}`.
             perturbation_covariate_reps: A dictionary where the keys indicate the name of the covariate group and the values are keys in `adata.uns` storing a dictionary with the representation of the covariates. E.g. `{"drug":"drug_embeddings"}` with `adata.uns["drug_embeddings"] = {"drugA": np.array, "drugB": np.array}`.
             sample_covariates: Keys in `adata.obs` indicating sample covatiates to be taken into account for training and prediction, e.g. `["age", "cell_type"]`.
@@ -931,6 +945,8 @@ class PredictionData(PerturbationData):
             PredictionData: Data container for the perturbation data.
         """
         # TODO: add device to possibly only load to cpu
+        covariate_data = covariate_data or adata.obs
+
         perturbation_covariates = {
             k: _to_list(v) for k, v in perturbation_covariates.items()
         }
@@ -972,11 +988,15 @@ class PredictionData(PerturbationData):
         perturb_covar_keys = _flatten_list(perturbation_covariates.values()) + list(
             sample_covariates
         )
-        perturb_covar_keys = [k for k in perturb_covar_keys if k is not None]
 
+        perturb_covar_keys = [k for k in perturb_covar_keys if k is not None]
         cls._verify_perturb_covar_keys(covariate_data, perturb_covar_keys)
 
-        perturb_covar_df = adata.obs[perturb_covar_keys].drop_duplicates().reset_index()
+        if condition_id_key is not None:
+            cls._verify_condition_id_key(covariate_data, condition_id_key)
+            select_keys = perturb_covar_keys + [condition_id_key]
+        else:
+            select_keys = perturb_covar_keys
 
         src_data: dict[int, jax.Array] = {}
 
@@ -1000,16 +1020,22 @@ class PredictionData(PerturbationData):
             if conditional:
                 condition_data[src_counter] = {}
 
+            covariate_data_mask = (
+                covariate_data[list(filter_dict.keys())] == list(filter_dict.values())
+            ).all(axis=1)
+
+            perturb_covar_df = covariate_data[covariate_data_mask][
+                select_keys
+            ].drop_duplicates()
+
+            if condition_id_key is not None:
+                perturb_covar_df = perturb_covar_df.set_index(condition_id_key)
+            else:
+                perturb_covar_df = perturb_covar_df.reset_index()
+
             pbar = tqdm(perturb_covar_df.iterrows(), total=perturb_covar_df.shape[0])
-            for _, tgt_cond in pbar:
+            for cond_id, tgt_cond in pbar:
                 tgt_cond = tgt_cond[perturb_covar_keys]
-
-                mask = (adata.obs[perturb_covar_keys] == tgt_cond.values).all(axis=1)
-                mask *= (1 - control_mask) * split_cov_mask
-                mask = np.array(mask == 1)
-
-                if mask.sum() == 0:
-                    continue
 
                 if conditional:
                     embedding = cls._get_perturbation_covariates(
@@ -1025,9 +1051,9 @@ class PredictionData(PerturbationData):
                         null_value=null_value,
                     )
 
-                    condition_data[src_counter][tgt_counter] = {}
+                    condition_data[src_counter][cond_id] = {}
                     for pert_cov, emb in embedding.items():
-                        condition_data[src_counter][tgt_counter][pert_cov] = (
+                        condition_data[src_counter][cond_id][pert_cov] = (
                             jnp.expand_dims(emb, 0)
                         )
 
