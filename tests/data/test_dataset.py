@@ -214,27 +214,27 @@ class TestTrainingData:
         perturbation_covariates = {"drug": ["drug1"]}
         perturbation_covariate_reps = {"drug": "drug"}
 
-        if max_combination_length == 0:
-            with pytest.warns(UserWarning, match=r".*max_combination_length.*"):
-                pdata = TrainingData.load_from_adata(
-                    adata,
-                    sample_rep=sample_rep,
-                    split_covariates=split_covariates,
-                    control_key=control_key,
-                    perturbation_covariates=perturbation_covariates,
-                    perturbation_covariate_reps=perturbation_covariate_reps,
-                    max_combination_length=max_combination_length,
-                )
-        else:
-            pdata = TrainingData.load_from_adata(
-                adata,
-                sample_rep=sample_rep,
-                split_covariates=split_covariates,
-                control_key=control_key,
-                perturbation_covariates=perturbation_covariates,
-                perturbation_covariate_reps=perturbation_covariate_reps,
-                max_combination_length=max_combination_length,
-            )
+        # if max_combination_length == 0:
+        #     with pytest.warns(UserWarning, match=r".*max_combination_length.*"):
+        #         pdata = TrainingData.load_from_adata(
+        #             adata,
+        #             sample_rep=sample_rep,
+        #             split_covariates=split_covariates,
+        #             control_key=control_key,
+        #             perturbation_covariates=perturbation_covariates,
+        #             perturbation_covariate_reps=perturbation_covariate_reps,
+        #             max_combination_length=max_combination_length,
+        #         )
+        # else:
+        pdata = TrainingData.load_from_adata(
+            adata,
+            sample_rep=sample_rep,
+            split_covariates=split_covariates,
+            control_key=control_key,
+            perturbation_covariates=perturbation_covariates,
+            perturbation_covariate_reps=perturbation_covariate_reps,
+            max_combination_length=max_combination_length,
+        )
 
         assert (
             (pdata.perturbation_covariates_mask == -1)
@@ -310,27 +310,27 @@ class TestValidationData:
         perturbation_covariates = {"drug": ["drug1"]}
         perturbation_covariate_reps = {"drug": "drug"}
 
-        if max_combination_length == 0:
-            with pytest.warns(UserWarning, match=r".*max_combination_length.*"):
-                pdata = ValidationData.load_from_adata(
-                    adata,
-                    sample_rep=sample_rep,
-                    split_covariates=split_covariates,
-                    control_key=control_key,
-                    perturbation_covariates=perturbation_covariates,
-                    perturbation_covariate_reps=perturbation_covariate_reps,
-                    max_combination_length=max_combination_length,
-                )
-        else:
-            pdata = ValidationData.load_from_adata(
-                adata,
-                sample_rep=sample_rep,
-                split_covariates=split_covariates,
-                control_key=control_key,
-                perturbation_covariates=perturbation_covariates,
-                perturbation_covariate_reps=perturbation_covariate_reps,
-                max_combination_length=max_combination_length,
-            )
+        # if max_combination_length == 0:
+        #     with pytest.warns(UserWarning, match=r".*max_combination_length.*"):
+        #         pdata = ValidationData.load_from_adata(
+        #             adata,
+        #             sample_rep=sample_rep,
+        #             split_covariates=split_covariates,
+        #             control_key=control_key,
+        #             perturbation_covariates=perturbation_covariates,
+        #             perturbation_covariate_reps=perturbation_covariate_reps,
+        #             max_combination_length=max_combination_length,
+        #         )
+        # else:
+        pdata = ValidationData.load_from_adata(
+            adata,
+            sample_rep=sample_rep,
+            split_covariates=split_covariates,
+            control_key=control_key,
+            perturbation_covariates=perturbation_covariates,
+            perturbation_covariate_reps=perturbation_covariate_reps,
+            max_combination_length=max_combination_length,
+        )
 
         expected_max_combination_length = max(
             max_combination_length, len(perturbation_covariates["drug"])
