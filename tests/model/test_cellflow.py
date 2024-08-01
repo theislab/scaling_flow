@@ -48,7 +48,7 @@ class TestCellFlow:
         )
         assert cf.trainer is not None
 
-        cf.train(num_iterations=2)
+        cf.train(num_iterations=3)
         assert cf.dataloader is not None
 
     @pytest.mark.parametrize("solver", ["otfm", "genot"])
@@ -84,7 +84,7 @@ class TestCellFlow:
         )
         assert cf.trainer is not None
 
-        cf.train(num_iterations=2)
+        cf.train(num_iterations=3)
         assert cf.dataloader is not None
 
     @pytest.mark.parametrize("split_covariates", [[], ["cell_type"]])
@@ -211,7 +211,6 @@ class TestCellFlow:
             metrics=[metric_to_compute]
         )
 
-        cf.train(num_iterations=2, callbacks=[metrics_callback], valid_freq=1)
+        cf.train(num_iterations=3, callbacks=[metrics_callback], valid_freq=1)
         assert cf.dataloader is not None
         assert f"val_{metric_to_compute}" in cf.trainer.training_logs
-        assert f"train_{metric_to_compute}" in cf.trainer.training_logs

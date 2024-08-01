@@ -2,6 +2,7 @@ import abc
 from typing import Any, Literal
 
 import jax.tree as jt
+import jax.tree_util as jtu
 import numpy as np
 from numpy.typing import ArrayLike
 
@@ -68,7 +69,6 @@ class ComputationCallback(BaseCallback, abc.ABC):
         self,
         validation_data: dict[str, ValidationData],
         predicted_data: dict[str, dict[str, ArrayLike]],
-        training_data: dict[str, ArrayLike],
     ) -> dict[str, float]:
         """Called at each validation/log iteration to compute metrics
 
@@ -84,7 +84,6 @@ class ComputationCallback(BaseCallback, abc.ABC):
         self,
         validation_data: dict[str, ValidationData],
         predicted_data: dict[str, dict[str, ArrayLike]],
-        training_data: dict[str, ArrayLike],
     ) -> dict[str, float]:
         """Called at the end of training to compute metrics
 
@@ -101,6 +100,11 @@ metric_to_func = {
     "mmd": compute_scalar_mmd,
     "sinkhorn_div": compute_sinkhorn_div,
     "e_distance": compute_e_distance,
+}
+
+agg_fn_to_func = {
+    "mean": np.mean,
+    "median": np.median,
 }
 
 
@@ -126,9 +130,6 @@ class ComputeMetrics(ComputationCallback):
     ):
         self.metrics = metrics
         self.metric_aggregation = metric_aggregation
-        self._aggregation_func = (
-            np.median if metric_aggregation == "median" else np.mean
-        )
         for metric in metrics:
             # TODO: support custom callables as metrics
             if metric not in metric_to_func:
@@ -144,31 +145,24 @@ class ComputeMetrics(ComputationCallback):
         self,
         validation_data: dict[str, ValidationData],
         predicted_data: dict[str, dict[str, ArrayLike]],
-        training_data: dict[str, ArrayLike],
     ) -> dict[str, float]:
         """Called at each validation/log iteration to compute metrics
 
         Args:
             validation_data: Validation data
             predicted_data: Predicted data
-            training_data: Current batch and predicted data
         """
         metrics = {}
         for metric in self.metrics:
             for k in validation_data.keys():
-                result = jt.flatten(
-                    jt.map(
-                        metric_to_func[metric],
-                        validation_data[k].tgt_data,
-                        predicted_data[k],
+                out = jtu.tree_map(
+                    metric_to_func[metric], validation_data[k], predicted_data[k]
+                )
+                out_flattened = jt.flatten(out)[0]
+                for agg_fn in self.metric_aggregation:
+                    metrics[f"{k}_{metric}_{agg_fn}"] = agg_fn_to_func[agg_fn](
+                        out_flattened
                     )
-                )[0]
-                # TODO: support multiple aggregation functions
-                metrics[f"{k}_{metric}"] = self._aggregation_func(result)
-            result = metric_to_func[metric](
-                training_data["tgt_cell_data"], training_data["pred_data"]
-            )
-            metrics[f"train_{metric}"] = self._aggregation_func(result)
 
         return metrics
 
@@ -176,7 +170,6 @@ class ComputeMetrics(ComputationCallback):
         self,
         validation_data: dict[str, ValidationData],
         predicted_data: dict[str, dict[str, ArrayLike]],
-        training_data: dict[str, ArrayLike],
     ) -> dict[str, float]:
         """Called at the end of training to compute metrics
 
@@ -297,12 +290,15 @@ class CallbackRunner:
         for callback in self.logging_callbacks:
             callback.on_train_begin()
 
-    def on_log_iteration(self, valid_data, train_data, pred_data) -> dict[str, Any]:
+    def on_log_iteration(
+        self, valid_data: dict[str, ValidationData], pred_data
+    ) -> dict[str, Any]:
         """Called at each validation/log iteration to run callbacks. First computes metrics with computation callbacks and then logs data with logging callbacks.
 
-        Args:
-            train_data: Training data
-            pred_data: Predicted data
+        Parameters
+        ----------
+        valid_data: Validation data
+        pred_data: Predicted data corresponding to validation data
 
         Returns
         -------
@@ -311,7 +307,7 @@ class CallbackRunner:
         dict_to_log: dict[str, Any] = {}
 
         for callback in self.computation_callbacks:
-            results = callback.on_log_iteration(valid_data, pred_data, train_data)
+            results = callback.on_log_iteration(valid_data, pred_data)
             dict_to_log.update(results)
 
         for callback in self.logging_callbacks:
@@ -319,11 +315,11 @@ class CallbackRunner:
 
         return dict_to_log
 
-    def on_train_end(self, valid_data, train_data, pred_data) -> dict[str, Any]:
+    def on_train_end(self, valid_data, pred_data) -> dict[str, Any]:
         """Called at the end of training to run callbacks. First computes metrics with computation callbacks and then logs data with logging callbacks.
 
         Args:
-            train_data: Training data
+            valid_data: Validation data
             pred_data: Predicted data
 
         Returns
@@ -333,7 +329,7 @@ class CallbackRunner:
         dict_to_log: dict[str, Any] = {}
 
         for callback in self.computation_callbacks:
-            results = callback.on_log_iteration(valid_data, pred_data, train_data)
+            results = callback.on_log_iteration(valid_data, pred_data)
             dict_to_log.update(results)
 
         for callback in self.logging_callbacks:

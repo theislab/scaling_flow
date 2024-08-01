@@ -96,30 +96,30 @@ class CellFlowTrainer:
 
     def _validation_step(
         self,
-        batch: dict[str, ArrayLike],
         val_data: dict[str, dict[str, dict[str, ArrayLike]]],
     ) -> dict[str, dict[str, dict[str, ArrayLike]]]:
         """Compute predictions for validation data."""
         # TODO: Sample fixed number of conditions to validate on
 
         valid_pred_data: dict[str, dict[str, ArrayLike]] = {}
+        valid_true_data: dict[str, dict[str, ArrayLike]] = {}
         for val_key, vdl in val_data.items():
             valid_pred_data[val_key] = {}
+            valid_true_data[val_key] = {}
             for src_dist in vdl.src_data:
                 valid_pred_data[val_key][src_dist] = {}
+                valid_true_data[val_key][src_dist] = {}
                 src = vdl.src_data[src_dist]
                 tgt_dists = vdl.tgt_data[src_dist]
                 for tgt_dist in tgt_dists:
                     condition = vdl.condition_data[src_dist][tgt_dist]
                     pred = self.model.predict(src, condition)
+                    valid_true_data[val_key][src_dist][tgt_dist] = vdl.tgt_data[
+                        src_dist
+                    ][tgt_dist]
                     valid_pred_data[val_key][src_dist][tgt_dist] = pred
 
-        src = batch["src_cell_data"]
-        condition = batch.get("condition")
-        train_pred = self.model.predict(src, condition)
-        batch["pred_data"] = train_pred
-
-        return batch, valid_pred_data
+        return valid_true_data, valid_pred_data
 
     def _update_logs(self, logs: dict[str, Any]) -> None:
         """Update training logs."""
@@ -168,22 +168,18 @@ class CellFlowTrainer:
             self.training_logs["loss"].append(float(loss))
 
             if ((it - 1) % valid_freq == 0) and (it > 1):
-                # TODO: Accumulate tran data over multiple iterations
-
                 # Subsample validation data
                 valid_data_subsampled = self._sample_validation_data(
                     valid_data, stage="on_log_iteration"
                 )
 
                 # Get predictions from validation data
-                train_data, valid_pred_data = self._validation_step(
-                    batch, valid_data_subsampled
+                valid_true_data, valid_pred_data = self._validation_step(
+                    valid_data_subsampled
                 )
 
                 # Run callbacks
-                metrics = crun.on_log_iteration(
-                    valid_data_subsampled, train_data, valid_pred_data
-                )
+                metrics = crun.on_log_iteration(valid_true_data, valid_pred_data)
                 self._update_logs(metrics)
 
                 # Update progress bar
@@ -201,10 +197,8 @@ class CellFlowTrainer:
             )
 
             # Val step and callbacks at the end of training
-            train_data, valid_pred_data = self._validation_step(
-                batch, valid_data_subsampled
+            valid_true_data, valid_pred_data = self._validation_step(
+                valid_data_subsampled
             )
-            metrics = crun.on_train_end(
-                valid_data_subsampled, train_data, valid_pred_data
-            )
+            metrics = crun.on_train_end(valid_true_data, valid_pred_data)
             self._update_logs(metrics)

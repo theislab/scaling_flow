@@ -130,7 +130,6 @@ class CellFlow:
             null_value=self.null_value,
             n_conditions_on_log_iteration=n_conditions_on_log_iteration,
             n_conditions_on_train_end=n_conditions_on_train_end,
-            **self.data_kwargs,
         )
         self._validation_data[name] = val_data
 

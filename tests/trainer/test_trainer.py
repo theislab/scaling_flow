@@ -81,7 +81,6 @@ class TestTrainer:
         )
 
         assert "loss" in trainer.training_logs
-        assert f"train_{metric_to_compute}" in trainer.training_logs
         if use_validdata:
             assert f"val_{metric_to_compute}" in trainer.training_logs
 
