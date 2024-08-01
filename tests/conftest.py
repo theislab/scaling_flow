@@ -55,6 +55,9 @@ def adata_perturbation() -> ad.AnnData:
     drug1 = np.random.choice(drugs, n_obs)
     drug2 = np.random.choice(drugs, n_obs)
     drug3 = np.random.choice(drugs, n_obs)
+    dosages_a = np.random.choice([10.0, 100.0, 1000.0], n_obs)
+    dosages_b = np.random.choice([10.0, 100.0, 1000.0], n_obs)
+    dosages_c = np.random.choice([10.0, 100.0, 1000.0], n_obs)
 
     obs_data = pd.DataFrame(
         {
@@ -63,6 +66,9 @@ def adata_perturbation() -> ad.AnnData:
             "drug1": drug1,
             "drug2": drug2,
             "drug3": drug3,
+            "dosage_a": dosages_a,
+            "dosage_b": dosages_b,
+            "dosage_c": dosages_c,
         }
     )
 
@@ -77,8 +83,26 @@ def adata_perturbation() -> ad.AnnData:
     for col in ["drug1", "drug2", "drug3"]:
         adata.obs.loc[[str(idx) for idx in control_idcs], col] = "control"
 
+    adata.obs["drug_a"] = (
+        (adata.obs["drug1"] == "drug_a")
+        | (adata.obs["drug2"] == "drug_a")
+        | (adata.obs["drug3"] == "drug_a")
+    )
+
     for col in adata.obs.columns:
         adata.obs[col] = adata.obs[col].astype("category")
+
+    adata.obs["drug_b"] = (
+        (adata.obs["drug1"] == "drug_b")
+        | (adata.obs["drug2"] == "drug_b")
+        | (adata.obs["drug3"] == "drug_b")
+    )
+    adata.obs["drug_c"] = (
+        (adata.obs["drug1"] == "drug_c")
+        | (adata.obs["drug2"] == "drug_c")
+        | (adata.obs["drug3"] == "drug_c")
+    )
+    adata.obs["control"] = adata.obs["drug1"] == "control"
 
     drug_emb = {}
     for drug in adata.obs["drug1"].cat.categories:
@@ -116,19 +140,22 @@ def adata_perturbation_with_nulls(adata_perturbation: ad.AnnData) -> ad.AnnData:
 
 @pytest.fixture()
 def pdata(adata_perturbation: ad.AnnData) -> TrainingData:
-    cell_data = "X"
+    sample_rep = "X"
     split_covariates = ["cell_type"]
-    control_data = ("drug1", "control")
-    obs_perturbation_covariates = [("dosage",)]
-    uns_perturbation_covariates = {"drug": ("drug1", "drug2")}
+    control_key = "control"
+    perturbation_covariates = {
+        "drug": ("drug1", "drug2"),
+        "dosage": ("dosage_a", "dosage_b"),
+    }
+    perturbation_covariate_reps = {"drug": "drug"}
 
     pdata = TrainingData.load_from_adata(
         adata_perturbation,
-        cell_data=cell_data,
+        sample_rep=sample_rep,
         split_covariates=split_covariates,
-        control_data=control_data,
-        obs_perturbation_covariates=obs_perturbation_covariates,
-        uns_perturbation_covariates=uns_perturbation_covariates,
+        control_key=control_key,
+        perturbation_covariates=perturbation_covariates,
+        perturbation_covariate_reps=perturbation_covariate_reps,
     )
 
     return pdata
