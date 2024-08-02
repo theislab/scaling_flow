@@ -1,5 +1,6 @@
 import os
 from collections.abc import Callable, Sequence
+from functools import partial
 from typing import Any, Literal
 
 import anndata as ad
@@ -149,9 +150,9 @@ class CellFlow:
         flow: (
             dict[Literal["constant_noise", "schroedinger_bridge"], float] | None
         ) = None,
-        match_fn: Callable[
-            [ArrayLike, ArrayLike], ArrayLike
-        ] = solver_utils.match_linear,
+        match_fn: Callable[[ArrayLike, ArrayLike], ArrayLike] = partial(
+            solver_utils.match_linear, epsilon=0.1, scale_cost="mean"
+        ),
         optimizer: optax.GradientTransformation = optax.adam(1e-4),
         seed=0,
     ) -> None:
