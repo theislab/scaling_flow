@@ -677,7 +677,7 @@ class ValidationData(PerturbationData):
         Values in :attr:`anndata.AnnData.obs` columns which indicate no treatment with the corresponding covariate. These values will be masked with `null_token`.
     null_token
         Token to use for masking `null_value`.
-    n_conditions_on_log_iterations
+    n_conditions_on_log_iteration
         Number of conditions to use for computation callbacks at each logged iteration.
         If :obj:`None`, use all conditions.
     n_conditions_on_train_end
@@ -723,7 +723,7 @@ class ValidationData(PerturbationData):
             split_covariates: Covariates in adata.obs to split all control cells into different control populations. The perturbed cells are also split according to these columns, but if these covariates should also be encoded in the model, the corresponding column should also be used in `perturbation_covariates` or `sample_covariates`.
             max_combination_length: Maximum number of combinations of primary `perturbation_covariates`. If `None`, the value is inferred from the provided `perturbation_covariates`.
             null_value: Value to use for padding to `max_combination_length`.
-            n_conditions_on_log_iterations: Number of conditions to use for computation callbacks at each logged iteration.
+            n_conditions_on_log_iteration: Number of conditions to use for computation callbacks at each logged iteration.
             n_conditions_on_train_end: Number of conditions to use for computation callbacks at the end of training.
 
 
@@ -847,20 +847,25 @@ class ValidationData(PerturbationData):
                 tgt_counter += 1
             src_counter += 1
 
-        if n_conditions_on_log_iteration > 0 or n_conditions_on_train_end > 0:
-            if condition_data is None:
-                raise ValueError(
-                    f"Number of conditions for computation callbacks provided with `n_conditions_on_log_iteration`={n_conditions_on_log_iteration} and `n_conditions_on_train_end`={n_conditions_on_train_end}, but no conditions found in the data."
-                )
-        n_conditions = len(next(iter(condition_data.values())))
-        if n_conditions_on_log_iteration > n_conditions:
-            raise ValueError(
-                f"Number of conditions for computation callbacks provided with `n_conditions_on_log_iteration`={n_conditions_on_log_iteration} is larger than the number of conditions found in the data ({n_conditions})."
-            )
-        if n_conditions_on_train_end > n_conditions:
-            raise ValueError(
-                f"Number of conditions for computation callbacks provided with `n_conditions_on_train_end`={n_conditions_on_train_end} is larger than the number of conditions found in the data ({n_conditions})."
-            )
+        if (
+            n_conditions_on_log_iteration is not None
+            or n_conditions_on_train_end is not None
+        ):
+            max_conditions = 0
+            if n_conditions_on_log_iteration:
+                max_conditions = n_conditions_on_log_iteration
+            if n_conditions_on_train_end:
+                max_conditions = max(n_conditions_on_train_end, max_conditions)
+            if max_conditions > 0:
+                if condition_data is None:
+                    raise ValueError(
+                        f"Number of conditions for computation callbacks provided with `n_conditions_on_log_iteration`={n_conditions_on_log_iteration} and `n_conditions_on_train_end`={n_conditions_on_train_end}, but no conditions found in the data."
+                    )
+                n_conditions = len(next(iter(condition_data.values())))
+                if max_conditions > n_conditions:
+                    raise ValueError(
+                        f"Number of conditions for computation callbacks provided with `n_conditions_on_log_iteration`={n_conditions_on_log_iteration} or `n_conditions_on_train_end`={n_conditions_on_train_end} is larger than the number of conditions found in the data ({n_conditions})."
+                    )
 
         return cls(
             tgt_data=tgt_data,
