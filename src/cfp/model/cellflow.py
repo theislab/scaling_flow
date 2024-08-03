@@ -147,9 +147,9 @@ class CellFlow:
         condition_encoder_kwargs: dict[str, Any] | None = None,
         velocity_field_kwargs: dict[str, Any] | None = None,
         solver_kwargs: dict[str, Any] | None = None,
-        flow: (
-            dict[Literal["constant_noise", "schroedinger_bridge"], float] | None
-        ) = None,
+        flow: dict[Literal["constant_noise", "schroedinger_bridge"], float] | None = {
+            "constant_noise": 0.0
+        },
         match_fn: Callable[[ArrayLike, ArrayLike], ArrayLike] = partial(
             solver_utils.match_linear, epsilon=0.1, scale_cost="mean"
         ),
