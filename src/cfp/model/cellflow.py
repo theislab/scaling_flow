@@ -11,7 +11,7 @@ from numpy.typing import ArrayLike
 from ott.neural.methods.flows import dynamics
 from ott.solvers import utils as solver_utils
 
-from cfp.data.data import TrainingData, ValidationData
+from cfp.data.data import TrainingData, ValidationData, PredictionData, ConditionData
 from cfp.data.dataloader import TrainSampler
 from cfp.networks.velocity_field import ConditionalVelocityField
 from cfp.solvers import genot, otfm
@@ -320,6 +320,7 @@ class CellFlow:
         for src_dist in pred_data.src_data:
             predicted_data[src_dist] = {}
             src = pred_data.src_data[src_dist]
+            tgt_dists = pred_data.tgt_data[src_dist]
             for tgt_dist in tgt_dists:
                 condition = pred_data.condition_data[src_dist][tgt_dist]
                 pred = self.model.predict(src, condition)
@@ -343,7 +344,31 @@ class CellFlow:
         -------
             Condition embedding.
         """
-        pass
+        if self.model is None:
+            raise ValueError("Model not trained. Please call `train` first.")
+
+        cond_data = ConditionData.load_from_adata(
+            adata,
+            covariate_data=covariate_data,
+            condition_id_key=condition_id_key,
+            perturbation_covariates=self.perturbation_covariates,
+            perturbation_covariate_reps=self.perturbation_covariate_reps,
+            sample_covariates=self.sample_covariates,
+            sample_covariate_reps=self.sample_covariate_reps,
+            split_covariates=self.split_covariates,
+            max_combination_length=self.max_combination_length,
+            null_value=self.null_value,
+        )
+
+        conds = cond_data.condition_data
+
+        condition_embeddings = {}
+        for cond_id, condition in conds.items():
+            condition_embeddings[cond_id] = self.model.get_condition_embedding(
+                condition
+            )
+
+        return condition_embeddings
 
     def save(
         self,
