@@ -23,10 +23,10 @@ __all__ = ["CellFlow"]
 class CellFlow:
     """CellFlow model for perturbation prediction using Flow Matching.
 
-    Args:
-        adata: Anndata object.
-        solver: Solver to use for training the model.
-
+    Parameters
+    ----------
+        adata: An :class:`~anndata.AnnData` object.
+        solver: Solver to use for training. Either "otfm" or "genot".
     """
 
     def __init__(self, adata: ad.AnnData, solver: Literal["otfm", "genot"] = "otfm"):
@@ -106,8 +106,9 @@ class CellFlow:
         """Prepare validation data.
 
         Args:
-            adata: Anndata object.
+            adata: An :class:`~anndata.AnnData` object.
             name: Name of the validation data.
+            condition_id_key: Key in `adata.obs` or `covariate_data` indicating the condition name.
             n_conditions_on_log_iterations: Number of conditions to use for computation callbacks at each logged iteration. If :obj:`None`, use all conditions.
             n_conditions_on_train_end: Number of conditions to use for computation callbacks at the end of training. If :obj:`None`, use all conditions.
 
@@ -286,16 +287,18 @@ class CellFlow:
         covariate_data: pd.DataFrame | None = None,
         condition_id_key: str | None = None,
         sample_rep: str | None = None,
-    ) -> ArrayLike:
+    ) -> dict[str, dict[str, ArrayLike]] | dict[str, ArrayLike]:
         """Predict perturbation.
 
         Args:
-            adata: Anndata object.
-
+            adata: An :class:`~anndata.AnnData` object.
+            covariate_data: Covariate data.
+            condition_id_key: Key in `adata.obs` or `covariate_data` indicating the condition name.
+            sample_rep: Key in `adata.obsm` where the sample representation is stored or "X" to use `adata.X`.
 
         Returns
         -------
-            Perturbation prediction.
+            A dict with the predicted sample representation for each source distribution and condition.
         """
         if self.model is None:
             raise ValueError("Model not trained. Please call `train` first.")
@@ -320,11 +323,9 @@ class CellFlow:
         for src_dist in pred_data.src_data:
             predicted_data[src_dist] = {}
             src = pred_data.src_data[src_dist]
-            tgt_dists = pred_data.tgt_data[src_dist]
-            for tgt_dist in tgt_dists:
-                condition = pred_data.condition_data[src_dist][tgt_dist]
+            for cond_id, condition in pred_data.condition_data.items():
                 pred = self.model.predict(src, condition)
-                predicted_data[src_dist][tgt_dist] = pred
+                predicted_data[src_dist][cond_id] = pred
 
         if len(predicted_data) == 1:
             return next(iter(predicted_data.items()))
@@ -334,15 +335,19 @@ class CellFlow:
     def get_condition_embedding(
         self,
         adata: ad.AnnData,
-    ) -> ArrayLike:
+        covariate_data: pd.DataFrame | None = None,
+        condition_id_key: str | None = None,
+    ) -> dict[str, ArrayLike]:
         """Get condition embedding.
 
         Args:
-            adata: Anndata object.
+            adata: An :class:`~anndata.AnnData` object.
+            covariate_data: Covariate data.
+            condition_id_key: Key in `adata.obs` or `covariate_data` indicating the condition name.
 
         Returns
         -------
-            Condition embedding.
+            A dict with the condition embedding for each condition.
         """
         if self.model is None:
             raise ValueError("Model not trained. Please call `train` first.")
@@ -360,10 +365,8 @@ class CellFlow:
             null_value=self.null_value,
         )
 
-        conds = cond_data.condition_data
-
         condition_embeddings = {}
-        for cond_id, condition in conds.items():
+        for cond_id, condition in cond_data.condition_data.items():
             condition_embeddings[cond_id] = self.model.get_condition_embedding(
                 condition
             )
