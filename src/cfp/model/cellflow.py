@@ -1,5 +1,6 @@
 import os
 from collections.abc import Callable, Sequence
+from functools import partial
 from typing import Any, Literal
 
 import anndata as ad
@@ -97,14 +98,17 @@ class CellFlow:
     def prepare_validation_data(
         self,
         adata: ad.AnnData,
-        name: str = "validation",
+        name: str,
+        n_conditions_on_log_iteration: int | None = None,
+        n_conditions_on_train_end: int | None = None,
     ) -> None:
         """Prepare validation data.
 
         Args:
             adata: Anndata object.
             name: Name of the validation data.
-            **kwargs: Keyword arguments.
+            n_conditions_on_log_iterations: Number of conditions to use for computation callbacks at each logged iteration. If :obj:`None`, use all conditions.
+            n_conditions_on_train_end: Number of conditions to use for computation callbacks at the end of training. If :obj:`None`, use all conditions.
 
         Returns
         -------
@@ -125,6 +129,8 @@ class CellFlow:
             split_covariates=self.split_covariates,
             max_combination_length=self.max_combination_length,
             null_value=self.null_value,
+            n_conditions_on_log_iteration=n_conditions_on_log_iteration,
+            n_conditions_on_train_end=n_conditions_on_train_end,
         )
         self._validation_data[name] = val_data
 
@@ -144,9 +150,9 @@ class CellFlow:
         flow: (
             dict[Literal["constant_noise", "schroedinger_bridge"], float] | None
         ) = None,
-        match_fn: Callable[
-            [ArrayLike, ArrayLike], ArrayLike
-        ] = solver_utils.match_linear,
+        match_fn: Callable[[ArrayLike, ArrayLike], ArrayLike] = partial(
+            solver_utils.match_linear, epsilon=0.1, scale_cost="mean"
+        ),
         optimizer: optax.GradientTransformation = optax.adam(1e-4),
         seed=0,
     ) -> None:

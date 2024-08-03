@@ -47,10 +47,14 @@ class TestConditionEncoder:
             output_dropout=0.1,
         )
 
-        encoder_rng = jax.random.PRNGKey(111)
+        rng = jax.random.PRNGKey(111)
+        encoder_rng, dropout_rng = jax.random.split(rng, 2)
         opt = optax.adam(1e-3)
         encoder_state = cond_encoder.create_train_state(encoder_rng, opt, cond)
         cond_out = encoder_state.apply_fn(
-            {"params": encoder_state.params}, cond, training=True
+            {"params": encoder_state.params},
+            cond,
+            training=True,
+            rngs={"dropout": dropout_rng},
         )
         assert cond_out.shape == (1, 5)
