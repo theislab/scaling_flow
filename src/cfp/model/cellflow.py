@@ -35,6 +35,7 @@ class CellFlow:
         self.solver = solver
         self.dataloader: TrainSampler | None = None
         self.trainer: CellFlowTrainer | None = None
+        self.model: otfm.OTFlowMatching | genot.GENOT | None = None
         self._validation_data: dict[str, ValidationData] = {}
         self._solver: otfm.OTFlowMatching | genot.GENOT | None = None
         self._condition_dim: int | None = None
@@ -182,7 +183,7 @@ class CellFlow:
         """
         if self.pdata is None:
             raise ValueError(
-                "Dataloader not initialized. Please call prepare_data first."
+                "Dataloader not initialized. Please call `prepare_data` first."
             )
 
         condition_encoder_kwargs = condition_encoder_kwargs or {}
@@ -212,7 +213,7 @@ class CellFlow:
             flow = dynamics.BrownianBridge(noise)
         else:
             raise NotImplementedError(
-                f"The key of `flow` must be `constant_noise` or `bridge` but found {flow.keys()[0]}."
+                f"The key of `flow` must be `'constant_noise'` or `'bridge'` but found {flow.keys()[0]}."
             )
         if self.solver == "otfm":
             self._solver = otfm.OTFlowMatching(
@@ -260,10 +261,12 @@ class CellFlow:
             None
         """
         if self.pdata is None:
-            raise ValueError("Data not initialized. Please call prepare_data first.")
+            raise ValueError("Data not initialized. Please call `prepare_data` first.")
 
         if self.trainer is None:
-            raise ValueError("Model not initialized. Please call prepare_model first.")
+            raise ValueError(
+                "Model not initialized. Please call `prepare_model` first."
+            )
 
         self.dataloader = TrainSampler(data=self.pdata, batch_size=batch_size)
 
@@ -275,6 +278,7 @@ class CellFlow:
             callbacks=callbacks,
             monitor_metrics=monitor_metrics,
         )
+        self.model = self.trainer.model
 
     def predict(
         self,
@@ -293,6 +297,9 @@ class CellFlow:
         -------
             Perturbation prediction.
         """
+        if self.model is None:
+            raise ValueError("Model not trained. Please call `train` first.")
+
         sample_rep = sample_rep or self.sample_rep
 
         pred_data = PredictionData.load_from_adata(
