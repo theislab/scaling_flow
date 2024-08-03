@@ -996,9 +996,15 @@ class PredictionData(PerturbationData):
         sample_covariates = _to_list(sample_covariates)
 
         perturbation_covariate_reps = perturbation_covariate_reps or {}
+        cls._verify_perturbation_covariate_reps(
+            covariate_data, perturbation_covariate_reps, perturbation_covariates
+        )
 
         sample_covariate_reps = sample_covariate_reps or {}
         sample_cov_groups = {covar: _to_list(covar) for covar in sample_covariates}
+        cls._verify_sample_covariate_reps(
+            covariate_data, sample_covariate_reps, sample_cov_groups
+        )
 
         covariate_groups = perturbation_covariates | sample_cov_groups
         covariate_reps = perturbation_covariate_reps | sample_covariate_reps
@@ -1044,7 +1050,6 @@ class PredictionData(PerturbationData):
         control_mask = adata.obs[control_key]
 
         src_counter = 0
-        tgt_counter = 0
         for split_combination in split_cov_combs:
             filter_dict = dict(zip(split_covariates, split_combination, strict=False))
             split_cov_mask = (
@@ -1094,7 +1099,6 @@ class PredictionData(PerturbationData):
                             jnp.expand_dims(emb, 0)
                         )
 
-                tgt_counter += 1
             src_counter += 1
 
         return cls(
@@ -1105,13 +1109,11 @@ class PredictionData(PerturbationData):
         )
 
 
-class PredictionData(PerturbationData):
+class ConditionData(PerturbationData):
     """Data container to perform prediction.
 
     Parameters
     ----------
-    src_data
-        Dictionary with data for source cells.
     condition_data
         Dictionary with embeddings for conditions.
     max_combination_length
@@ -1120,7 +1122,6 @@ class PredictionData(PerturbationData):
         Token to use for masking `null_value`.
     """
 
-    src_data: dict[int, jnp.ndarray] | None
     condition_data: dict[int | str, jnp.ndarray] | None
     max_combination_length: int
     null_value: Any
@@ -1176,8 +1177,9 @@ class PredictionData(PerturbationData):
     @classmethod
     def load_from_adata(
         cls,
+        # TODO: this needs adata only to get the covariate reps, so we could add a
+        # separate argument for this so one does not have to create a dummy adata object
         adata: anndata.AnnData,
-        sample_rep: str | None = None,
         covariate_data: pd.DataFrame | None = None,
         condition_id_key: str | None = None,
         perturbation_covariates: dict[str, Sequence[str]] | None = None,
@@ -1223,9 +1225,15 @@ class PredictionData(PerturbationData):
         sample_covariates = _to_list(sample_covariates)
 
         perturbation_covariate_reps = perturbation_covariate_reps or {}
+        cls._verify_perturbation_covariate_reps(
+            adata, perturbation_covariate_reps, perturbation_covariates
+        )
 
         sample_covariate_reps = sample_covariate_reps or {}
         sample_cov_groups = {covar: _to_list(covar) for covar in sample_covariates}
+        cls._verify_sample_covariate_reps(
+            adata, sample_covariate_reps, sample_cov_groups
+        )
 
         covariate_groups = perturbation_covariates | sample_cov_groups
         covariate_reps = perturbation_covariate_reps | sample_covariate_reps
@@ -1244,11 +1252,6 @@ class PredictionData(PerturbationData):
 
         cls._verify_split_covariates(covariate_data, split_covariates, adata)
 
-        if len(split_covariates) > 0:
-            split_cov_combs = adata.obs[split_covariates].drop_duplicates().values
-        else:
-            split_cov_combs = [[]]
-
         perturb_covar_keys = _flatten_list(perturbation_covariates.values()) + list(
             sample_covariates
         )
@@ -1262,70 +1265,41 @@ class PredictionData(PerturbationData):
         else:
             select_keys = perturb_covar_keys
 
-        src_data: dict[int, jax.Array] = {}
-
         conditional = (len(perturbation_covariates) > 0) or (len(sample_covariates) > 0)
         condition_data: dict[int | str, dict[int, list]] | None = (
             {} if conditional else None
         )
-        control_mask = adata.obs[control_key]
 
-        src_counter = 0
-        tgt_counter = 0
-        for split_combination in split_cov_combs:
-            filter_dict = dict(zip(split_covariates, split_combination, strict=False))
-            split_cov_mask = (
-                adata.obs[list(filter_dict.keys())] == list(filter_dict.values())
-            ).all(axis=1)
-            mask = np.array(control_mask * split_cov_mask)
+        perturb_covar_df = covariate_data[select_keys].drop_duplicates()
 
-            src_data[src_counter] = cls._get_cell_data(adata[mask, :], sample_rep)
+        if condition_id_key is not None:
+            perturb_covar_df = perturb_covar_df.set_index(condition_id_key)
+        else:
+            perturb_covar_df = perturb_covar_df.reset_index()
+
+        pbar = tqdm(perturb_covar_df.iterrows(), total=perturb_covar_df.shape[0])
+        for cond_id, tgt_cond in pbar:
+            tgt_cond = tgt_cond[perturb_covar_keys]
 
             if conditional:
-                condition_data[src_counter] = {}
+                embedding = cls._get_perturbation_covariates(
+                    condition_data=tgt_cond,
+                    rep_dict=adata.uns,
+                    perturb_covariates=perturbation_covariates,
+                    sample_covariates=sample_covariates,
+                    covariate_reps=covariate_reps,
+                    linked_perturb_covars=linked_perturb_covars,
+                    primary_encoder=primary_encoder,
+                    primary_is_cat=primary_is_cat,
+                    max_combination_length=max_combination_length,
+                    null_value=null_value,
+                )
 
-            covariate_data_mask = (
-                covariate_data[list(filter_dict.keys())] == list(filter_dict.values())
-            ).all(axis=1)
-
-            perturb_covar_df = covariate_data[covariate_data_mask][
-                select_keys
-            ].drop_duplicates()
-
-            if condition_id_key is not None:
-                perturb_covar_df = perturb_covar_df.set_index(condition_id_key)
-            else:
-                perturb_covar_df = perturb_covar_df.reset_index()
-
-            pbar = tqdm(perturb_covar_df.iterrows(), total=perturb_covar_df.shape[0])
-            for cond_id, tgt_cond in pbar:
-                tgt_cond = tgt_cond[perturb_covar_keys]
-
-                if conditional:
-                    embedding = cls._get_perturbation_covariates(
-                        condition_data=tgt_cond,
-                        rep_dict=adata.uns,
-                        perturb_covariates=perturbation_covariates,
-                        sample_covariates=sample_covariates,
-                        covariate_reps=covariate_reps,
-                        linked_perturb_covars=linked_perturb_covars,
-                        primary_encoder=primary_encoder,
-                        primary_is_cat=primary_is_cat,
-                        max_combination_length=max_combination_length,
-                        null_value=null_value,
-                    )
-
-                    condition_data[src_counter][cond_id] = {}
-                    for pert_cov, emb in embedding.items():
-                        condition_data[src_counter][cond_id][pert_cov] = (
-                            jnp.expand_dims(emb, 0)
-                        )
-
-                tgt_counter += 1
-            src_counter += 1
+                condition_data[cond_id] = {}
+                for pert_cov, emb in embedding.items():
+                    condition_data[cond_id][pert_cov] = jnp.expand_dims(emb, 0)
 
         return cls(
-            src_data=src_data,
             condition_data=condition_data,
             max_combination_length=max_combination_length,
             null_value=null_value,
