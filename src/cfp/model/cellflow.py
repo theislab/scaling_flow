@@ -273,6 +273,9 @@ class CellFlow:
     def predict(
         self,
         adata: ad.AnnData,
+        covariate_data: pd.DataFrame | None = None,
+        condition_id_key: str | None = None,
+        sample_rep: str | None = None,
     ) -> ArrayLike:
         """Predict perturbation.
 
@@ -284,7 +287,21 @@ class CellFlow:
         -------
             Perturbation prediction.
         """
-        pass
+        sample_rep = sample_rep or self.sample_rep
+
+        pred_data = PredictionData.load_from_adata(
+            adata,
+            sample_rep=sample_rep,
+            covariate_data=covariate_data,
+            condition_id_key=condition_id_key,
+            perturbation_covariates=self.perturbation_covariates,
+            perturbation_covariate_reps=self.perturbation_covariate_reps,
+            sample_covariates=self.sample_covariates,
+            sample_covariate_reps=self.sample_covariate_reps,
+            split_covariates=self.split_covariates,
+            max_combination_length=self.max_combination_length,
+            null_value=self.null_value,
+        )
 
     def get_condition_embedding(
         self,
