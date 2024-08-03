@@ -316,6 +316,20 @@ class CellFlow:
             null_value=self.null_value,
         )
 
+        predicted_data: dict[str, dict[str, ArrayLike]] = {}
+        for src_dist in pred_data.src_data:
+            predicted_data[src_dist] = {}
+            src = pred_data.src_data[src_dist]
+            for tgt_dist in tgt_dists:
+                condition = pred_data.condition_data[src_dist][tgt_dist]
+                pred = self.model.predict(src, condition)
+                predicted_data[src_dist][tgt_dist] = pred
+
+        if len(predicted_data) == 1:
+            return next(iter(predicted_data.items()))
+
+        return predicted_data
+
     def get_condition_embedding(
         self,
         adata: ad.AnnData,
