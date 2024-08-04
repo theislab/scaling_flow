@@ -194,6 +194,23 @@ class GENOT:
         )
         return loss
 
+    def get_condition_embedding(self, condition: dict[str, ArrayLike]) -> ArrayLike:
+        """Encode conditions
+
+        Args:
+            condition: Conditions to encode
+
+        Returns
+        -------
+            Encoded conditions
+        """
+        cond_embed = self.vf.apply(
+            {"params": self.vf_state.params},
+            condition,
+            method="get_condition_embedding",
+        )
+        return np.asarray(cond_embed)
+
     def predict(
         self,
         source: ArrayLike,
