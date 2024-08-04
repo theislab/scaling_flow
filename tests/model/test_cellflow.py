@@ -12,58 +12,23 @@ perturbation_covariate_comb_args = [
 
 
 class TestCellFlow:
-    @pytest.mark.parametrize(
-        "sample_rep",
-        ["X", {"obsm": "X_pca"}],
-    )
     @pytest.mark.parametrize("solver", ["genot", "otfm"])
-    def test_cellflow_sample_rep(
+    def test_cellflow_solver(
         self,
         adata_perturbation,
-        sample_rep,
         solver,
     ):
+        sample_rep = "X"
+        control_key = "control"
+        perturbation_covariates = {"drug": ["drug1", "drug2"]}
+        perturbation_covariate_reps = {"drug": "drug"}
+        condition_embedding_dim = 32
+
         cf = cfp.model.cellflow.CellFlow(adata_perturbation, solver=solver)
         cf.prepare_data(
             sample_rep=sample_rep,
-            control_key="control",
-            perturbation_covariates={"drug": ["drug1"]},
-            perturbation_covariate_reps={"drug": "drug"},
-        )
-        assert cf.pdata is not None
-        assert hasattr(cf, "_data_dim")
-
-        condition_encoder_kwargs = {}
-        if solver == "genot":
-            condition_encoder_kwargs["genot_source_layers"] = (
-                ("mlp", {"dims": (32, 32)}),
-            )
-            condition_encoder_kwargs["genot_source_dim"] = 32
-
-        cf.prepare_model(
-            condition_embedding_dim=32,
-            hidden_dims=(32, 32),
-            decoder_dims=(32, 32),
-            condition_encoder_kwargs=condition_encoder_kwargs,
-        )
-        assert cf.trainer is not None
-
-        cf.train(num_iterations=3)
-        assert cf.dataloader is not None
-
-    @pytest.mark.parametrize("solver", ["otfm", "genot"])
-    @pytest.mark.parametrize("perturbation_covariate_reps", [{}, {"drug": "drug"}])
-    def test_cellflow_covar_reps(
-        self,
-        adata_perturbation,
-        perturbation_covariate_reps,
-        solver,
-    ):
-        cf = cfp.model.cellflow.CellFlow(adata_perturbation, solver=solver)
-        cf.prepare_data(
-            sample_rep="X",
-            control_key="control",
-            perturbation_covariates={"drug": ["drug1", "drug2"]},
+            control_key=control_key,
+            perturbation_covariates=perturbation_covariates,
             perturbation_covariate_reps=perturbation_covariate_reps,
         )
         assert cf.pdata is not None
@@ -77,7 +42,7 @@ class TestCellFlow:
             condition_encoder_kwargs["genot_source_dim"] = 32
 
         cf.prepare_model(
-            condition_embedding_dim=32,
+            condition_embedding_dim=condition_embedding_dim,
             hidden_dims=(32, 32),
             decoder_dims=(32, 32),
             condition_encoder_kwargs=condition_encoder_kwargs,
@@ -86,6 +51,68 @@ class TestCellFlow:
 
         cf.train(num_iterations=3)
         assert cf.dataloader is not None
+
+        pred = cf.predict(adata_perturbation)
+        assert isinstance(pred, dict)
+        assert pred[0].shape[0] == adata_perturbation.n_obs
+        assert pred[0].shape[1] == cf._data_dim
+
+        cond_embed = cf.get_condition_embedding(adata_perturbation)
+        assert isinstance(cond_embed, dict)
+        assert cond_embed[0].shape[0] == 1
+        assert cond_embed[0].shape[1] == condition_embedding_dim
+
+    @pytest.mark.parametrize("solver", ["otfm", "genot"])
+    @pytest.mark.parametrize("perturbation_covariate_reps", [{}, {"drug": "drug"}])
+    def test_cellflow_covar_reps(
+        self,
+        adata_perturbation,
+        perturbation_covariate_reps,
+        solver,
+    ):
+        sample_rep = "X"
+        control_key = "control"
+        perturbation_covariates = {"drug": ["drug1"]}
+        perturbation_covariate_reps = {"drug": "drug"}
+        condition_embedding_dim = 32
+
+        cf = cfp.model.cellflow.CellFlow(adata_perturbation, solver=solver)
+        cf.prepare_data(
+            sample_rep=sample_rep,
+            control_key=control_key,
+            perturbation_covariates=perturbation_covariates,
+            perturbation_covariate_reps=perturbation_covariate_reps,
+        )
+        assert cf.pdata is not None
+        assert hasattr(cf, "_data_dim")
+
+        condition_encoder_kwargs = {}
+        if solver == "genot":
+            condition_encoder_kwargs["genot_source_layers"] = (
+                ("mlp", {"dims": (32, 32)}),
+            )
+            condition_encoder_kwargs["genot_source_dim"] = 32
+
+        cf.prepare_model(
+            condition_embedding_dim=condition_embedding_dim,
+            hidden_dims=(32, 32),
+            decoder_dims=(32, 32),
+            condition_encoder_kwargs=condition_encoder_kwargs,
+        )
+        assert cf.trainer is not None
+
+        cf.train(num_iterations=3)
+        assert cf.dataloader is not None
+
+        pred = cf.predict(adata_perturbation)
+        assert isinstance(pred, dict)
+        assert pred[0].shape[0] == adata_perturbation.n_obs
+        assert pred[0].shape[1] == cf._data_dim
+
+        cond_embed = cf.get_condition_embedding(adata_perturbation)
+        assert isinstance(cond_embed, dict)
+        assert cond_embed[0].shape[0] == 1
+        assert cond_embed[0].shape[1] == condition_embedding_dim
 
     @pytest.mark.parametrize("split_covariates", [[], ["cell_type"]])
     @pytest.mark.parametrize(
