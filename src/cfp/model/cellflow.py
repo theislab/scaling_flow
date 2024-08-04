@@ -338,14 +338,14 @@ class CellFlow:
 
     def get_condition_embedding(
         self,
-        adata: ad.AnnData,
+        adata: ad.AnnData | None = None,
         covariate_data: pd.DataFrame | None = None,
         condition_id_key: str | None = None,
     ) -> dict[str, ArrayLike]:
         """Get condition embedding.
 
         Args:
-            adata: An :class:`~anndata.AnnData` object.
+            adata: An :class:`~anndata.AnnData` object. If not provided, the training data is used.
             covariate_data: Covariate data.
             condition_id_key: Key in `adata.obs` or `covariate_data` indicating the condition name.
 
@@ -355,6 +355,8 @@ class CellFlow:
         """
         if self.model is None:
             raise ValueError("Model not trained. Please call `train` first.")
+
+        adata = adata if adata is not None else self.adata
 
         cond_data = ConditionData.load_from_adata(
             adata,
