@@ -4,6 +4,7 @@ from functools import partial
 from typing import Any, Literal
 
 import anndata as ad
+import pandas as pd
 import cloudpickle
 import jax
 import optax
@@ -78,8 +79,6 @@ class CellFlow:
         self.sample_covariates = sample_covariates
         self.sample_covariate_reps = sample_covariate_reps
         self.split_covariates = split_covariates
-        self.max_combination_length = max_combination_length
-        self.null_value = null_value
 
         self.pdata = TrainingData.load_from_adata(
             self.adata,
@@ -90,8 +89,8 @@ class CellFlow:
             sample_covariates=self.sample_covariates,
             sample_covariate_reps=self.sample_covariate_reps,
             split_covariates=self.split_covariates,
-            max_combination_length=self.max_combination_length,
-            null_value=self.null_value,
+            max_combination_length=max_combination_length,
+            null_value=null_value,
         )
 
         self._data_dim = self.pdata.cell_data.shape[-1]
@@ -124,13 +123,15 @@ class CellFlow:
             adata,
             sample_rep=self.sample_rep,
             control_key=self.control_key,
+            covariate_encoder=self.pdata.covariate_encoder,
+            categorical=self.pdata.categorical,
+            max_combination_length=self.pdata.max_combination_length,
             perturbation_covariates=self.perturbation_covariates,
             perturbation_covariate_reps=self.perturbation_covariate_reps,
             sample_covariates=self.sample_covariates,
             sample_covariate_reps=self.sample_covariate_reps,
             split_covariates=self.split_covariates,
-            max_combination_length=self.max_combination_length,
-            null_value=self.null_value,
+            null_value=self.pdata.null_value,
             n_conditions_on_log_iteration=n_conditions_on_log_iteration,
             n_conditions_on_train_end=n_conditions_on_train_end,
         )
@@ -291,8 +292,8 @@ class CellFlow:
         """Predict perturbation.
 
         Args:
-            adata: An :class:`~anndata.AnnData` object.
-            covariate_data: Covariate data.
+            adata: An :class:`~anndata.AnnData` object with the source representation.
+            covariate_data: Covariate data defining the condition to predict. If not provided, `adata.obs` is used.
             condition_id_key: Key in `adata.obs` or `covariate_data` indicating the condition name.
             sample_rep: Key in `adata.obsm` where the sample representation is stored or "X" to use `adata.X`.
 
@@ -307,6 +308,9 @@ class CellFlow:
 
         pred_data = PredictionData.load_from_adata(
             adata,
+            covariate_encoder=self.pdata.covariate_encoder,
+            max_combination_length=self.pdata.max_combination_length,
+            categorical=self.pdata.categorical,
             sample_rep=sample_rep,
             covariate_data=covariate_data,
             condition_id_key=condition_id_key,
@@ -315,20 +319,20 @@ class CellFlow:
             sample_covariates=self.sample_covariates,
             sample_covariate_reps=self.sample_covariate_reps,
             split_covariates=self.split_covariates,
-            max_combination_length=self.max_combination_length,
-            null_value=self.null_value,
+            null_value=self.pdata.null_value,
         )
 
         predicted_data: dict[str, dict[str, ArrayLike]] = {}
         for src_dist in pred_data.src_data:
             predicted_data[src_dist] = {}
             src = pred_data.src_data[src_dist]
-            for cond_id, condition in pred_data.condition_data.items():
+            conds = pred_data.condition_data[src_dist]
+            for cond_id, condition in conds.items():
                 pred = self.model.predict(src, condition)
                 predicted_data[src_dist][cond_id] = pred
 
         if len(predicted_data) == 1:
-            return next(iter(predicted_data.items()))
+            return next(iter(predicted_data.values()))
 
         return predicted_data
 
@@ -354,6 +358,9 @@ class CellFlow:
 
         cond_data = ConditionData.load_from_adata(
             adata,
+            covariate_encoder=self.pdata.covariate_encoder,
+            max_combination_length=self.pdata.max_combination_length,
+            categorical=self.pdata.categorical,
             covariate_data=covariate_data,
             condition_id_key=condition_id_key,
             perturbation_covariates=self.perturbation_covariates,
@@ -361,8 +368,7 @@ class CellFlow:
             sample_covariates=self.sample_covariates,
             sample_covariate_reps=self.sample_covariate_reps,
             split_covariates=self.split_covariates,
-            max_combination_length=self.max_combination_length,
-            null_value=self.null_value,
+            null_value=self.pdata.null_value,
         )
 
         condition_embeddings = {}

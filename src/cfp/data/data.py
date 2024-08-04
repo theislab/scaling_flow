@@ -38,6 +38,8 @@ class BaseData(abc.ABC):
     )
     perturbation_idx_to_covariates: dict[int, tuple[str, ...]] | None = None
     control_to_perturbation: dict[int, jax.Array] | None = None
+    covariate_encoder: preprocessing.OneHotEncoder | None = None
+    categorical: bool | None = None
     max_combination_length: int | None = None
     null_value: Any | None = None
     null_token: Any | None = None
@@ -231,6 +233,18 @@ class PerturbationData(BaseData):
         else:
             return max_combination_length
 
+    @staticmethod
+    def _verify_max_combination_length(
+        perturbation_covariates: dict[str, Sequence[str]], max_combination_length: int
+    ) -> int:
+        obs_max_combination_length = max(
+            len(comb) for comb in perturbation_covariates.values()
+        )
+        if max_combination_length < obs_max_combination_length:
+            raise ValueError(
+                f"Observed maximum combination length of the perturbation covariates ({obs_max_combination_length}) does not match required `max_combination_length` ({max_combination_length}).",
+            )
+
     @classmethod
     def _get_primary_covar_encoder(
         cls,
@@ -279,6 +293,35 @@ class PerturbationData(BaseData):
             )
 
         return max(col_is_cat)
+
+    @staticmethod
+    def _verify_covariate_type(
+        covariate_data: pd.DataFrame, covars: Sequence[str], categorical: bool
+    ) -> None:
+        for covariate in covars:
+            if is_numeric_dtype(covariate_data[covariate]):
+                if categorical:
+                    raise ValueError(
+                        f"Perturbation covariates `{covariate}` should be categorical, found numeric."
+                    )
+                continue
+            if covariate_data[covariate].isin(["True", "False", True, False]).all():
+                if categorical:
+                    raise ValueError(
+                        f"Perturbation covariates `{covariate}` should be categorical, found boolean."
+                    )
+                continue
+            try:
+                covariate_data[covariate] = covariate_data[covariate].astype("category")
+            except ValueError as e:
+                raise ValueError(
+                    f"Perturbation covariates `{covariate}` should be either numeric/boolean or categorical."
+                ) from e
+            else:
+                if not categorical:
+                    raise ValueError(
+                        f"Perturbation covariates `{covariate}` should be numeric/boolean, found categorical."
+                    )
 
     @staticmethod
     def _check_shape(arr: float | ArrayLike) -> ArrayLike:
@@ -463,6 +506,7 @@ class TrainingData(PerturbationData):
         int, jax.Array
     ]  # mapping from control idx to target distribution idcs
     covariate_encoder: preprocessing.OneHotEncoder | None
+    categorical: bool
     max_combination_length: int
     null_value: Any
 
@@ -499,7 +543,7 @@ class TrainingData(PerturbationData):
             TrainingData: Data container for the perturbation data.
         """
         # TODO: add device to possibly only load to cpu
-        # TODO: check if covariates are duplicates and raise error if so
+        # TODO: check if covariates are duplicated and raise error if so
         cls._verify_control_data(adata, control_key)
 
         perturbation_covariates = perturbation_covariates or {}
@@ -631,6 +675,7 @@ class TrainingData(PerturbationData):
             condition_data=condition_data,
             control_to_perturbation=control_to_perturbation,
             covariate_encoder=primary_encoder,
+            categorical=primary_is_cat,
             max_combination_length=max_combination_length,
             null_value=null_value,
         )
@@ -688,6 +733,8 @@ class ValidationData(PerturbationData):
     src_data: dict[int, jnp.ndarray]
     tgt_data: dict[int, dict[int, jnp.ndarray]]
     condition_data: dict[int | str, jnp.ndarray] | None
+    covariate_encoder: preprocessing.OneHotEncoder | None
+    categorical: bool
     max_combination_length: int
     null_value: Any
     n_conditions_on_log_iteration: int | None = None
@@ -699,13 +746,14 @@ class ValidationData(PerturbationData):
         adata: anndata.AnnData,
         sample_rep: str,
         control_key: str,
+        covariate_encoder: preprocessing.OneHotEncoder | None,
+        categorical: bool,
+        max_combination_length: int,
         perturbation_covariates: dict[str, Sequence[str]] | None = None,
         perturbation_covariate_reps: dict[str, str] | None = None,
         sample_covariates: Sequence[str] | None = None,
         sample_covariate_reps: dict[str, str] | None = None,
         split_covariates: Sequence[str] | None = None,
-        covariate_encoder: preprocessing.OneHotEncoder | None = None,
-        max_combination_length: int | None = None,
         null_value: float = 0.0,
         n_conditions_on_log_iteration: int = 0,
         n_conditions_on_train_end: int = 0,
@@ -764,15 +812,14 @@ class ValidationData(PerturbationData):
         split_covariates = split_covariates or []
         cls._verify_split_covariates(adata, split_covariates)
 
-        max_combination_length = cls._get_max_combination_length(
+        cls._verify_max_combination_length(
             perturbation_covariates, max_combination_length
         )
 
         idx_to_covar, covar_to_idx = cls._get_idx_to_covariate(covariate_groups)
 
         primary_group, primary_covars = next(iter(perturbation_covariates.items()))
-        primary_is_cat = cls._check_covariate_type(adata, primary_covars)
-        primary_encoder = covariate_encoder
+        cls._verify_covariate_type(adata.obs, primary_covars, categorical)
 
         if len(split_covariates) > 0:
             split_cov_combs = adata.obs[split_covariates].drop_duplicates().values
@@ -832,8 +879,8 @@ class ValidationData(PerturbationData):
                         sample_covariates=sample_covariates,
                         covariate_reps=covariate_reps,
                         linked_perturb_covars=linked_perturb_covars,
-                        primary_encoder=primary_encoder,
-                        primary_is_cat=primary_is_cat,
+                        primary_encoder=covariate_encoder,
+                        primary_is_cat=categorical,
                         max_combination_length=max_combination_length,
                         null_value=null_value,
                     )
@@ -871,6 +918,8 @@ class ValidationData(PerturbationData):
             tgt_data=tgt_data,
             src_data=src_data,
             condition_data=condition_data,
+            covariate_encoder=covariate_encoder,
+            categorical=categorical,
             max_combination_length=max_combination_length,
             null_value=null_value,
             n_conditions_on_log_iteration=n_conditions_on_log_iteration,
@@ -895,20 +944,10 @@ class PredictionData(PerturbationData):
 
     src_data: dict[int, jnp.ndarray] | None
     condition_data: dict[int | str, jnp.ndarray] | None
+    covariate_encoder: preprocessing.OneHotEncoder | None
+    categorical: bool
     max_combination_length: int
     null_value: Any
-
-    @staticmethod
-    def _verify_max_combination_length(
-        perturbation_covariates: dict[str, Sequence[str]], max_combination_length: int
-    ) -> int:
-        obs_max_combination_length = max(
-            len(comb) for comb in perturbation_covariates.values()
-        )
-        if max_combination_length < obs_max_combination_length:
-            raise ValueError(
-                f"Observed maximum combination length of the perturbation covariates ({obs_max_combination_length}) does not match required `max_combination_length` ({max_combination_length}).",
-            )
 
     @staticmethod
     def _verify_split_covariates(
@@ -950,6 +989,9 @@ class PredictionData(PerturbationData):
     def load_from_adata(
         cls,
         adata: anndata.AnnData,
+        covariate_encoder: preprocessing.OneHotEncoder | None,
+        categorical: bool,
+        max_combination_length: int,
         sample_rep: str | None = None,
         covariate_data: pd.DataFrame | None = None,
         condition_id_key: str | None = None,
@@ -958,8 +1000,6 @@ class PredictionData(PerturbationData):
         sample_covariates: Sequence[str] | None = None,
         sample_covariate_reps: dict[str, str] | None = None,
         split_covariates: Sequence[str] | None = None,
-        covariate_encoder: preprocessing.OneHotEncoder | None = None,
-        max_combination_length: int | None = None,
         null_value: float = 0.0,
     ) -> "PredictionData":
         """Load cell data from an AnnData object.
@@ -982,7 +1022,7 @@ class PredictionData(PerturbationData):
             PredictionData: Data container for the perturbation data.
         """
         # TODO: add device to possibly only load to cpu
-        covariate_data = covariate_data or adata.obs
+        covariate_data = covariate_data if covariate_data is not None else adata.obs
 
         perturbation_covariates = {
             k: _to_list(v) for k, v in perturbation_covariates.items()
@@ -997,13 +1037,13 @@ class PredictionData(PerturbationData):
 
         perturbation_covariate_reps = perturbation_covariate_reps or {}
         cls._verify_perturbation_covariate_reps(
-            covariate_data, perturbation_covariate_reps, perturbation_covariates
+            adata, perturbation_covariate_reps, perturbation_covariates
         )
 
         sample_covariate_reps = sample_covariate_reps or {}
         sample_cov_groups = {covar: _to_list(covar) for covar in sample_covariates}
         cls._verify_sample_covariate_reps(
-            covariate_data, sample_covariate_reps, sample_cov_groups
+            adata, sample_covariate_reps, sample_cov_groups
         )
 
         covariate_groups = perturbation_covariates | sample_cov_groups
@@ -1018,8 +1058,7 @@ class PredictionData(PerturbationData):
         idx_to_covar, covar_to_idx = cls._get_idx_to_covariate(covariate_groups)
 
         primary_group, primary_covars = next(iter(perturbation_covariates.items()))
-        primary_is_cat = cls._check_covariate_type(covariate_data, primary_covars)
-        primary_encoder = covariate_encoder
+        cls._verify_covariate_type(covariate_data, primary_covars, categorical)
 
         cls._verify_split_covariates(covariate_data, split_covariates, adata)
 
@@ -1047,15 +1086,13 @@ class PredictionData(PerturbationData):
         condition_data: dict[int | str, dict[int, list]] | None = (
             {} if conditional else None
         )
-        control_mask = adata.obs[control_key]
 
         src_counter = 0
         for split_combination in split_cov_combs:
             filter_dict = dict(zip(split_covariates, split_combination, strict=False))
-            split_cov_mask = (
+            mask = np.array(
                 adata.obs[list(filter_dict.keys())] == list(filter_dict.values())
             ).all(axis=1)
-            mask = np.array(control_mask * split_cov_mask)
 
             src_data[src_counter] = cls._get_cell_data(adata[mask, :], sample_rep)
 
@@ -1087,8 +1124,8 @@ class PredictionData(PerturbationData):
                         sample_covariates=sample_covariates,
                         covariate_reps=covariate_reps,
                         linked_perturb_covars=linked_perturb_covars,
-                        primary_encoder=primary_encoder,
-                        primary_is_cat=primary_is_cat,
+                        primary_encoder=covariate_encoder,
+                        primary_is_cat=categorical,
                         max_combination_length=max_combination_length,
                         null_value=null_value,
                     )
@@ -1104,6 +1141,8 @@ class PredictionData(PerturbationData):
         return cls(
             src_data=src_data,
             condition_data=condition_data,
+            covariate_encoder=covariate_encoder,
+            categorical=categorical,
             max_combination_length=max_combination_length,
             null_value=null_value,
         )
@@ -1123,20 +1162,10 @@ class ConditionData(PerturbationData):
     """
 
     condition_data: dict[int | str, jnp.ndarray] | None
+    covariate_encoder: preprocessing.OneHotEncoder | None
+    categorical: bool
     max_combination_length: int
     null_value: Any
-
-    @staticmethod
-    def _verify_max_combination_length(
-        perturbation_covariates: dict[str, Sequence[str]], max_combination_length: int
-    ) -> int:
-        obs_max_combination_length = max(
-            len(comb) for comb in perturbation_covariates.values()
-        )
-        if max_combination_length < obs_max_combination_length:
-            raise ValueError(
-                f"Observed maximum combination length of the perturbation covariates ({obs_max_combination_length}) does not match required `max_combination_length` ({max_combination_length}).",
-            )
 
     @staticmethod
     def _verify_split_covariates(
@@ -1180,6 +1209,9 @@ class ConditionData(PerturbationData):
         # TODO: this needs adata only to get the covariate reps, so we could add a
         # separate argument for this so one does not have to create a dummy adata object
         adata: anndata.AnnData,
+        covariate_encoder: preprocessing.OneHotEncoder | None,
+        categorical: bool,
+        max_combination_length: int,
         covariate_data: pd.DataFrame | None = None,
         condition_id_key: str | None = None,
         perturbation_covariates: dict[str, Sequence[str]] | None = None,
@@ -1187,8 +1219,6 @@ class ConditionData(PerturbationData):
         sample_covariates: Sequence[str] | None = None,
         sample_covariate_reps: dict[str, str] | None = None,
         split_covariates: Sequence[str] | None = None,
-        covariate_encoder: preprocessing.OneHotEncoder | None = None,
-        max_combination_length: int | None = None,
         null_value: float = 0.0,
     ) -> "PredictionData":
         """Load cell data from an AnnData object.
@@ -1211,7 +1241,7 @@ class ConditionData(PerturbationData):
             PredictionData: Data container for the perturbation data.
         """
         # TODO: add device to possibly only load to cpu
-        covariate_data = covariate_data or adata.obs
+        covariate_data = covariate_data if covariate_data is not None else adata.obs
 
         perturbation_covariates = {
             k: _to_list(v) for k, v in perturbation_covariates.items()
@@ -1247,8 +1277,7 @@ class ConditionData(PerturbationData):
         idx_to_covar, covar_to_idx = cls._get_idx_to_covariate(covariate_groups)
 
         primary_group, primary_covars = next(iter(perturbation_covariates.items()))
-        primary_is_cat = cls._check_covariate_type(covariate_data, primary_covars)
-        primary_encoder = covariate_encoder
+        cls._verify_covariate_type(covariate_data, primary_covars, categorical)
 
         cls._verify_split_covariates(covariate_data, split_covariates, adata)
 
@@ -1289,8 +1318,8 @@ class ConditionData(PerturbationData):
                     sample_covariates=sample_covariates,
                     covariate_reps=covariate_reps,
                     linked_perturb_covars=linked_perturb_covars,
-                    primary_encoder=primary_encoder,
-                    primary_is_cat=primary_is_cat,
+                    primary_encoder=covariate_encoder,
+                    primary_is_cat=categorical,
                     max_combination_length=max_combination_length,
                     null_value=null_value,
                 )
@@ -1301,6 +1330,8 @@ class ConditionData(PerturbationData):
 
         return cls(
             condition_data=condition_data,
+            covariate_encoder=covariate_encoder,
+            categorical=categorical,
             max_combination_length=max_combination_length,
             null_value=null_value,
         )
