@@ -480,6 +480,10 @@ class TrainingData(PerturbationData):
         Dictionary with embeddings for conditions.
     control_to_perturbation
         Mapping from control index to target distribution indices.
+    covariate_encoder
+        Encoder for the primary covariate.
+    categorical
+        Whether the primary covariate is categorical.
     max_combination_length
         Maximum number of covariates in a combination.
     null_value
@@ -718,6 +722,10 @@ class ValidationData(PerturbationData):
         Dictionary with data for target cells.
     condition_data
         Dictionary with embeddings for conditions.
+    covariate_encoder
+        Encoder for the primary covariate.
+    categorical
+        Whether the primary covariate is categorical.
     max_combination_length
         Maximum number of covariates in a combination.
     null_value
@@ -764,12 +772,14 @@ class ValidationData(PerturbationData):
             adata: An :class:`~anndata.AnnData` object.
             sample_rep: Key in `adata.obsm` where the sample representation is stored or "X" to use `adata.X`.
             control_key: Key of a boolean column in `adata.obs` that defines the control samples.
+            covariate_encoder: Encoder for the primary covariate.
+            categorical: Whether the primary covariate is categorical.
+            max_combination_length: Maximum number of combinations of primary `perturbation_covariates`. If `None`, the value is inferred from the provided `perturbation_covariates`.
             perturbation_covariates: A dictionary where the keys indicate the name of the covariate group and the values are keys in `adata.obs`. The corresponding columns should be either boolean (presence/abscence of the perturbation) or numeric (concentration or magnitude of the perturbation). If multiple groups are provided, the first is interpreted as the primary perturbation and the others as covariates corresponding to these perturbations, e.g. `{"drug":("drugA", "drugB"), "time":("drugA_time", "drugB_time")}`.
             perturbation_covariate_reps: A dictionary where the keys indicate the name of the covariate group and the values are keys in `adata.uns` storing a dictionary with the representation of the covariates. E.g. `{"drug":"drug_embeddings"}` with `adata.uns["drug_embeddings"] = {"drugA": np.array, "drugB": np.array}`.
             sample_covariates: Keys in `adata.obs` indicating sample covatiates to be taken into account for training and prediction, e.g. `["age", "cell_type"]`.
             sample_covariate_reps: A dictionary where the keys indicate the name of the covariate group and the values are keys in `adata.uns` storing a dictionary with the representation of the covariates. E.g. `{"cell_type": "cell_type_embeddings"}` with `adata.uns["cell_type_embeddings"] = {"cell_typeA": np.array, "cell_typeB": np.array}`.
             split_covariates: Covariates in adata.obs to split all control cells into different control populations. The perturbed cells are also split according to these columns, but if these covariates should also be encoded in the model, the corresponding column should also be used in `perturbation_covariates` or `sample_covariates`.
-            max_combination_length: Maximum number of combinations of primary `perturbation_covariates`. If `None`, the value is inferred from the provided `perturbation_covariates`.
             null_value: Value to use for padding to `max_combination_length`.
             n_conditions_on_log_iteration: Number of conditions to use for computation callbacks at each logged iteration.
             n_conditions_on_train_end: Number of conditions to use for computation callbacks at the end of training.
@@ -777,7 +787,7 @@ class ValidationData(PerturbationData):
 
         Returns
         -------
-            ValidationData: Data container for the perturbation data.
+            ValidationData: Data container to perform validation.
         """
         # TODO: add device to possibly only load to cpu
         cls._verify_control_data(adata, control_key)
@@ -936,6 +946,10 @@ class PredictionData(PerturbationData):
         Dictionary with data for source cells.
     condition_data
         Dictionary with embeddings for conditions.
+    covariate_encoder
+        Encoder for the primary covariate.
+    categorical
+        Whether the primary covariate is categorical.
     max_combination_length
         Maximum number of covariates in a combination.
     null_value
@@ -1006,6 +1020,9 @@ class PredictionData(PerturbationData):
 
         Args:
             adata: An :class:`~anndata.AnnData` object.
+            covariate_encoder: Encoder for the primary covariate.
+            categorical: Whether the primary covariate is categorical.
+            max_combination_length: Maximum number of combinations of primary `perturbation_covariates`.
             sample_rep: Key in `adata.obsm` where the sample representation is stored or "X" to use `adata.X`.
             covariate_data: Dataframe with covariates. If `None`, `adata.obs` is used.
             condition_id_key: Key in `adata.obs` that defines the condition id.
@@ -1014,12 +1031,11 @@ class PredictionData(PerturbationData):
             sample_covariates: Keys in `adata.obs` indicating sample covatiates to be taken into account for training and prediction, e.g. `["age", "cell_type"]`.
             sample_covariate_reps: A dictionary where the keys indicate the name of the covariate group and the values are keys in `adata.uns` storing a dictionary with the representation of the covariates. E.g. `{"cell_type": "cell_type_embeddings"}` with `adata.uns["cell_type_embeddings"] = {"cell_typeA": np.array, "cell_typeB": np.array}`.
             split_covariates: Covariates in adata.obs to split all control cells into different control populations. The perturbed cells are also split according to these columns, but if these covariates should also be encoded in the model, the corresponding column should also be used in `perturbation_covariates` or `sample_covariates`.
-            max_combination_length: Maximum number of combinations of primary `perturbation_covariates`. If `None`, the value is inferred from the provided `perturbation_covariates`.
             null_value: Value to use for padding to `max_combination_length`.
 
         Returns
         -------
-            PredictionData: Data container for the perturbation data.
+            PredictionData: Data container to perform predictions.
         """
         # TODO: add device to possibly only load to cpu
         covariate_data = covariate_data if covariate_data is not None else adata.obs
@@ -1149,12 +1165,16 @@ class PredictionData(PerturbationData):
 
 
 class ConditionData(PerturbationData):
-    """Data container to perform prediction.
+    """Data container to get condition embedding.
 
     Parameters
     ----------
     condition_data
         Dictionary with embeddings for conditions.
+    covariate_encoder
+        Encoder for the primary covariate.
+    categorical
+        Whether the primary covariate is categorical.
     max_combination_length
         Maximum number of covariates in a combination.
     null_value
@@ -1220,11 +1240,14 @@ class ConditionData(PerturbationData):
         sample_covariate_reps: dict[str, str] | None = None,
         split_covariates: Sequence[str] | None = None,
         null_value: float = 0.0,
-    ) -> "PredictionData":
+    ) -> "ConditionData":
         """Load cell data from an AnnData object.
 
         Args:
             adata: An :class:`~anndata.AnnData` object.
+            covariate_encoder: Encoder for the primary covariate.
+            categorical: Whether the primary covariate is categorical.
+            max_combination_length: Maximum number of combinations of primary `perturbation_covariates`.
             sample_rep: Key in `adata.obsm` where the sample representation is stored or "X" to use `adata.X`.
             covariate_data: Dataframe with covariates. If `None`, `adata.obs` is used.
             condition_id_key: Key in `adata.obs` that defines the condition id.
@@ -1233,12 +1256,11 @@ class ConditionData(PerturbationData):
             sample_covariates: Keys in `adata.obs` indicating sample covatiates to be taken into account for training and prediction, e.g. `["age", "cell_type"]`.
             sample_covariate_reps: A dictionary where the keys indicate the name of the covariate group and the values are keys in `adata.uns` storing a dictionary with the representation of the covariates. E.g. `{"cell_type": "cell_type_embeddings"}` with `adata.uns["cell_type_embeddings"] = {"cell_typeA": np.array, "cell_typeB": np.array}`.
             split_covariates: Covariates in adata.obs to split all control cells into different control populations. The perturbed cells are also split according to these columns, but if these covariates should also be encoded in the model, the corresponding column should also be used in `perturbation_covariates` or `sample_covariates`.
-            max_combination_length: Maximum number of combinations of primary `perturbation_covariates`. If `None`, the value is inferred from the provided `perturbation_covariates`.
             null_value: Value to use for padding to `max_combination_length`.
 
         Returns
         -------
-            PredictionData: Data container for the perturbation data.
+            ConditionData: Data container to get condition embedding.
         """
         # TODO: add device to possibly only load to cpu
         covariate_data = covariate_data if covariate_data is not None else adata.obs
