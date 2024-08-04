@@ -367,7 +367,6 @@ class CellFlow:
             perturbation_covariate_reps=self.perturbation_covariate_reps,
             sample_covariates=self.sample_covariates,
             sample_covariate_reps=self.sample_covariate_reps,
-            split_covariates=self.split_covariates,
             null_value=self.pdata.null_value,
         )
 

@@ -240,9 +240,9 @@ class PerturbationData(BaseData):
         obs_max_combination_length = max(
             len(comb) for comb in perturbation_covariates.values()
         )
-        if max_combination_length < obs_max_combination_length:
+        if max_combination_length != obs_max_combination_length:
             raise ValueError(
-                f"Observed maximum combination length of the perturbation covariates ({obs_max_combination_length}) does not match required `max_combination_length` ({max_combination_length}).",
+                f"Observed maximum combination length of the perturbation covariates ({obs_max_combination_length}) does not match `max_combination_length` ({max_combination_length}).",
             )
 
     @classmethod
@@ -1003,10 +1003,10 @@ class PredictionData(PerturbationData):
     def load_from_adata(
         cls,
         adata: anndata.AnnData,
+        sample_rep: str,
         covariate_encoder: preprocessing.OneHotEncoder | None,
         categorical: bool,
         max_combination_length: int,
-        sample_rep: str | None = None,
         covariate_data: pd.DataFrame | None = None,
         condition_id_key: str | None = None,
         perturbation_covariates: dict[str, Sequence[str]] | None = None,
@@ -1188,20 +1188,6 @@ class ConditionData(PerturbationData):
     null_value: Any
 
     @staticmethod
-    def _verify_split_covariates(
-        covariate_data: pd.DataFrame,
-        split_covariates: Sequence[str],
-        adata: anndata.AnnData | None = None,
-    ) -> None:
-        for covar in split_covariates:
-            if covar not in covariate_data.columns:
-                raise ValueError(
-                    f"Covariate '{covar}' is required for prediction but was not found in provided data."
-                )
-            if adata is not None and covar not in adata.obs.columns:
-                raise ValueError(f"Split covariate '{covar}' not found in `adata.obs`.")
-
-    @staticmethod
     def _verify_perturb_covar_keys(
         covariate_data: pd.DataFrame, perturb_covar_keys: Sequence[str]
     ) -> None:
@@ -1238,7 +1224,6 @@ class ConditionData(PerturbationData):
         perturbation_covariate_reps: dict[str, str] | None = None,
         sample_covariates: Sequence[str] | None = None,
         sample_covariate_reps: dict[str, str] | None = None,
-        split_covariates: Sequence[str] | None = None,
         null_value: float = 0.0,
     ) -> "ConditionData":
         """Load cell data from an AnnData object.
@@ -1255,7 +1240,6 @@ class ConditionData(PerturbationData):
             perturbation_covariate_reps: A dictionary where the keys indicate the name of the covariate group and the values are keys in `adata.uns` storing a dictionary with the representation of the covariates. E.g. `{"drug":"drug_embeddings"}` with `adata.uns["drug_embeddings"] = {"drugA": np.array, "drugB": np.array}`.
             sample_covariates: Keys in `adata.obs` indicating sample covatiates to be taken into account for training and prediction, e.g. `["age", "cell_type"]`.
             sample_covariate_reps: A dictionary where the keys indicate the name of the covariate group and the values are keys in `adata.uns` storing a dictionary with the representation of the covariates. E.g. `{"cell_type": "cell_type_embeddings"}` with `adata.uns["cell_type_embeddings"] = {"cell_typeA": np.array, "cell_typeB": np.array}`.
-            split_covariates: Covariates in adata.obs to split all control cells into different control populations. The perturbed cells are also split according to these columns, but if these covariates should also be encoded in the model, the corresponding column should also be used in `perturbation_covariates` or `sample_covariates`.
             null_value: Value to use for padding to `max_combination_length`.
 
         Returns
@@ -1290,8 +1274,6 @@ class ConditionData(PerturbationData):
         covariate_groups = perturbation_covariates | sample_cov_groups
         covariate_reps = perturbation_covariate_reps | sample_covariate_reps
 
-        split_covariates = split_covariates or []
-
         cls._verify_max_combination_length(
             perturbation_covariates, max_combination_length
         )
@@ -1300,8 +1282,6 @@ class ConditionData(PerturbationData):
 
         primary_group, primary_covars = next(iter(perturbation_covariates.items()))
         cls._verify_covariate_type(covariate_data, primary_covars, categorical)
-
-        cls._verify_split_covariates(covariate_data, split_covariates, adata)
 
         perturb_covar_keys = _flatten_list(perturbation_covariates.values()) + list(
             sample_covariates
