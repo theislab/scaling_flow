@@ -9,6 +9,7 @@ import cloudpickle
 import jax
 import optax
 from numpy.typing import ArrayLike
+from tqdm import tqdm
 from ott.neural.methods.flows import dynamics
 from ott.solvers import utils as solver_utils
 
@@ -327,7 +328,7 @@ class CellFlow:
             predicted_data[src_dist] = {}
             src = pred_data.src_data[src_dist]
             conds = pred_data.condition_data[src_dist]
-            for cond_id, condition in conds.items():
+            for cond_id, condition in tqdm(conds.items()):
                 pred = self.model.predict(src, condition)
                 predicted_data[src_dist][cond_id] = pred
 
