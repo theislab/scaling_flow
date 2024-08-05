@@ -14,7 +14,7 @@ import cfp
 cf = cfp.model.CellFlow(adata, model="otfm")
 
 # Prepare the training data and perturbation conditions
-cf.perpare_data(
+cf.prepare_data(
     sample_rep="X_pca",
     control_key="CTRL",
     perturbation_covariates={
