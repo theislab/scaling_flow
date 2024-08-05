@@ -617,7 +617,6 @@ class TrainingData(PerturbationData):
         control_mask = adata.obs[control_key]
 
         src_counter = 0
-        tgt_counter = 0
         for split_combination in split_cov_combs:
             filter_dict = dict(zip(split_covariates, split_combination, strict=False))
             split_cov_mask = (
@@ -630,6 +629,7 @@ class TrainingData(PerturbationData):
 
             conditional_distributions = []
 
+            tgt_counter = 0
             pbar = tqdm(perturb_covar_df.iterrows(), total=perturb_covar_df.shape[0])
             for _, tgt_cond in pbar:
                 tgt_cond = tgt_cond[perturb_covar_keys]
@@ -852,7 +852,6 @@ class ValidationData(PerturbationData):
         control_mask = adata.obs[control_key]
 
         src_counter = 0
-        tgt_counter = 0
         for split_combination in split_cov_combs:
             filter_dict = dict(zip(split_covariates, split_combination, strict=False))
             split_cov_mask = (
@@ -866,6 +865,7 @@ class ValidationData(PerturbationData):
             if conditional:
                 condition_data[src_counter] = {}
 
+            tgt_counter = 0
             pbar = tqdm(perturb_covar_df.iterrows(), total=perturb_covar_df.shape[0])
             for _, tgt_cond in pbar:
                 tgt_cond = tgt_cond[perturb_covar_keys]
