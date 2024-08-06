@@ -4,16 +4,16 @@ from functools import partial
 from typing import Any, Literal
 
 import anndata as ad
-import pandas as pd
 import cloudpickle
 import jax
 import optax
+import pandas as pd
 from numpy.typing import ArrayLike
-from tqdm import tqdm
 from ott.neural.methods.flows import dynamics
 from ott.solvers import utils as solver_utils
+from tqdm import tqdm
 
-from cfp.data.data import TrainingData, ValidationData, PredictionData, ConditionData
+from cfp.data.data import ConditionData, PredictionData, TrainingData, ValidationData
 from cfp.data.dataloader import TrainSampler
 from cfp.networks.velocity_field import ConditionalVelocityField
 from cfp.solvers import genot, otfm

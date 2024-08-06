@@ -21,6 +21,76 @@ perturbation_covariate_comb_args = [
 ]
 
 
+class TestDataManager:
+    @pytest.mark.parametrize("sample_rep", ["X", "X_pca"])
+    @pytest.mark.parametrize("split_covariates", [[], ["cell_type"]])
+    @pytest.mark.parametrize("perturbation_covariates", perturbation_covariates_args)
+    @pytest.mark.parametrize("perturbation_covariate_reps", [{}, {"drug": "drug"}])
+    @pytest.mark.parametrize("sample_covariates", [[], ["dosage_c"]])
+    def test_init_DataManager(
+        self,
+        adata_perturbation: ad.AnnData,
+        sample_rep,
+        split_covariates,
+        perturbation_covariates,
+        perturbation_covariate_reps,
+        sample_covariates,
+    ):
+        from cfp.data.datamanager import DataManager
+
+        dm = DataManager(
+            adata_perturbation,
+            sample_rep=sample_rep,
+            split_covariates=split_covariates,
+            control_key="control",
+            perturbation_covariates=perturbation_covariates,
+            perturbation_covariate_reps=perturbation_covariate_reps,
+            sample_covariates=sample_covariates,
+        )
+        assert isinstance(dm, DataManager)
+        assert dm.sample_rep == sample_rep
+        assert dm.control_key == "control"
+        assert dm.split_covariates == split_covariates
+        assert dm.perturbation_covariates == perturbation_covariates
+        assert dm.sample_covariates == sample_covariates
+
+    @pytest.mark.parametrize("sample_rep", ["X", "X_pca"])
+    @pytest.mark.parametrize("split_covariates", [[], ["cell_type"]])
+    @pytest.mark.parametrize("perturbation_covariates", perturbation_covariates_args)
+    @pytest.mark.parametrize("perturbation_covariate_reps", [{}, {"drug": "drug"}])
+    @pytest.mark.parametrize("sample_covariates", [[], ["dosage_c"]])
+    def test_get_train_data(
+        self,
+        adata_perturbation: ad.AnnData,
+        sample_rep,
+        split_covariates,
+        perturbation_covariates,
+        perturbation_covariate_reps,
+        sample_covariates,
+    ):
+        from cfp.data.data import TrainingDataNew
+        from cfp.data.datamanager import DataManager
+
+        dm = DataManager(
+            adata_perturbation,
+            sample_rep=sample_rep,
+            split_covariates=split_covariates,
+            control_key="control",
+            perturbation_covariates=perturbation_covariates,
+            perturbation_covariate_reps=perturbation_covariate_reps,
+            sample_covariates=sample_covariates,
+        )
+        assert isinstance(dm, DataManager)
+        assert dm.sample_rep == sample_rep
+        assert dm.control_key == "control"
+        assert dm.split_covariates == split_covariates
+        assert dm.perturbation_covariates == perturbation_covariates
+        assert dm.sample_covariates == sample_covariates
+
+        train_data = dm.get_train_data(adata_perturbation)
+        assert isinstance(train_data, TrainingDataNew)
+
+
 class TestTrainingData:
     @pytest.mark.parametrize("sample_rep", ["X", "X_pca"])
     @pytest.mark.parametrize("split_covariates", [[], ["cell_type"]])
@@ -263,7 +333,7 @@ class TestValidationData:
         perturbation_covariates,
         perturbation_covariate_reps,
     ):
-        from cfp.data.data import ValidationData, TrainingData
+        from cfp.data.data import TrainingData, ValidationData
 
         control_key = "control"
         sample_covariates = ["cell_type"]
