@@ -379,7 +379,7 @@ class ConditionEncoder(BaseModule):
 
         # pooling
         if self.pooling == "mean":
-            self.pool_module = lambda x, mask: jnp.mean(x * mask, axis=-2)
+            self.pool_module = lambda x, mask, training: jnp.mean(x * mask, axis=-2)
         elif self.pooling == "attention_token":
             self.pool_module = TokenAttentionPooling(**self.pooling_kwargs)
         elif self.pooling == "attention_seed":
@@ -445,7 +445,7 @@ class ConditionEncoder(BaseModule):
 
         # pooling
         pool_mask = mask if self.pooling == "mean" else attention_mask
-        conditions = self.pool_module(conditions, pool_mask)
+        conditions = self.pool_module(conditions, pool_mask, training=training)
 
         # apply modules after pooling
         conditions = self._apply_modules(
