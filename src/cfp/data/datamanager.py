@@ -85,10 +85,8 @@ class DataManager:
         )
         sample_cov_groups = {covar: _to_list(covar) for covar in sample_covariates}
         covariate_groups = self.perturbation_covariates | sample_cov_groups
-        print("perturbation_covariate_reps ", perturbation_covariate_reps)
-        print("sample cov reps", sample_covariate_reps)
-        self.covariate_reps = (perturbation_covariate_reps or {}) | (
-            sample_covariate_reps or {}
+        self.covariate_reps = (self.perturbation_covariate_reps or {}) | (
+            self.sample_covariate_reps or {}
         )
 
         self.idx_to_covar, self.covar_to_idx = self._get_idx_to_covariate(
@@ -100,7 +98,6 @@ class DataManager:
         self.perturb_covar_keys = [k for k in perturb_covar_keys if k is not None]
 
     def get_train_data(self, adata: anndata.AnnData) -> Any:
-        print(self.perturbation_covariates)
         self._verify_covariate_data(
             adata, {covar: _to_list(covar) for covar in self.sample_covariates}
         )
@@ -320,24 +317,10 @@ class DataManager:
     @staticmethod
     def _verify_perturbation_covariate_reps(
         adata: anndata.AnnData,
-        data: dict[str, str],
         perturbation_covariate_reps: dict[str, Sequence[str]],
+        perturbation_covariates: dict[str, str],
     ) -> dict[str, Sequence[str]]:
-        if data is None:
-            return None
-        for key, value in data.items():
-            if key not in perturbation_covariate_reps:
-                raise ValueError(
-                    f"Key '{key}' not found in `perturbation_covariate_reps`."
-                )
-            if value not in adata.uns:
-                raise ValueError(
-                    f"Perturbation covariate representation '{value}' not found in `adata.uns`."
-                )
-            if not isinstance(adata.uns[value], dict):
-                raise ValueError(
-                    f"Perturbation covariate representation '{value}' in `adata.uns` should be of type `dict`, found {type(adata.uns[value])}."
-                )
+        # TODO
         return perturbation_covariate_reps
 
     @staticmethod
@@ -400,18 +383,13 @@ class DataManager:
     ) -> tuple[preprocessing.OneHotEncoder | None, bool]:
         primary_group, primary_covars = next(iter(perturbation_covariates.items()))
         is_categorical = self._check_covariate_type(adata, primary_covars)
-        print("is_categorical", is_categorical)
-        print("primary group", primary_group)
-        print("is_categorical", is_categorical)
         if primary_group in perturbation_covariate_reps:
             return None, is_categorical
-        
         if is_categorical:
             encoder = preprocessing.OneHotEncoder(sparse_output=False)
             all_values = np.unique(adata.obs[primary_covars].values.flatten())
             encoder.fit(all_values.reshape(-1, 1))
             return encoder, is_categorical
-
         encoder = preprocessing.OneHotEncoder(sparse_output=False)
         encoder.fit(np.array(primary_covars).reshape(-1, 1))
         return encoder, is_categorical
@@ -528,13 +506,10 @@ class DataManager:
         }
         for primary_cov in primary_covars:
             value = condition_data[primary_cov]
-
             cov_name = value if self.is_categorical else primary_cov
-            print("primary_group", primary_group)
-            print("self.covariate_reps", self.covariate_reps)
             if primary_group in self.covariate_reps:
-                rep_key = self.covariate_reps[primary_group]
-                if cov_name not in rep_dict[rep_key]:
+                rep_key = primary_group
+                if cov_name not in rep_dict[primary_group]:
                     raise ValueError(
                         f"Representation for '{cov_name}' not found in `adata.uns['{primary_group}']`."
                     )
@@ -564,7 +539,7 @@ class DataManager:
                 cov_name = condition_data[linked_cov]
 
                 if linked_group in self.covariate_reps:
-                    rep_key = self.covariate_reps[linked_group]
+                    rep_key = linked_group  # self.covariate_reps[linked_group][0]
                     if cov_name not in rep_dict[rep_key]:
                         raise ValueError(
                             f"Representation for '{cov_name}' not found in `adata.uns['{linked_group}']`."
