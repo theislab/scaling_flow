@@ -62,8 +62,9 @@ class CellFlowTrainer:
             if n is None:
                 subsampled_validation_data[val_data_name] = val_data
             else:
+                n_conditions = min([len(v) for v in val_data.condition_data.values()])
                 condition_idxs = self.rng_subsampling.choice(
-                    len(val_data.condition_data),
+                    n_conditions,
                     n,
                     replace=False,
                 )
@@ -88,10 +89,13 @@ class CellFlowTrainer:
         for src_idx in val_data.src_data.keys():
             src_data[src_idx] = val_data.src_data[src_idx]
             tgt_data[src_idx] = {}
+            condition_data[src_idx] = {}
             for tgt_idx in val_data.tgt_data[src_idx].keys():
                 if tgt_idx in condition_idxs:
                     tgt_data[src_idx][tgt_idx] = val_data.tgt_data[src_idx][tgt_idx]
-                    condition_data[tgt_idx] = val_data.condition_data[tgt_idx]
+                    condition_data[src_idx][tgt_idx] = val_data.condition_data[src_idx][
+                        tgt_idx
+                    ]
 
         return ValidationData(
             src_data=src_data,

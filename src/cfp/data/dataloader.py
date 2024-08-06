@@ -21,6 +21,7 @@ class TrainSampler:
 
     def __init__(self, data: TrainingData, batch_size: int = 64):
         self.data = data
+        self.data_idcs = jnp.arange(data.cell_data.shape[0])
         self.batch_size = batch_size
         self.n_source_dists = data.n_controls
         self.n_target_dists = data.n_perturbations
@@ -42,12 +43,9 @@ class TrainSampler:
             source_cells_mask = self.data.split_covariates_mask == source_dist_idx
             src_cond_p = source_cells_mask / jnp.count_nonzero(source_cells_mask)
             source_batch_idcs = jax.random.choice(
-                rng_2,
-                self.data.split_covariates_mask,
-                [self.batch_size],
-                replace=True,
-                p=src_cond_p,
+                rng_2, self.data_idcs, [self.batch_size], replace=True, p=src_cond_p
             )
+
             source_batch = self.data.cell_data[source_batch_idcs]
 
             target_dist_idx = jax.lax.switch(
@@ -59,7 +57,7 @@ class TrainSampler:
             tgt_cond_p = target_cells_mask / jnp.count_nonzero(target_cells_mask)
             target_batch_idcs = jax.random.choice(
                 rng_4,
-                self.data.perturbation_covariates_mask,
+                self.data_idcs,
                 [self.batch_size],
                 replace=True,
                 p=tgt_cond_p,

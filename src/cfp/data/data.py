@@ -740,7 +740,7 @@ class ValidationData(PerturbationData):
 
     src_data: dict[int, jnp.ndarray]
     tgt_data: dict[int, dict[int, jnp.ndarray]]
-    condition_data: dict[int | str, jnp.ndarray] | None
+    condition_data: dict[int, dict[int | str, jnp.ndarray]] | None
     covariate_encoder: preprocessing.OneHotEncoder | None
     categorical: bool
     max_combination_length: int
@@ -852,7 +852,6 @@ class ValidationData(PerturbationData):
         control_mask = adata.obs[control_key]
 
         src_counter = 0
-        tgt_counter = 0
         for split_combination in split_cov_combs:
             filter_dict = dict(zip(split_covariates, split_combination, strict=False))
             split_cov_mask = (
@@ -866,6 +865,7 @@ class ValidationData(PerturbationData):
             if conditional:
                 condition_data[src_counter] = {}
 
+            tgt_counter = 0
             pbar = tqdm(perturb_covar_df.iterrows(), total=perturb_covar_df.shape[0])
             for _, tgt_cond in pbar:
                 tgt_cond = tgt_cond[perturb_covar_keys]
@@ -918,7 +918,7 @@ class ValidationData(PerturbationData):
                     raise ValueError(
                         f"Number of conditions for computation callbacks provided with `n_conditions_on_log_iteration`={n_conditions_on_log_iteration} and `n_conditions_on_train_end`={n_conditions_on_train_end}, but no conditions found in the data."
                     )
-                n_conditions = len(next(iter(condition_data.values())))
+                n_conditions = min([len(v) for v in condition_data.values()])
                 if max_conditions > n_conditions:
                     raise ValueError(
                         f"Number of conditions for computation callbacks provided with `n_conditions_on_log_iteration`={n_conditions_on_log_iteration} or `n_conditions_on_train_end`={n_conditions_on_train_end} is larger than the number of conditions found in the data ({n_conditions})."

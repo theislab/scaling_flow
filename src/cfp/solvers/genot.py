@@ -258,9 +258,7 @@ class GENOT:
                 t1=1.0,
                 y0=x,
                 args=condition,
-                dt0=None,
-                solver=diffrax.Tsit5(),
-                stepsize_controller=diffrax.PIDController(rtol=1e-5, atol=1e-5),
+                **kwargs,
             )
             return result.ys[0]
 
