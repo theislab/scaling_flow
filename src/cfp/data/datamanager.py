@@ -13,7 +13,7 @@ from tqdm import tqdm
 
 from cfp._logging import logger
 from cfp._types import ArrayLike
-from cfp.data.data import TrainingDataNew, ValidationDataNew
+from cfp.data.data import TrainingData, ValidationData
 
 from .utils import _flatten_list, _to_list
 
@@ -106,7 +106,20 @@ class DataManager:
 
         Returns
         -------
-        TrainingDataNew: Training data for the model.
+        TrainingData: Training data for the model.
+        """
+        return self._get_data(adata)
+
+    def get_prediction_data(self, adata: anndata.AnnData) -> Any:
+        """Get training data for the model.
+
+        Parameters
+        ----------
+        adata: An :class:`~anndata.Anndata` object.
+
+        Returns
+        -------
+        TrainingData: Training data for the model.
         """
         return self._get_data(adata)
 
@@ -115,9 +128,21 @@ class DataManager:
         adata: anndata.AnnData,
         n_conditions_on_log_iteration: int | None = None,
         n_conditions_on_train_end: int | None = None,
-    ) -> ValidationDataNew:
+    ) -> ValidationData:
+        """Get validation data for the model.
+
+        Parameters
+        ----------
+        adata: An :class:`~anndata.Anndata` object.
+        n_conditions_on_log_iteration: Number of conditions to validate on during logging.
+        n_conditions_on_train_end: Number of conditions to validate on at the end of training.
+
+        Returns
+        -------
+        ValidationData: Validation data for the model.
+        """
         tdata = self._get_data(adata)
-        return ValidationDataNew(
+        return ValidationData(
             cell_data=tdata.cell_data,
             split_covariates_mask=tdata.split_covariates_mask,
             split_idx_to_covariates=tdata.split_idx_to_covariates,
@@ -131,7 +156,7 @@ class DataManager:
             n_conditions_on_train_end=n_conditions_on_train_end,
         )
 
-    def _get_data(self, adata: anndata.AnnData) -> TrainingDataNew:
+    def _get_data(self, adata: anndata.AnnData) -> TrainingData:
 
         self._verify_covariate_data(
             adata, {covar: _to_list(covar) for covar in self.sample_covariates}
@@ -214,7 +239,7 @@ class DataManager:
             for pert_cov, emb in condition_data.items():
                 condition_data[pert_cov] = jnp.array(emb)
 
-        return TrainingDataNew(
+        return TrainingData(
             cell_data=self._get_cell_data(adata),
             split_covariates_mask=jnp.asarray(split_covariates_mask),
             split_idx_to_covariates=split_idx_to_covariates,
@@ -318,9 +343,9 @@ class DataManager:
         return sample_covariates
 
     @staticmethod
-    def _verify_split_covariates(data: Sequence[str] | None) -> Sequence[str] | None:
+    def _verify_split_covariates(data: Sequence[str] | None) -> Sequence[str]:
         if data is None:
-            return data
+            return []
         if not isinstance(data, tuple | list):
             raise ValueError(
                 f"`split_covariates` should be a tuple or list, found {data} to be of type {type(data)}."

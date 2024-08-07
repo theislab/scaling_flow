@@ -178,7 +178,9 @@ def pdata(adata_perturbation: ad.AnnData) -> TrainingData:
     }
     perturbation_covariate_reps = {"drug": "drug"}
 
-    pdata = TrainingData.load_from_adata(
+    from cfp.data.datamanager import DataManager
+
+    dm = DataManager(
         adata_perturbation,
         sample_rep=sample_rep,
         split_covariates=split_covariates,
@@ -187,7 +189,7 @@ def pdata(adata_perturbation: ad.AnnData) -> TrainingData:
         perturbation_covariate_reps=perturbation_covariate_reps,
     )
 
-    return pdata
+    return dm.get_train_data(adata_perturbation)
 
 
 @pytest.fixture()

@@ -13,8 +13,9 @@ from ott.neural.methods.flows import dynamics
 from ott.solvers import utils as solver_utils
 from tqdm import tqdm
 
-from cfp.data.data import ConditionData, PredictionData, TrainingData, ValidationData
-from cfp.data.dataloader import TrainSampler
+from cfp.data.data import ConditionData, PredictionData, ValidationData
+from cfp.data.dataloader import TrainSampler, ValidationSampler
+from cfp.data.datamanager import DataManager
 from cfp.networks.velocity_field import ConditionalVelocityField
 from cfp.solvers import genot, otfm
 from cfp.training.trainer import CellFlowTrainer
@@ -73,26 +74,21 @@ class CellFlow:
             None
 
         """
-        self.sample_rep = sample_rep
-        self.control_key = control_key
-        self.perturbation_covariates = perturbation_covariates
-        self.perturbation_covariate_reps = perturbation_covariate_reps
-        self.sample_covariates = sample_covariates
-        self.sample_covariate_reps = sample_covariate_reps
-        self.split_covariates = split_covariates
-
-        self.pdata = TrainingData.load_from_adata(
+        self.dm = DataManager(
             self.adata,
-            sample_rep=self.sample_rep,
-            control_key=self.control_key,
-            perturbation_covariates=self.perturbation_covariates,
-            perturbation_covariate_reps=self.perturbation_covariate_reps,
-            sample_covariates=self.sample_covariates,
-            sample_covariate_reps=self.sample_covariate_reps,
-            split_covariates=self.split_covariates,
+            sample_rep=sample_rep,
+            control_key=control_key,
+            perturbation_covariates=perturbation_covariates,
+            perturbation_covariate_reps=perturbation_covariate_reps,
+            sample_covariates=sample_covariates,
+            sample_covariate_reps=sample_covariate_reps,
+            split_covariates=split_covariates,
             max_combination_length=max_combination_length,
             null_value=null_value,
         )
+
+        # TODO: rename to self.train_data
+        self.pdata = self.dm.get_train_data(self.adata)
 
         self._data_dim = self.pdata.cell_data.shape[-1]
 
@@ -120,19 +116,8 @@ class CellFlow:
             raise ValueError(
                 "Dataloader not initialized. Training data needs to be set up before preparing validation data. Please call prepare_data first."
             )
-        val_data = ValidationData.load_from_adata(
+        val_data = self.dm.get_validation_data(
             adata,
-            sample_rep=self.sample_rep,
-            control_key=self.control_key,
-            covariate_encoder=self.pdata.covariate_encoder,
-            categorical=self.pdata.categorical,
-            max_combination_length=self.pdata.max_combination_length,
-            perturbation_covariates=self.perturbation_covariates,
-            perturbation_covariate_reps=self.perturbation_covariate_reps,
-            sample_covariates=self.sample_covariates,
-            sample_covariate_reps=self.sample_covariate_reps,
-            split_covariates=self.split_covariates,
-            null_value=self.pdata.null_value,
             n_conditions_on_log_iteration=n_conditions_on_log_iteration,
             n_conditions_on_train_end=n_conditions_on_train_end,
         )
@@ -272,12 +257,15 @@ class CellFlow:
             )
 
         self.dataloader = TrainSampler(data=self.pdata, batch_size=batch_size)
+        validation_loaders = {
+            k: ValidationSampler(v) for k, v in self._validation_data.items()
+        }
 
         self.trainer.train(
             dataloader=self.dataloader,
             num_iterations=num_iterations,
             valid_freq=valid_freq,
-            valid_data=self._validation_data,
+            valid_loaders=validation_loaders,
             callbacks=callbacks,
             monitor_metrics=monitor_metrics,
         )
