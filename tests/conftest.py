@@ -5,7 +5,7 @@ import pandas as pd
 import pytest
 
 from cfp.data.data import TrainingData
-from cfp.data.dataloader import TrainSampler
+from cfp.data.dataloader import TrainSampler, ValidationSampler
 
 
 @pytest.fixture
@@ -29,14 +29,27 @@ def validdata():
         n_conditions = 10
 
         def __init__(self):
-            self.src_data = {0: jnp.ones((10, 5)) * 10}
-            self.tgt_data = {0: {0: jnp.ones((10, 5))}}
-            self.condition_data = {0: {0: {"pert1": jnp.ones((1, 2, 3))}}}
+            self.cell_data = jnp.ones((10, 5))
+            self.condition_data = {"pert1": jnp.ones((1, 2, 3))}
             self.n_conditions_on_log_iteration = 1
             self.n_conditions_on_train_end = 1
             self.max_combination_length = 2
+            self.control_to_perturbation = {0: [0]}
+            self.n_perturbations = 1
+            self.split_covariates_mask = jnp.zeros(
+                len(self.cell_data),
+            )
+            self.perturbation_covariates_mask = jnp.zeros(
+                len(self.cell_data),
+            )
+            self.perturbation_idx_to_covariates = {0: np.array(["my_pert"])}
 
     return {"val": ValidData()}
+
+
+@pytest.fixture()
+def valid_loader(validdata):
+    return {k: ValidationSampler(v) for k, v in validdata.items()}
 
 
 @pytest.fixture
