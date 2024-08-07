@@ -255,7 +255,6 @@ class TestDataManager:
     @pytest.mark.parametrize("max_combination_length", [0, 4])
     def test_max_combination_length(self, adata_perturbation, max_combination_length):
 
-        adata = adata_perturbation
         sample_rep = "X"
         split_covariates = ["cell_type"]
         control_key = "control"
@@ -303,15 +302,14 @@ class TestDataManager:
         )
 
 
-class TestValidationData:
-    @pytest.mark.skip(reason="TODO")
+class TestValidationDataNew:
     @pytest.mark.parametrize("sample_rep", ["X", "X_pca"])
     @pytest.mark.parametrize("split_covariates", [[], ["cell_type"]])
     @pytest.mark.parametrize(
         "perturbation_covariates", perturbation_covariate_comb_args
     )
     @pytest.mark.parametrize("perturbation_covariate_reps", [{}, {"drug": "drug"}])
-    def test_load_from_adata_with_combinations(
+    def test_load_from_adata_with_combinations_new(
         self,
         adata_perturbation: ad.AnnData,
         sample_rep,
@@ -319,13 +317,13 @@ class TestValidationData:
         perturbation_covariates,
         perturbation_covariate_reps,
     ):
-        from cfp.data.data import TrainingData, ValidationData
+        from cfp.data.datamanager import DataManager
 
         control_key = "control"
         sample_covariates = ["cell_type"]
         sample_covariate_reps = {"cell_type": "cell_type"}
 
-        train_data = TrainingData.load_from_adata(
+        dm = DataManager(
             adata_perturbation,
             sample_rep=sample_rep,
             split_covariates=split_covariates,
@@ -336,46 +334,29 @@ class TestValidationData:
             sample_covariate_reps=sample_covariate_reps,
         )
 
-        val_data = ValidationData.load_from_adata(
-            adata_perturbation,
-            categorical=train_data.categorical,
-            covariate_encoder=train_data.covariate_encoder,
-            max_combination_length=train_data.max_combination_length,
-            sample_rep=sample_rep,
-            split_covariates=split_covariates,
-            control_key=control_key,
-            perturbation_covariates=perturbation_covariates,
-            perturbation_covariate_reps=perturbation_covariate_reps,
-            sample_covariates=sample_covariates,
-            sample_covariate_reps=sample_covariate_reps,
-        )
-        assert isinstance(val_data, ValidationData)
-        assert isinstance(val_data.tgt_data, dict)
-        assert isinstance(val_data.src_data, dict)
-        assert isinstance(val_data.condition_data, dict)
+        val_data = dm.get_validation_data(adata_perturbation)
+
+        assert isinstance(val_data.cell_data, jax.Array)
+        assert isinstance(val_data.split_covariates_mask, jax.Array)
+        assert isinstance(val_data.split_idx_to_covariates, dict)
+        assert isinstance(val_data.perturbation_covariates_mask, jax.Array)
+        assert isinstance(val_data.perturbation_idx_to_covariates, dict)
+        assert isinstance(val_data.control_to_perturbation, dict)
         assert val_data.max_combination_length == len(perturbation_covariates["drug"])
 
-        comb_data = val_data.condition_data[0][0]
-        for k in perturbation_covariates.keys():
-            assert k in comb_data.keys()
-            assert comb_data[k].ndim == 3
-            assert comb_data[k].shape[1] == val_data.max_combination_length
-            assert comb_data[k].shape[0] == 1
+        assert isinstance(val_data.condition_data, dict)
+        assert isinstance(list(val_data.condition_data.values())[0], jax.Array)
 
-        for k, v in perturbation_covariate_reps.items():
-            assert k in comb_data.keys()
-            assert comb_data[v].shape[1] == val_data.max_combination_length
-            assert comb_data[v].shape[0] == 1
-            cov_key = perturbation_covariates[v][0]
-            if cov_key == "drug_a":
-                cov_name = cov_key
-            else:
-                cov_name = adata_perturbation.obs[cov_key].values[0]
-            assert comb_data[v].shape[2] == adata_perturbation.uns[k][cov_name].shape[0]
+        if sample_covariates == [] and perturbation_covariates == {"drug": ("drug1",)}:
+            assert (
+                val_data.n_perturbations
+                == (len(adata_perturbation.obs["drug1"].cat.categories) - 1)
+                * val_data.n_controls
+            )
 
-    @pytest.mark.skip(reason="TODO")
-    def test_raises_wrong_max_combination_length(self, adata_perturbation):
-        from cfp.data.data import ValidationData
+    @pytest.mark.skip(reason="To discuss: why should it raise an error?")
+    def test_raises_wrong_max_combination_length_new(self, adata_perturbation):
+        from cfp.data.datamanager import DataManager
 
         max_combination_length = 3
         adata = adata_perturbation
@@ -384,14 +365,12 @@ class TestValidationData:
         control_key = "control"
         perturbation_covariates = {"drug": ["drug1"]}
         perturbation_covariate_reps = {"drug": "drug"}
-        categorical = True
-        covariate_encoder = None
 
         with pytest.raises(
             ValueError,
             match=r".*max_combination_length.*",
         ):
-            _ = ValidationData.load_from_adata(
+            dm = DataManager(
                 adata,
                 sample_rep=sample_rep,
                 split_covariates=split_covariates,
@@ -399,9 +378,9 @@ class TestValidationData:
                 perturbation_covariates=perturbation_covariates,
                 perturbation_covariate_reps=perturbation_covariate_reps,
                 max_combination_length=max_combination_length,
-                categorical=categorical,
-                covariate_encoder=covariate_encoder,
             )
+
+            _ = dm.get_validation_data(adata_perturbation)
 
 
 class TestPredictionData:
