@@ -13,7 +13,7 @@ from tqdm import tqdm
 
 from cfp._logging import logger
 from cfp._types import ArrayLike
-from cfp.data.data import TrainingDataNew
+from cfp.data.data import TrainingDataNew, ValidationDataNew
 
 from .utils import _flatten_list, _to_list
 
@@ -83,7 +83,7 @@ class DataManager:
         self.linked_perturb_covars = self._get_linked_perturbation_covariates(
             self.perturbation_covariates
         )
-        sample_cov_groups = {covar: _to_list(covar) for covar in sample_covariates}
+        sample_cov_groups = {covar: _to_list(covar) for covar in self.sample_covariates}
         covariate_groups = self.perturbation_covariates | sample_cov_groups
         self.covariate_reps = (self.perturbation_covariate_reps or {}) | (
             self.sample_covariate_reps or {}
@@ -93,11 +93,46 @@ class DataManager:
             covariate_groups
         )
         perturb_covar_keys = _flatten_list(perturbation_covariates.values()) + list(
-            sample_covariates
+            self.sample_covariates
         )
         self.perturb_covar_keys = [k for k in perturb_covar_keys if k is not None]
 
     def get_train_data(self, adata: anndata.AnnData) -> Any:
+        """Get training data for the model.
+
+        Parameters
+        ----------
+        adata: An :class:`~anndata.Anndata` object.
+
+        Returns
+        -------
+        TrainingDataNew: Training data for the model.
+        """
+        return self._get_data(adata)
+
+    def get_validation_data(
+        self,
+        adata: anndata.AnnData,
+        n_conditions_on_log_iteration: int | None = None,
+        n_conditions_on_train_end: int | None = None,
+    ) -> ValidationDataNew:
+        tdata = self._get_data(adata)
+        return ValidationDataNew(
+            cell_data=tdata.cell_data,
+            split_covariates_mask=tdata.split_covariates_mask,
+            split_idx_to_covariates=tdata.split_idx_to_covariates,
+            perturbation_covariates_mask=tdata.perturbation_covariates_mask,
+            perturbation_idx_to_covariates=tdata.perturbation_idx_to_covariates,
+            condition_data=tdata.condition_data,
+            control_to_perturbation=tdata.control_to_perturbation,
+            max_combination_length=tdata.max_combination_length,
+            data_manager=self,
+            n_conditions_on_log_iteration=n_conditions_on_log_iteration,
+            n_conditions_on_train_end=n_conditions_on_train_end,
+        )
+
+    def _get_data(self, adata: anndata.AnnData) -> TrainingDataNew:
+
         self._verify_covariate_data(
             adata, {covar: _to_list(covar) for covar in self.sample_covariates}
         )
@@ -266,17 +301,21 @@ class DataManager:
         return data
 
     @staticmethod
-    def _verify_sample_covariates(data: Sequence[str] | None) -> Sequence[str] | None:
-        if not isinstance(data, tuple | list):
+    def _verify_sample_covariates(
+        sample_covariates: Sequence[str] | None,
+    ) -> Sequence[str]:
+        if sample_covariates is None:
+            return []
+        if not isinstance(sample_covariates, tuple | list):
             raise ValueError(
-                f"`sample_covariates` should be a tuple or list, found {data} to be of type {type(data)}."
+                f"`sample_covariates` should be a tuple or list, found {sample_covariates} to be of type {type(sample_covariates)}."
             )
-        for covar in data:
+        for covar in sample_covariates:
             if not isinstance(covar, str):
                 raise ValueError(
                     f"Key should be a string, found {covar} to be of type {type(covar)}."
                 )
-        return data
+        return sample_covariates
 
     @staticmethod
     def _verify_split_covariates(data: Sequence[str] | None) -> Sequence[str] | None:
@@ -320,18 +359,18 @@ class DataManager:
         perturbation_covariate_reps: dict[str, Sequence[str]],
         perturbation_covariates: dict[str, str],
     ) -> dict[str, Sequence[str]]:
-        # TODO
+        # TODO check what this should do
         return perturbation_covariate_reps
 
     @staticmethod
     def _verify_sample_covariate_reps(
         adata: anndata.AnnData,
-        data: dict[str, str],
+        sample_covariate_reps: dict[str, str],
         covariates: dict[str, Sequence[str]],
     ) -> dict[str, Sequence[str]]:
-        if data is None:
+        if sample_covariate_reps is None:
             return None
-        for key, value in data.items():
+        for key, value in sample_covariate_reps.items():
             if key not in covariates:
                 raise ValueError(f"Key '{key}' not found in covariates.")
             if value not in adata.uns:
@@ -342,7 +381,7 @@ class DataManager:
                 raise ValueError(
                     f"Sample covariate representation '{value}' in `adata.uns` should be of type `dict`, found {type(adata.uns[value])}."
                 )
-        return covariates
+        return sample_covariate_reps
 
     @staticmethod
     def _get_max_combination_length(
