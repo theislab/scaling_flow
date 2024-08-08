@@ -13,7 +13,7 @@ perturbation_covariate_comb_args = [
 
 
 class TestCellFlow:
-    @pytest.mark.parametrize("solver", ["otfm"]) #TODO: add genot
+    @pytest.mark.parametrize("solver", ["otfm", "genot"])
     def test_cellflow_solver(
         self,
         adata_perturbation,

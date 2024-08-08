@@ -78,6 +78,7 @@ class GENOT:
         self.flow = flow
         self.data_match_fn = jax.jit(data_match_fn)
         self.time_sampler = time_sampler
+        self.source_dim = source_dim
         if latent_noise_fn is None:
             latent_noise_fn = functools.partial(_multivariate_normal, dim=target_dim)
         self.latent_noise_fn = latent_noise_fn
@@ -204,7 +205,8 @@ class GENOT:
         -------
             Encoded conditions
         """
-        dummy_source = jnp.zeros((1, self.vf.input_dim))
+        dummy_source = jnp.zeros((1, self.source_dim))
+        condition.update({GENOT_CELL_KEY: dummy_source})
         cond_embed = self.vf.apply(
             {"params": self.vf_state.params},
             condition,
