@@ -204,6 +204,7 @@ class GENOT:
         -------
             Encoded conditions
         """
+        dummy_source = jnp.zeros((1, self.vf.input_dim))
         cond_embed = self.vf.apply(
             {"params": self.vf_state.params},
             condition,

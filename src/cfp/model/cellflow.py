@@ -336,14 +336,14 @@ class CellFlow:
             raise ValueError(
                 "Covariate data must be a `pandas.DataFrame` or an instance of `BaseData`."
             )
-
+        print("cond_data.condition_data.keys()", cond_data.condition_data.keys())
         condition_embeddings = {}
-        for cond_id, condition in cond_data.condition_data.items():
-            condition_embeddings[cond_id] = self.model.get_condition_embedding(
-                condition
-            )
-
+        n_conditions = len(next(iter(cond_data.condition_data.values())))
+        for i in range(n_conditions):
+            condition = {k: v[[i], :] for k, v in cond_data.condition_data.items()}
+            condition_embeddings[i] = self.model.get_condition_embedding(condition)
         return condition_embeddings
+
 
     def save(
         self,

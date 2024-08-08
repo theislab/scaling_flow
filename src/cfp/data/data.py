@@ -19,7 +19,6 @@ class ReturnData:
     condition_data: dict[str | int, jnp.ndarray] | None
     control_to_perturbation: dict[int, jnp.ndarray] | None
     max_combination_length: int | None
-    null_value: Any
 
 
 class BaseData:
@@ -50,7 +49,7 @@ class BaseData:
     def __repr__(self) -> str:
         return f"{self.__class__.__name__}[{self._format_params(repr)}]"
 
-
+@dataclass
 class ConditionData(BaseData):
     """Data container containing condition embeddings.
 

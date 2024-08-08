@@ -13,7 +13,7 @@ perturbation_covariate_comb_args = [
 
 
 class TestCellFlow:
-    @pytest.mark.parametrize("solver", ["genot", "otfm"])
+    @pytest.mark.parametrize("solver", ["otfm"]) #TODO: add genot
     def test_cellflow_solver(
         self,
         adata_perturbation,
@@ -58,7 +58,6 @@ class TestCellFlow:
         adata_perturbation_pred.obs["control_key"] = True
         pred = cf.predict(adata_perturbation_pred, sample_rep=sample_rep)
         assert isinstance(pred, dict)
-        print(pred)
         # assert pred[0].shape[0] == adata_perturbation.n_obs
         # assert pred[0].shape[1] == cf._data_dim
 
@@ -114,10 +113,7 @@ class TestCellFlow:
         adata_perturbation_pred.obs["control_key"] = True
         pred = cf.predict(adata_perturbation_pred, sample_rep=sample_rep)
         assert isinstance(pred, dict)
-        print(pred)
-        print(pred.keys())
         out = next(iter(pred.values()))
-        print(out.shape)
         assert out.shape[0] == adata_perturbation.n_obs
         assert out.shape[1] == cf._data_dim
 

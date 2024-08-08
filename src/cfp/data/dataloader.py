@@ -170,8 +170,8 @@ class PredictionSampler(BaseValidSampler):
         cell_rep_dict = {}
         cond_dict = {}
         for i in range(len(condition_idcs)):
-            arr = self.data.perturbation_idx_to_covariates[condition_idcs[i]]
-            k = tuple(arr[i] for i in range(len(arr)))
+            cov_combination = self.data.perturbation_idx_to_covariates[condition_idcs[i]]
+            k = tuple(cov_combination[i] for i in range(len(cov_combination)))
             cell_rep_dict[k] = source_cells[i]
             cond_dict[k] = conditions[i]
 

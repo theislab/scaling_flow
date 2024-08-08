@@ -148,7 +148,6 @@ class DataManager:
             condition_id_key=condition_id_key,
             return_ground_truth_data=False,
         )
-        print("rd.pertur.idxtocovariates", rd.perturbation_idx_to_covariates)
         return PredictionData(
             cell_data=rd.cell_data,
             split_covariates_mask=rd.split_covariates_mask,
