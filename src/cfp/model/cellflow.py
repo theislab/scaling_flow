@@ -13,7 +13,7 @@ from ott.neural.methods.flows import dynamics
 from ott.solvers import utils as solver_utils
 from tqdm import tqdm
 
-from cfp.data.data import ConditionData, PredictionData, ValidationData
+from cfp.data.data import BaseData, PredictionData, ValidationData
 from cfp.data.dataloader import TrainSampler, ValidationSampler
 from cfp.data.datamanager import DataManager
 from cfp.networks.velocity_field import ConditionalVelocityField
@@ -327,8 +327,7 @@ class CellFlow:
 
     def get_condition_embedding(
         self,
-        adata: ad.AnnData | None = None,
-        covariate_data: pd.DataFrame | None = None,
+        covariate_data: pd.DataFrame | BaseData | None = None,
         condition_id_key: str | None = None,
     ) -> dict[str, ArrayLike]:
         """Get condition embedding.
@@ -345,21 +344,16 @@ class CellFlow:
         if self.model is None:
             raise ValueError("Model not trained. Please call `train` first.")
 
-        adata = adata if adata is not None else self.adata
-
-        cond_data = ConditionData.load_from_adata(
-            adata,
-            covariate_encoder=self.pdata.covariate_encoder,
-            max_combination_length=self.pdata.max_combination_length,
-            categorical=self.pdata.categorical,
-            covariate_data=covariate_data,
-            condition_id_key=condition_id_key,
-            perturbation_covariates=self.perturbation_covariates,
-            perturbation_covariate_reps=self.perturbation_covariate_reps,
-            sample_covariates=self.sample_covariates,
-            sample_covariate_reps=self.sample_covariate_reps,
-            null_value=self.pdata.null_value,
-        )
+        if isinstance(covariate_data, BaseData):
+            cond_data = covariate_data
+        elif isinstance(covariate_data, pd.DataFrame):
+            cond_data = self.dm.get_condition_data(
+                covariate_data=covariate_data, condition_id_key=condition_id_key
+            )
+        else:
+            raise ValueError(
+                "Covariate data must be a `pandas.DataFrame` or an instance of `BaseData`."
+            )
 
         condition_embeddings = {}
         for cond_id, condition in cond_data.condition_data.items():
