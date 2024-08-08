@@ -53,13 +53,16 @@ class TestCellFlow:
         cf.train(num_iterations=3)
         assert cf.dataloader is not None
 
-        pred = cf.predict(adata_perturbation, sample_rep=sample_rep)
+        # we assume these are all source cells now in adata_perturbation
+        adata_perturbation_pred = adata_perturbation.copy()
+        adata_perturbation_pred.obs["control_key"] = True
+        pred = cf.predict(adata_perturbation_pred, sample_rep=sample_rep)
         assert isinstance(pred, dict)
         print(pred)
         # assert pred[0].shape[0] == adata_perturbation.n_obs
         # assert pred[0].shape[1] == cf._data_dim
 
-        cond_embed = cf.get_condition_embedding(adata_perturbation)
+        cond_embed = cf.get_condition_embedding(adata_perturbation.obs, rep_dict=adata_perturbation.uns)
         assert isinstance(cond_embed, dict)
         assert cond_embed[0].shape[0] == 1
         assert cond_embed[0].shape[1] == condition_embedding_dim
@@ -106,12 +109,19 @@ class TestCellFlow:
         cf.train(num_iterations=3)
         assert cf.dataloader is not None
 
-        pred = cf.predict(adata_perturbation, sample_rep=sample_rep)
+        # we assume these are all source cells now in adata_perturbation
+        adata_perturbation_pred = adata_perturbation.copy()
+        adata_perturbation_pred.obs["control_key"] = True
+        pred = cf.predict(adata_perturbation_pred, sample_rep=sample_rep)
         assert isinstance(pred, dict)
-        assert pred[0].shape[0] == adata_perturbation.n_obs
-        assert pred[0].shape[1] == cf._data_dim
+        print(pred)
+        print(pred.keys())
+        out = next(iter(pred.values()))
+        print(out.shape)
+        assert out.shape[0] == adata_perturbation.n_obs
+        assert out.shape[1] == cf._data_dim
 
-        cond_embed = cf.get_condition_embedding(adata_perturbation)
+        cond_embed = cf.get_condition_embedding(adata_perturbation.obs)
         assert isinstance(cond_embed, dict)
         assert cond_embed[0].shape[0] == 1
         assert cond_embed[0].shape[1] == condition_embedding_dim

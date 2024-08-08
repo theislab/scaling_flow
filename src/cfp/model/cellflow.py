@@ -302,15 +302,14 @@ class CellFlow:
         batch = pred_loader.sample()
         src = batch["source"]
         condition = batch.get("condition", None)
-        print("src is ", src)
-        print("con  is ", condition)
         out = jax.tree.map(self.model.predict, src, condition)
-        print("out is ", out)
+        
         return out
 
     def get_condition_embedding(
         self,
         covariate_data: pd.DataFrame | BaseData | None = None,
+        rep_dict: dict[str, str] | None = None,
         condition_id_key: str | None = None,
     ) -> dict[str, ArrayLike]:
         """Get condition embedding.
@@ -327,11 +326,11 @@ class CellFlow:
         if self.model is None:
             raise ValueError("Model not trained. Please call `train` first.")
 
-        if isinstance(covariate_data, BaseData):
+        if hasattr(covariate_data, "condition_data"):
             cond_data = covariate_data
         elif isinstance(covariate_data, pd.DataFrame):
             cond_data = self.dm.get_condition_data(
-                covariate_data=covariate_data, condition_id_key=condition_id_key
+                covariate_data=covariate_data, rep_dict=rep_dict, condition_id_key=condition_id_key
             )
         else:
             raise ValueError(

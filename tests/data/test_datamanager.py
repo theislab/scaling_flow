@@ -50,11 +50,11 @@ class TestDataManager:
             sample_covariates=sample_covariates,
         )
         assert isinstance(dm, DataManager)
-        assert dm.sample_rep == sample_rep
-        assert dm.control_key == "control"
-        assert dm.split_covariates == split_covariates
-        assert dm.perturbation_covariates == perturbation_covariates
-        assert dm.sample_covariates == sample_covariates
+        assert dm._sample_rep == sample_rep
+        assert dm._control_key == "control"
+        assert dm._split_covariates == split_covariates
+        assert dm._perturbation_covariates == perturbation_covariates
+        assert dm._sample_covariates == sample_covariates
 
     @pytest.mark.parametrize("el_to_delete", ["drug1", "cell_line_a"])
     def raise_false_uns_dict(self, adata_perturbation: ad.AnnData, el_to_delete):
@@ -141,11 +141,11 @@ class TestDataManager:
             sample_covariates=sample_covariates,
         )
         assert isinstance(dm, DataManager)
-        assert dm.sample_rep == sample_rep
-        assert dm.control_key == "control"
-        assert dm.split_covariates == split_covariates
-        assert dm.perturbation_covariates == perturbation_covariates
-        assert dm.sample_covariates == sample_covariates
+        assert dm._sample_rep == sample_rep
+        assert dm._control_key == "control"
+        assert dm._split_covariates == split_covariates
+        assert dm._perturbation_covariates == perturbation_covariates
+        assert dm._sample_covariates == sample_covariates
 
         train_data = dm.get_train_data(adata_perturbation)
         assert isinstance(train_data, TrainingData)
@@ -283,7 +283,7 @@ class TestDataManager:
         expected_max_combination_length = max(
             max_combination_length, len(perturbation_covariates["drug"])
         )
-        assert dm.max_combination_length == expected_max_combination_length
+        assert dm._max_combination_length == expected_max_combination_length
         assert (
             train_data.condition_data["drug"].shape[1]
             == expected_max_combination_length

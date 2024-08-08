@@ -53,49 +53,49 @@ class DataManager:
         max_combination_length: int | None = None,
         null_value: float = 0.0,
     ):
-        self.adata = adata
-        self.sample_rep = self._verify_sample_rep(sample_rep)
-        self.control_key = control_key
-        self.perturbation_covariates = self._verify_perturbation_covariates(
+        self._adata = adata
+        self._sample_rep = self._verify_sample_rep(sample_rep)
+        self._control_key = control_key
+        self._perturbation_covariates = self._verify_perturbation_covariates(
             perturbation_covariates
         )
-        self.perturbation_covariate_reps = self._verify_perturbation_covariate_reps(
+        self._perturbation_covariate_reps = self._verify_perturbation_covariate_reps(
             adata,
             perturbation_covariate_reps,
-            self.perturbation_covariates,
+            self._perturbation_covariates,
         )
-        self.sample_covariates = self._verify_sample_covariates(sample_covariates)
-        self.sample_covariate_reps = self._verify_sample_covariate_reps(
-            adata, sample_covariate_reps, self.sample_covariates
+        self._sample_covariates = self._verify_sample_covariates(sample_covariates)
+        self._sample_covariate_reps = self._verify_sample_covariate_reps(
+            adata, sample_covariate_reps, self._sample_covariates
         )
-        self.split_covariates = self._verify_split_covariates(split_covariates)
-        self.max_combination_length = self._get_max_combination_length(
-            self.perturbation_covariates, max_combination_length
+        self._split_covariates = self._verify_split_covariates(split_covariates)
+        self._max_combination_length = self._get_max_combination_length(
+            self._perturbation_covariates, max_combination_length
         )
-        self.null_value = null_value
+        self._null_value = null_value
         self._primary_one_hot_encoder, self._is_categorical = (
             self._get_primary_covar_encoder(
-                self.adata,
-                self.perturbation_covariates,
-                self.perturbation_covariate_reps,
+                self._adata,
+                self._perturbation_covariates,
+                self._perturbation_covariate_reps,
             )
         )
-        self.linked_perturb_covars = self._get_linked_perturbation_covariates(
-            self.perturbation_covariates
+        self._linked_perturb_covars = self._get_linked_perturbation_covariates(
+            self._perturbation_covariates
         )
-        sample_cov_groups = {covar: _to_list(covar) for covar in self.sample_covariates}
-        covariate_groups = self.perturbation_covariates | sample_cov_groups
-        self.covariate_reps = (self.perturbation_covariate_reps or {}) | (
-            self.sample_covariate_reps or {}
+        sample_cov_groups = {covar: _to_list(covar) for covar in self._sample_covariates}
+        covariate_groups = self._perturbation_covariates | sample_cov_groups
+        self._covariate_reps = (self._perturbation_covariate_reps or {}) | (
+            self._sample_covariate_reps or {}
         )
 
-        self.idx_to_covar, self.covar_to_idx = self._get_idx_to_covariate(
+        self._idx_to_covar, self._covar_to_idx = self._get_idx_to_covariate(
             covariate_groups
         )
         perturb_covar_keys = _flatten_list(perturbation_covariates.values()) + list(
-            self.sample_covariates
+            self._sample_covariates
         )
-        self.perturb_covar_keys = [k for k in perturb_covar_keys if k is not None]
+        self._perturb_covar_keys = [k for k in perturb_covar_keys if k is not None]
 
     def get_train_data(self, adata: anndata.AnnData) -> Any:
         """Get training data for the model.
@@ -118,6 +118,7 @@ class DataManager:
             condition_data=rd.condition_data,
             control_to_perturbation=rd.control_to_perturbation,
             max_combination_length=rd.max_combination_length,
+            null_value=self._null_value,
             data_manager=self,
         )
 
@@ -126,6 +127,7 @@ class DataManager:
         adata: anndata.AnnData,
         sample_rep: str,
         covariate_data: pd.DataFrame | None = None,
+        rep_dict: dict[str, Any] | None = None,
         condition_id_key: str | None = None,
     ) -> Any:
         """Get training data for the model.
@@ -142,6 +144,7 @@ class DataManager:
             adata,
             sample_rep=sample_rep,
             covariate_data=covariate_data,
+            rep_dict=rep_dict,
             condition_id_key=condition_id_key,
             return_ground_truth_data=False,
         )
@@ -154,6 +157,7 @@ class DataManager:
             control_to_perturbation=rd.control_to_perturbation,
             perturbation_idx_to_covariates=rd.perturbation_idx_to_covariates,
             max_combination_length=rd.max_combination_length,
+            null_value=self._null_value,
             data_manager=self,
         )
 
@@ -185,13 +189,14 @@ class DataManager:
             condition_data=rd.condition_data,
             control_to_perturbation=rd.control_to_perturbation,
             max_combination_length=rd.max_combination_length,
+            null_value=self._null_value,
             data_manager=self,
             n_conditions_on_log_iteration=n_conditions_on_log_iteration,
             n_conditions_on_train_end=n_conditions_on_train_end,
         )
 
     def get_condition_data(
-        self, covariate_data: pd.DataFrame, condition_id_key: str | None
+        self, covariate_data: pd.DataFrame, rep_dict: dict[str, Any] | None = None, condition_id_key: str | None = None
     ) -> ConditionData:
         """Get condition data for the model.
 
@@ -204,22 +209,21 @@ class DataManager:
         -------
         ConditionData: Condition data for the model.
         """
-        self._verify_covariate_data(covariate_data, self.perturb_covar_keys)
+        self._verify_covariate_data(covariate_data, self._perturb_covar_keys)
         self._verify_covariate_type(
-            covariate_data, self.perturb_covar_keys, self.is_categorical
+            covariate_data, self._perturb_covar_keys, self.is_categorical
         )
         bd = self._get_data(
             adata=None,
             covariate_data=covariate_data,
+            rep_dict=rep_dict,
             condition_id_key=condition_id_key,
             return_ground_truth_data=False,
         )
         return ConditionData(
             condition_data=bd.condition_data,
-            covariate_encoder=bd.covariate_encoder,
-            is_categorical=bd.is_categorical,
             max_combination_length=bd.max_combination_length,
-            null_value=bd.null_value,
+            null_value=self._null_value,
             data_manager=self,
         )
 
@@ -228,6 +232,7 @@ class DataManager:
         adata: anndata.AnnData | None,
         sample_rep: str | None = None,
         covariate_data: pd.DataFrame | None = None,
+        rep_dict: dict[str, Any] | None = None,
         condition_id_key: str | None = None,
         *,
         return_ground_truth_data: bool = True,
@@ -235,17 +240,19 @@ class DataManager:
         if adata is None and covariate_data is None:
             raise ValueError("Either `adata` or `covariate_data` must be provided.")
         covariate_data = covariate_data if covariate_data is not None else adata.obs
+        if rep_dict is None:
+            rep_dict = adata.uns if adata is not None else {}
         self._verify_covariate_data(
-            adata, {covar: _to_list(covar) for covar in self.sample_covariates}
+            adata, {covar: _to_list(covar) for covar in self._sample_covariates}
         )
         self._verify_control_data(adata)
-        self._verify_covariate_data(adata, _to_list(self.split_covariates))
+        self._verify_covariate_data(adata, _to_list(self._split_covariates))
 
         if condition_id_key is not None:
             self._verify_condition_id_key(covariate_data, condition_id_key)
-            select_keys = self.perturb_covar_keys + [condition_id_key]
+            select_keys = self._perturb_covar_keys + [condition_id_key]
         else:
-            select_keys = self.perturb_covar_keys
+            select_keys = self._perturb_covar_keys
 
         perturb_covar_df = covariate_data[select_keys].drop_duplicates()
 
@@ -254,13 +261,16 @@ class DataManager:
         else:
             perturb_covar_df = perturb_covar_df.reset_index()
 
+        if adata is None:
+            split_covariates_mask = None
+            perturbation_covariates_mask = None
         if adata is not None:
             split_covariates_mask = np.full((adata.n_obs,), -1, dtype=jnp.int32)
             perturbation_covariates_mask = np.full((adata.n_obs,), -1, dtype=jnp.int32)
-            control_mask = covariate_data[self.control_key]
+        control_mask = covariate_data[self._control_key]
 
         condition_data: dict[int | str, list[jnp.ndarray]] | None = (
-            {i: [] for i in self.covar_to_idx.keys()} if self.is_conditional else None
+            {i: [] for i in self._covar_to_idx.keys()} if self.is_conditional else None
         )
 
         control_to_perturbation: dict[int, int] = {}
@@ -270,9 +280,9 @@ class DataManager:
         src_counter = 0
         tgt_counter = 0
 
-        if len(self.split_covariates) > 0:
+        if len(self._split_covariates) > 0:
             split_cov_combs = (
-                covariate_data[self.split_covariates].drop_duplicates().values
+                covariate_data[self._split_covariates].drop_duplicates().values
             )
         else:
             split_cov_combs = [[]]
@@ -280,7 +290,7 @@ class DataManager:
         for split_combination in split_cov_combs:
             if adata is not None:
                 filter_dict = dict(
-                    zip(self.split_covariates, split_combination, strict=False)
+                    zip(self._split_covariates, split_combination, strict=False)
                 )
                 split_cov_mask = (
                     covariate_data[list(filter_dict.keys())]
@@ -295,10 +305,10 @@ class DataManager:
 
             pbar = tqdm(perturb_covar_df.iterrows(), total=perturb_covar_df.shape[0])
             for _, tgt_cond in pbar:
-                tgt_cond = tgt_cond[self.perturb_covar_keys]
+                tgt_cond = tgt_cond[self._perturb_covar_keys]
                 if return_ground_truth_data:
                     mask = (
-                        covariate_data[self.perturb_covar_keys] == tgt_cond.values
+                        covariate_data[self._perturb_covar_keys] == tgt_cond.values
                     ).all(axis=1)
                     mask *= (1 - control_mask) * split_cov_mask
                     mask = np.array(mask == 1)
@@ -306,17 +316,18 @@ class DataManager:
                     if mask.sum() == 0:
                         continue
 
+                    perturbation_covariates_mask[mask] = tgt_counter
+
                 conditional_distributions.append(tgt_counter)
-                perturbation_covariates_mask[mask] = tgt_counter
                 perturbation_idx_to_covariates[tgt_counter] = tgt_cond.values
 
                 if self.is_conditional:
                     embedding = self._get_perturbation_covariates(
                         condition_data=tgt_cond,
-                        rep_dict=adata.uns,
+                        rep_dict=rep_dict,
                         perturb_covariates={
                             k: _to_list(v)
-                            for k, v in self.perturbation_covariates.items()
+                            for k, v in self._perturbation_covariates.items()
                         },
                     )
 
@@ -353,7 +364,7 @@ class DataManager:
             perturbation_idx_to_covariates=perturbation_idx_to_covariates,
             condition_data=condition_data,
             control_to_perturbation=control_to_perturbation,
-            max_combination_length=self.max_combination_length,
+            max_combination_length=self._max_combination_length,
         )
 
     @staticmethod
@@ -381,39 +392,39 @@ class DataManager:
         adata: anndata.AnnData,
         sample_rep: str | None,
     ) -> jax.Array:
-        sample_rep = self.sample_rep if sample_rep is None else sample_rep
+        sample_rep = self._sample_rep if sample_rep is None else sample_rep
         if sample_rep == "X":
             sample_rep = adata.X
             if isinstance(sample_rep, sp.csr_matrix):
                 return jnp.asarray(sample_rep.toarray())
             else:
                 return jnp.asarray(sample_rep)
-        if isinstance(self.sample_rep, str):
-            if self.sample_rep not in adata.obsm:
+        if isinstance(self._sample_rep, str):
+            if self._sample_rep not in adata.obsm:
                 raise KeyError(
-                    f"Sample representation '{self.sample_rep}' not found in `adata.obsm`."
+                    f"Sample representation '{self._sample_rep}' not found in `adata.obsm`."
                 )
-            return jnp.asarray(adata.obsm[self.sample_rep])
+            return jnp.asarray(adata.obsm[self._sample_rep])
         attr, key = next(iter(sample_rep.items()))
         return jnp.asarray(getattr(adata, attr)[key])
 
     def _verify_control_data(self, adata: anndata.AnnData | None) -> None:
         if adata is None:
             return None
-        if self.control_key not in adata.obs:
+        if self._control_key not in adata.obs:
             raise ValueError(
-                f"Control column '{self.control_key}' not found in adata.obs."
+                f"Control column '{self._control_key}' not found in adata.obs."
             )
-        if not isinstance(adata.obs[self.control_key].dtype, pd.BooleanDtype):
+        if not isinstance(adata.obs[self._control_key].dtype, pd.BooleanDtype):
             try:
-                adata.obs[self.control_key] = adata.obs[self.control_key].astype(
+                adata.obs[self._control_key] = adata.obs[self._control_key].astype(
                     "boolean"
                 )
             except ValueError as e:
                 raise ValueError(
-                    f"Control column '{self.control_key}' could not be converted to boolean."
+                    f"Control column '{self._control_key}' could not be converted to boolean."
                 ) from e
-        if adata.obs[self.control_key].sum() == 0:
+        if adata.obs[self._control_key].sum() == 0:
             raise ValueError("No control cells found in adata.")
 
     @staticmethod
@@ -694,7 +705,7 @@ class DataManager:
         for primary_cov in primary_covars:
             value = condition_data[primary_cov]
             cov_name = value if self.is_categorical else primary_cov
-            if primary_group in self.covariate_reps:
+            if primary_group in self._covariate_reps:
                 rep_key = primary_group
                 if cov_name not in rep_dict[primary_group]:
                     raise ValueError(
@@ -714,18 +725,18 @@ class DataManager:
             prim_arr = self._check_shape(prim_arr)
             perturb_covar_emb[primary_group].append(prim_arr)
 
-            for linked_covar in self.linked_perturb_covars[primary_cov].items():
+            for linked_covar in self._linked_perturb_covars[primary_cov].items():
                 linked_group, linked_cov = list(linked_covar)
 
                 if linked_cov is None:
-                    linked_arr = jnp.full((1, 1), self.null_value)
+                    linked_arr = jnp.full((1, 1), self._null_value)
                     linked_arr = self._check_shape(linked_arr)
                     perturb_covar_emb[linked_group].append(linked_arr)
                     continue
 
                 cov_name = condition_data[linked_cov]
 
-                if linked_group in self.covariate_reps:
+                if linked_group in self._covariate_reps:
                     rep_key = linked_group  # self.covariate_reps[linked_group][0]
                     if cov_name not in rep_dict[rep_key]:
                         raise ValueError(
@@ -740,16 +751,16 @@ class DataManager:
 
         perturb_covar_emb = {
             k: self._pad_to_max_length(
-                jnp.concatenate(v, axis=0), self.max_combination_length, self.null_value
+                jnp.concatenate(v, axis=0), self._max_combination_length, self._null_value
             )
             for k, v in perturb_covar_emb.items()
         }
 
         sample_covar_emb: dict[str, jax.Array] = {}
-        for sample_cov in self.sample_covariates:
+        for sample_cov in self._sample_covariates:
             value = condition_data[sample_cov]
-            if sample_cov in self.covariate_reps:
-                rep_key = self.covariate_reps[sample_cov]
+            if sample_cov in self._covariate_reps:
+                rep_key = self._covariate_reps[sample_cov]
                 if value not in rep_dict[rep_key]:
                     raise ValueError(
                         f"Representation for '{value}' not found in `adata.uns['{sample_cov}']`."
@@ -760,7 +771,7 @@ class DataManager:
 
             cov_arr = self._check_shape(cov_arr)
             sample_covar_emb[sample_cov] = jnp.tile(
-                cov_arr, (self.max_combination_length, 1)
+                cov_arr, (self._max_combination_length, 1)
             )
 
         return perturb_covar_emb | sample_covar_emb
@@ -778,6 +789,17 @@ class DataManager:
     @property
     def is_conditional(self) -> bool:
         """Whether the model is conditional."""
-        return (len(self.perturbation_covariates) > 0) or (
-            len(self.sample_covariates) > 0
+        return (len(self._perturbation_covariates) > 0) or (
+            len(self._sample_covariates) > 0
         )
+
+    @property
+    def adata(self) -> anndata.AnnData:
+        """An :class:`~anndata.Anndata` object used for instantiating the DataManager."""
+        return self._adata
+    
+    @property
+    def covariate_reps(self) -> dict[str, str]:
+        """Representation of covariates."""
+        return self._covariate_reps
+    

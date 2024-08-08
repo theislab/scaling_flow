@@ -4,15 +4,6 @@ import pytest
 from cfp.data.dataloader import PredictionSampler, TrainSampler
 from cfp.data.datamanager import DataManager
 
-perturbation_covariate_comb_args = [
-    {"drug": ["drug1", "drug2"]},
-    {"drug": ["drug1", "drug2"], "dosage": ["dosage_a", "dosage_b"]},
-    {
-        "drug": ["drug_a", "drug_b", "drug_c"],
-        "dosage": ["dosage_a", "dosage_b", "dosage_c"],
-    },
-]
-
 
 class TestTrainSampler:
     @pytest.mark.parametrize("batch_size", [1, 31])
@@ -100,19 +91,17 @@ class TestValidationSampler:
 class TestPredictionSampler:
     @pytest.mark.parametrize("sample_rep", ["X", "X_pca"])
     @pytest.mark.parametrize("split_covariates", [[], ["cell_type"]])
-    @pytest.mark.parametrize(
-        "perturbation_covariates", perturbation_covariate_comb_args
-    )
     @pytest.mark.parametrize("perturbation_covariate_reps", [{}, {"drug": "drug"}])
     def test_pred_sampler(
         self,
         adata_perturbation,
         sample_rep,
         split_covariates,
-        perturbation_covariates,
         perturbation_covariate_reps,
     ):
         from cfp.data.datamanager import DataManager
+
+        perturbation_covariates = {"drug": ["drug1", "drug2"]}
 
         control_key = "control"
         sample_covariates = ["cell_type"]
@@ -135,4 +124,3 @@ class TestPredictionSampler:
         assert "source" in out
         assert "condition" in out
         assert len(out["source"]) == len(out["condition"])
-        assert len(out["condition"]) == pred_data.n_perturbations

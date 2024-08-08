@@ -19,6 +19,7 @@ class ReturnData:
     condition_data: dict[str | int, jnp.ndarray] | None
     control_to_perturbation: dict[int, jnp.ndarray] | None
     max_combination_length: int | None
+    null_value: Any
 
 
 class BaseData:
@@ -51,25 +52,21 @@ class BaseData:
 
 
 class ConditionData(BaseData):
-    """Data container to get condition embedding.
+    """Data container containing condition embeddings.
 
     Parameters
     ----------
     condition_data
         Dictionary with embeddings for conditions.
-    covariate_encoder
-        Encoder for the primary covariate.
-    categorical
-        Whether the primary covariate is categorical.
     max_combination_length
         Maximum number of covariates in a combination.
     null_value
         Token to use for masking `null_value`.
+    data_manager
+        Data manager used to generate the data.
     """
 
     condition_data: dict[int | str, jnp.ndarray] | None
-    covariate_encoder: preprocessing.OneHotEncoder | None
-    categorical: bool
     max_combination_length: int
     null_value: Any
     data_manager: Any
@@ -77,7 +74,7 @@ class ConditionData(BaseData):
 
 @dataclass
 class TrainingData(BaseData):
-    """Data container for the perturbation data.
+    """Training data.
 
     Parameters
     ----------
@@ -121,6 +118,7 @@ class TrainingData(BaseData):
         int, jax.Array
     ]  # mapping from control idx to target distribution idcs
     max_combination_length: int
+    null_value: Any
     data_manager: Any
 
 
@@ -176,6 +174,7 @@ class ValidationData(BaseData):
         int, jax.Array
     ]  # mapping from control idx to target distribution idcs
     max_combination_length: int
+    null_value: Any
     data_manager: Any
     n_conditions_on_log_iteration: int | None = None
     n_conditions_on_train_end: int | None = None
@@ -231,4 +230,5 @@ class PredictionData(BaseData):
     ]  # (n_targets,) all embeddings for conditions
     control_to_perturbation: dict[int, jnp.ndarray] | None
     max_combination_length: int
+    null_value: Any
     data_manager: Any
