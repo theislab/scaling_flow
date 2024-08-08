@@ -522,7 +522,17 @@ class DataManager:
         perturbation_covariate_reps: dict[str, Sequence[str]],
         perturbation_covariates: dict[str, str],
     ) -> dict[str, Sequence[str]]:
-        # TODO check what this should do
+        for key, value in perturbation_covariate_reps.items():
+            if key not in perturbation_covariates:
+                raise ValueError(f"Key '{key}' not found in covariates.")
+            if value not in adata.uns:
+                raise ValueError(
+                    f"Perturbation covariate representation '{value}' not found in `adata.uns`."
+                )
+            if not isinstance(adata.uns[value], dict):
+                raise ValueError(
+                    f"Perturbation covariate representation '{value}' in `adata.uns` should be of type `dict`, found {type(adata.uns[value])}."
+                )
         return perturbation_covariate_reps
 
     @staticmethod
@@ -783,11 +793,6 @@ class DataManager:
         return perturb_covar_emb | sample_covar_emb
 
     @property
-    def primary_one_hot_encoder(self) -> preprocessing.OneHotEncoder | None:
-        """One-hot encoder for the primary covariate."""
-        return self._primary_one_hot_encoder
-
-    @property
     def is_categorical(self) -> bool:
         """Whether the primary covariate is categorical."""
         return self._is_categorical
@@ -805,6 +810,70 @@ class DataManager:
         return self._adata
 
     @property
+    def control_key(self) -> str:
+        """Boolean key in :attr:`~anndata.AnnData.obs` indicating whether belongs to control group."""
+        return self._control_key
+
+    @property
+    def perturbation_covariates(self) -> dict[str, list[str]]:
+        """Dictionary with keys indicating the name of the covariate group and values are keys in :attr:`~anndata.AnnData.obs` which together define the covariates."""
+        return self._perturbation_covariates
+
+    @property
+    def perturbation_covariate_reps(self) -> dict[str, list[str]]:
+        """Dictionary with keys indicating the name of the covariate group and values are keys in :attr:`~anndata.AnnData.uns` storing a dictionary with the representation of the covariates."""
+        return self._perturbation_covariate_reps
+
+    @property
+    def sample_covariates(self) -> Sequence[str]:
+        """Keys in :attr:`~anndata.AnnData.obs` indicating which sample the cell belongs to (e.g. cell line)."""
+        return self._sample_covariates
+
+    @property
+    def sample_covariate_reps(self) -> dict[str, str]:
+        """Dictionary with keys indicating the name of the sample covariate group and values are keys in :attr:`~anndata.AnnData.uns` storing a dictionary with the representation of the sample covariates."""
+        return self._sample_covariate_reps
+
+    @property
+    def split_covariates(self) -> Sequence[str]:
+        """Covariates in :attr:`~anndata.AnnData.obs` to split all control cells into different control populations."""
+        return self._split_covariates
+
+    @property
+    def max_combination_length(self) -> int:
+        """Maximum combination length of perturbation covariates."""
+        return self._max_combination_length
+
+    @property
+    def null_value(self) -> float:
+        """Value to use for padding to :attr:`~max_combination_length`."""
+        return self._null_value
+
+    @property
+    def primary_one_hot_encoder(self) -> preprocessing.OneHotEncoder | None:
+        """One-hot encoder for the primary covariate."""
+        return self._primary_one_hot_encoder
+
+    @property
+    def linked_perturb_covars(self) -> dict[str, dict[Any, Any]]:
+        """Dictionary with keys indicating the name of the primary covariate and values are dictionaries with keys indicating the name of the linked covariate group and values are the linked covariates."""
+        return self._linked_perturb_covars
+
+    @property
     def covariate_reps(self) -> dict[str, str]:
-        """Representation of covariates."""
+        """Dictionary which stores representation of covariates, i.e. the union of `sample_covariate_reps` and `perturbation_covariate_reps`."""
         return self._covariate_reps
+
+    @property
+    def idx_to_covar(self) -> dict[int, str]:
+        """TODO: we don't need this, do we?"""
+        return self._idx_to_covar
+
+    @property
+    def covar_to_idx(self) -> dict[str, int]:
+        """TODO: add description"""
+
+    @property
+    def perturb_covar_keys(self) -> list[str]:
+        """List of all perturbation covariates."""
+        return self._perturb_covar_keys
