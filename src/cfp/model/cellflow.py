@@ -11,10 +11,9 @@ import pandas as pd
 from numpy.typing import ArrayLike
 from ott.neural.methods.flows import dynamics
 from ott.solvers import utils as solver_utils
-from tqdm import tqdm
 
-from cfp.data.data import BaseData, PredictionData, ValidationData
-from cfp.data.dataloader import TrainSampler, ValidationSampler
+from cfp.data.data import BaseData, ValidationData
+from cfp.data.dataloader import PredictionSampler, TrainSampler, ValidationSampler
 from cfp.data.datamanager import DataManager
 from cfp.networks.velocity_field import ConditionalVelocityField
 from cfp.solvers import genot, otfm
@@ -274,17 +273,17 @@ class CellFlow:
     def predict(
         self,
         adata: ad.AnnData,
+        sample_rep: str,
         covariate_data: pd.DataFrame | None = None,
         condition_id_key: str | None = None,
-        sample_rep: str | None = None,
     ) -> dict[str, dict[str, ArrayLike]] | dict[str, ArrayLike]:
         """Predict perturbation.
 
         Args:
             adata: An :class:`~anndata.AnnData` object with the source representation.
+            sample_rep: Key in `adata.obsm` where the sample representation is stored or "X" to use `adata.X`.
             covariate_data: Covariate data defining the condition to predict. If not provided, `adata.obs` is used.
             condition_id_key: Key in `adata.obs` or `covariate_data` indicating the condition name.
-            sample_rep: Key in `adata.obsm` where the sample representation is stored or "X" to use `adata.X`.
 
         Returns
         -------
@@ -293,37 +292,21 @@ class CellFlow:
         if self.model is None:
             raise ValueError("Model not trained. Please call `train` first.")
 
-        sample_rep = sample_rep or self.sample_rep
-
-        pred_data = PredictionData.load_from_adata(
+        pred_data = self.dm.get_prediction_data(
             adata,
-            covariate_encoder=self.pdata.covariate_encoder,
-            max_combination_length=self.pdata.max_combination_length,
-            categorical=self.pdata.categorical,
             sample_rep=sample_rep,
             covariate_data=covariate_data,
             condition_id_key=condition_id_key,
-            perturbation_covariates=self.perturbation_covariates,
-            perturbation_covariate_reps=self.perturbation_covariate_reps,
-            sample_covariates=self.sample_covariates,
-            sample_covariate_reps=self.sample_covariate_reps,
-            split_covariates=self.split_covariates,
-            null_value=self.pdata.null_value,
         )
-
-        predicted_data: dict[str, dict[str, ArrayLike]] = {}
-        for src_dist in pred_data.src_data:
-            predicted_data[src_dist] = {}
-            src = pred_data.src_data[src_dist]
-            conds = pred_data.condition_data[src_dist]
-            for cond_id, condition in tqdm(conds.items()):
-                pred = self.model.predict(src, condition)
-                predicted_data[src_dist][cond_id] = pred
-
-        if len(predicted_data) == 1:
-            return next(iter(predicted_data.values()))
-
-        return predicted_data
+        pred_loader = PredictionSampler(pred_data)
+        batch = pred_loader.sample()
+        src = batch["source"]
+        condition = batch.get("condition", None)
+        print("src is ", src)
+        print("con  is ", condition)
+        out = jax.tree.map(self.model.predict, src, condition)
+        print("out is ", out)
+        return out
 
     def get_condition_embedding(
         self,

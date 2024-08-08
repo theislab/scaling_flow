@@ -206,6 +206,8 @@ class PredictionData(BaseData):
         Dictionary with data for source cells.
     condition_data
         Dictionary with embeddings for conditions.
+    control_to_perturbation
+        Mapping from control index to target distribution indices.
     covariate_encoder
         Encoder for the primary covariate.
     max_combination_length
@@ -221,8 +223,12 @@ class PredictionData(BaseData):
     split_idx_to_covariates: dict[
         int, str
     ]  # (n_sources,) dictionary explaining split_covariates_mask
+    perturbation_idx_to_covariates: dict[
+        int, tuple[str, ...]
+    ]  # (n_targets,), dictionary explaining perturbation_covariates_mask
     condition_data: dict[
         str | int, jnp.ndarray
     ]  # (n_targets,) all embeddings for conditions
+    control_to_perturbation: dict[int, jnp.ndarray] | None
     max_combination_length: int
     data_manager: Any

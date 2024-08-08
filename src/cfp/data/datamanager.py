@@ -121,7 +121,13 @@ class DataManager:
             data_manager=self,
         )
 
-    def get_prediction_data(self, adata: anndata.AnnData) -> Any:
+    def get_prediction_data(
+        self,
+        adata: anndata.AnnData,
+        sample_rep: str,
+        covariate_data: pd.DataFrame | None = None,
+        condition_id_key: str | None = None,
+    ) -> Any:
         """Get training data for the model.
 
         Parameters
@@ -132,12 +138,21 @@ class DataManager:
         -------
         TrainingData: Training data for the model.
         """
-        rd = self._get_data(adata, return_ground_truth_data=False)
+        rd = self._get_data(
+            adata,
+            sample_rep=sample_rep,
+            covariate_data=covariate_data,
+            condition_id_key=condition_id_key,
+            return_ground_truth_data=False,
+        )
+        print("rd.pertur.idxtocovariates", rd.perturbation_idx_to_covariates)
         return PredictionData(
             cell_data=rd.cell_data,
             split_covariates_mask=rd.split_covariates_mask,
             split_idx_to_covariates=rd.split_idx_to_covariates,
             condition_data=rd.condition_data,
+            control_to_perturbation=rd.control_to_perturbation,
+            perturbation_idx_to_covariates=rd.perturbation_idx_to_covariates,
             max_combination_length=rd.max_combination_length,
             data_manager=self,
         )
@@ -191,7 +206,7 @@ class DataManager:
         """
         self._verify_covariate_data(covariate_data, self.perturb_covar_keys)
         self._verify_covariate_type(
-            covariate_data, self.perturb_covar_keys, self._is_categorical
+            covariate_data, self.perturb_covar_keys, self.is_categorical
         )
         bd = self._get_data(
             adata=None,
@@ -211,6 +226,7 @@ class DataManager:
     def _get_data(
         self,
         adata: anndata.AnnData | None,
+        sample_rep: str | None = None,
         covariate_data: pd.DataFrame | None = None,
         condition_id_key: str | None = None,
         *,
@@ -218,9 +234,7 @@ class DataManager:
     ) -> TrainingData:
         if adata is None and covariate_data is None:
             raise ValueError("Either `adata` or `covariate_data` must be provided.")
-        if adata is not None and covariate_data is not None:
-            raise ValueError("Only one of `adata` or `covariate_data` can be provided.")
-
+        covariate_data = covariate_data if covariate_data is not None else adata.obs
         self._verify_covariate_data(
             adata, {covar: _to_list(covar) for covar in self.sample_covariates}
         )
@@ -228,13 +242,12 @@ class DataManager:
         self._verify_covariate_data(adata, _to_list(self.split_covariates))
 
         if condition_id_key is not None:
-            covariate_data = covariate_data if covariate_data is not None else adata.obs
             self._verify_condition_id_key(covariate_data, condition_id_key)
             select_keys = self.perturb_covar_keys + [condition_id_key]
         else:
             select_keys = self.perturb_covar_keys
 
-        perturb_covar_df = adata.obs[select_keys].drop_duplicates()
+        perturb_covar_df = covariate_data[select_keys].drop_duplicates()
 
         if condition_id_key is not None:
             perturb_covar_df = perturb_covar_df.set_index(condition_id_key)
@@ -244,7 +257,7 @@ class DataManager:
         if adata is not None:
             split_covariates_mask = np.full((adata.n_obs,), -1, dtype=jnp.int32)
             perturbation_covariates_mask = np.full((adata.n_obs,), -1, dtype=jnp.int32)
-            control_mask = adata.obs[self.control_key]
+            control_mask = covariate_data[self.control_key]
 
         condition_data: dict[int | str, list[jnp.ndarray]] | None = (
             {i: [] for i in self.covar_to_idx.keys()} if self.is_conditional else None
@@ -258,7 +271,9 @@ class DataManager:
         tgt_counter = 0
 
         if len(self.split_covariates) > 0:
-            split_cov_combs = adata.obs[self.split_covariates].drop_duplicates().values
+            split_cov_combs = (
+                covariate_data[self.split_covariates].drop_duplicates().values
+            )
         else:
             split_cov_combs = [[]]
 
@@ -268,7 +283,8 @@ class DataManager:
                     zip(self.split_covariates, split_combination, strict=False)
                 )
                 split_cov_mask = (
-                    adata.obs[list(filter_dict.keys())] == list(filter_dict.values())
+                    covariate_data[list(filter_dict.keys())]
+                    == list(filter_dict.values())
                 ).all(axis=1)
                 mask = np.array(control_mask * split_cov_mask)
 
@@ -281,18 +297,18 @@ class DataManager:
             for _, tgt_cond in pbar:
                 tgt_cond = tgt_cond[self.perturb_covar_keys]
                 if return_ground_truth_data:
-                    mask = (adata.obs[self.perturb_covar_keys] == tgt_cond.values).all(
-                        axis=1
-                    )
+                    mask = (
+                        covariate_data[self.perturb_covar_keys] == tgt_cond.values
+                    ).all(axis=1)
                     mask *= (1 - control_mask) * split_cov_mask
                     mask = np.array(mask == 1)
 
                     if mask.sum() == 0:
                         continue
 
-                    conditional_distributions.append(tgt_counter)
-                    perturbation_covariates_mask[mask] = tgt_counter
-                    perturbation_idx_to_covariates[tgt_counter] = tgt_cond.values
+                conditional_distributions.append(tgt_counter)
+                perturbation_covariates_mask[mask] = tgt_counter
+                perturbation_idx_to_covariates[tgt_counter] = tgt_cond.values
 
                 if self.is_conditional:
                     embedding = self._get_perturbation_covariates(
@@ -326,7 +342,9 @@ class DataManager:
             if perturbation_covariates_mask is not None
             else None
         )
-        cell_data = self._get_cell_data(adata) if adata is not None else None
+        cell_data = (
+            self._get_cell_data(adata, sample_rep) if adata is not None else None
+        )
         return ReturnData(
             cell_data=cell_data,
             split_covariates_mask=split_covariates_mask,
@@ -339,6 +357,18 @@ class DataManager:
         )
 
     @staticmethod
+    def _verify_condition_id_key(
+        covariate_data: pd.DataFrame, condition_id_key: str | None
+    ) -> None:
+        if (
+            condition_id_key is not None
+            and condition_id_key not in covariate_data.columns
+        ):
+            raise ValueError(
+                f"Condition id key '{condition_id_key}' is required for prediction but was not found in provided data."
+            )
+
+    @staticmethod
     def _verify_sample_rep(sample_rep: str | dict[str, str]) -> str | dict[str, str]:
         if not (isinstance(sample_rep, str) or isinstance(sample_rep, dict)):
             raise ValueError(
@@ -349,8 +379,10 @@ class DataManager:
     def _get_cell_data(
         self,
         adata: anndata.AnnData,
+        sample_rep: str | None,
     ) -> jax.Array:
-        if self.sample_rep == "X":
+        sample_rep = self.sample_rep if sample_rep is None else sample_rep
+        if sample_rep == "X":
             sample_rep = adata.X
             if isinstance(sample_rep, sp.csr_matrix):
                 return jnp.asarray(sample_rep.toarray())

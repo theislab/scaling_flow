@@ -53,15 +53,16 @@ class TestCellFlow:
         cf.train(num_iterations=3)
         assert cf.dataloader is not None
 
-        # pred = cf.predict(adata_perturbation)
-        # assert isinstance(pred, dict)
+        pred = cf.predict(adata_perturbation, sample_rep=sample_rep)
+        assert isinstance(pred, dict)
+        print(pred)
         # assert pred[0].shape[0] == adata_perturbation.n_obs
         # assert pred[0].shape[1] == cf._data_dim
 
-        # cond_embed = cf.get_condition_embedding(adata_perturbation)
-        # assert isinstance(cond_embed, dict)
-        # assert cond_embed[0].shape[0] == 1
-        # assert cond_embed[0].shape[1] == condition_embedding_dim
+        cond_embed = cf.get_condition_embedding(adata_perturbation)
+        assert isinstance(cond_embed, dict)
+        assert cond_embed[0].shape[0] == 1
+        assert cond_embed[0].shape[1] == condition_embedding_dim
 
     @pytest.mark.parametrize("solver", ["otfm", "genot"])
     @pytest.mark.parametrize("perturbation_covariate_reps", [{}, {"drug": "drug"}])
@@ -105,15 +106,15 @@ class TestCellFlow:
         cf.train(num_iterations=3)
         assert cf.dataloader is not None
 
-        # pred = cf.predict(adata_perturbation)
-        # assert isinstance(pred, dict)
-        # assert pred[0].shape[0] == adata_perturbation.n_obs
-        # assert pred[0].shape[1] == cf._data_dim
+        pred = cf.predict(adata_perturbation, sample_rep=sample_rep)
+        assert isinstance(pred, dict)
+        assert pred[0].shape[0] == adata_perturbation.n_obs
+        assert pred[0].shape[1] == cf._data_dim
 
-        # cond_embed = cf.get_condition_embedding(adata_perturbation)
-        # assert isinstance(cond_embed, dict)
-        # assert cond_embed[0].shape[0] == 1
-        # assert cond_embed[0].shape[1] == condition_embedding_dim
+        cond_embed = cf.get_condition_embedding(adata_perturbation)
+        assert isinstance(cond_embed, dict)
+        assert cond_embed[0].shape[0] == 1
+        assert cond_embed[0].shape[1] == condition_embedding_dim
 
     @pytest.mark.parametrize("split_covariates", [[], ["cell_type"]])
     @pytest.mark.parametrize(

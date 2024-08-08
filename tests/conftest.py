@@ -181,30 +181,5 @@ def adata_perturbation_with_nulls(adata_perturbation: ad.AnnData) -> ad.AnnData:
 
 
 @pytest.fixture()
-def pdata(adata_perturbation: ad.AnnData) -> TrainingData:
-    sample_rep = "X"
-    split_covariates = ["cell_type"]
-    control_key = "control"
-    perturbation_covariates = {
-        "drug": ("drug1", "drug2"),
-        "dosage": ("dosage_a", "dosage_b"),
-    }
-    perturbation_covariate_reps = {"drug": "drug"}
-
-    from cfp.data.datamanager import DataManager
-
-    dm = DataManager(
-        adata_perturbation,
-        sample_rep=sample_rep,
-        split_covariates=split_covariates,
-        control_key=control_key,
-        perturbation_covariates=perturbation_covariates,
-        perturbation_covariate_reps=perturbation_covariate_reps,
-    )
-
-    return dm.get_train_data(adata_perturbation)
-
-
-@pytest.fixture()
-def sampler(pdata: TrainingData):
-    return TrainSampler(pdata, batch_size=32)
+def sampler(train_data: TrainingData):
+    return TrainSampler(train_data, batch_size=32)
