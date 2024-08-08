@@ -83,7 +83,9 @@ class DataManager:
         self._linked_perturb_covars = self._get_linked_perturbation_covariates(
             self._perturbation_covariates
         )
-        sample_cov_groups = {covar: _to_list(covar) for covar in self._sample_covariates}
+        sample_cov_groups = {
+            covar: _to_list(covar) for covar in self._sample_covariates
+        }
         covariate_groups = self._perturbation_covariates | sample_cov_groups
         self._covariate_reps = (self._perturbation_covariate_reps or {}) | (
             self._sample_covariate_reps or {}
@@ -195,7 +197,10 @@ class DataManager:
         )
 
     def get_condition_data(
-        self, covariate_data: pd.DataFrame, rep_dict: dict[str, Any] | None = None, condition_id_key: str | None = None
+        self,
+        covariate_data: pd.DataFrame,
+        rep_dict: dict[str, Any] | None = None,
+        condition_id_key: str | None = None,
     ) -> ConditionData:
         """Get condition data for the model.
 
@@ -750,7 +755,9 @@ class DataManager:
 
         perturb_covar_emb = {
             k: self._pad_to_max_length(
-                jnp.concatenate(v, axis=0), self._max_combination_length, self._null_value
+                jnp.concatenate(v, axis=0),
+                self._max_combination_length,
+                self._null_value,
             )
             for k, v in perturb_covar_emb.items()
         }
@@ -796,9 +803,8 @@ class DataManager:
     def adata(self) -> anndata.AnnData:
         """An :class:`~anndata.Anndata` object used for instantiating the DataManager."""
         return self._adata
-    
+
     @property
     def covariate_reps(self) -> dict[str, str]:
         """Representation of covariates."""
         return self._covariate_reps
-    

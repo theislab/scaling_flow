@@ -4,7 +4,6 @@ from typing import Any
 
 import jax
 import jax.numpy as jnp
-import sklearn.preprocessing as preprocessing
 
 __all__ = ["TrainingData", "ValidationData"]
 
@@ -48,6 +47,7 @@ class BaseData:
 
     def __repr__(self) -> str:
         return f"{self.__class__.__name__}[{self._format_params(repr)}]"
+
 
 @dataclass
 class ConditionData(BaseData):

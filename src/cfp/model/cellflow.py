@@ -303,7 +303,7 @@ class CellFlow:
         src = batch["source"]
         condition = batch.get("condition", None)
         out = jax.tree.map(self.model.predict, src, condition)
-        
+
         return out
 
     def get_condition_embedding(
@@ -330,7 +330,9 @@ class CellFlow:
             cond_data = covariate_data
         elif isinstance(covariate_data, pd.DataFrame):
             cond_data = self.dm.get_condition_data(
-                covariate_data=covariate_data, rep_dict=rep_dict, condition_id_key=condition_id_key
+                covariate_data=covariate_data,
+                rep_dict=rep_dict,
+                condition_id_key=condition_id_key,
             )
         else:
             raise ValueError(
@@ -343,7 +345,6 @@ class CellFlow:
             condition = {k: v[[i], :] for k, v in cond_data.condition_data.items()}
             condition_embeddings[i] = self.model.get_condition_embedding(condition)
         return condition_embeddings
-
 
     def save(
         self,
