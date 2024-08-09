@@ -29,7 +29,7 @@ class TrainSampler:
         self.n_target_dists = data.n_perturbations
         self.conditional_samplings = [
             lambda key: jax.random.choice(
-                key, self.data.control_to_perturbation[i].shape[0]  # noqa: B023
+                key, self.data.control_to_perturbation[i]  # noqa: B023
             )
             for i in range(self.n_source_dists)
         ]

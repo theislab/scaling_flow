@@ -1,5 +1,5 @@
 # Configuration file for the Sphinx documentation builder.
-
+#
 # This file only contains a selection of the most common options. For a full
 # list see the documentation:
 # https://www.sphinx-doc.org/en/master/usage/configuration.html
@@ -7,123 +7,157 @@
 # -- Path setup --------------------------------------------------------------
 import sys
 from datetime import datetime
-from importlib.metadata import metadata
 from pathlib import Path
 
-HERE = Path(__file__).parent
-sys.path.insert(0, str(HERE / "extensions"))
+# If extensions (or modules to document with autodoc) are in another directory,
+# add these directories to sys.path here. If the directory is relative to the
+# documentation root, use os.path.abspath to make it absolute, like shown here.
+import cfp
 
+sys.path.insert(0, str(Path(__file__).parent / "extensions"))
 
 # -- Project information -----------------------------------------------------
 
-# NOTE: If you installed your project in editable mode, this might be stale.
-#       If this is the case, reinstall it to refresh the metadata
-info = metadata("cell_flow_perturbation")
-project_name = info["Name"]
-author = info["Author"]
-copyright = f"{datetime.now():%Y}, {author}."
-version = info["Version"]
-urls = dict(pu.split(", ") for pu in info.get_all("Project-URL"))
-repository_url = urls["Source"]
-
-# The full version, including alpha/beta/rc tags
-release = info["Version"]
-
-bibtex_bibfiles = ["references.bib"]
-templates_path = ["_templates"]
-nitpicky = True  # Warn about broken links
-needs_sphinx = "4.0"
-
-html_context = {
-    "display_github": True,  # Integrate GitHub
-    "github_user": "MUCDK",
-    "github_repo": "https://github.com/theislab/cell_flow_perturbation",
-    "github_version": "main",
-    "conf_py_path": "/docs/",
-}
+project = cfp.__name__
+author = cfp.__author__
+version = cfp.__version__
+copyright = f"{datetime.now():%Y}, Theislab"
 
 # -- General configuration ---------------------------------------------------
 
-# Add any Sphinx extension module names here, as strings.
-# They can be extensions coming with Sphinx (named 'sphinx.ext.*') or your custom ones.
+# Add any Sphinx extension module names here, as strings. They can be
+# extensions coming with Sphinx (named 'sphinx.ext.*') or your custom
+# ones.
 extensions = [
-    "myst_nb",
-    "sphinx_copybutton",
     "sphinx.ext.autodoc",
+    "sphinx.ext.napoleon",
+    "sphinx.ext.viewcode",
+    "sphinx.ext.mathjax",
     "sphinx.ext.intersphinx",
     "sphinx.ext.autosummary",
-    "sphinx.ext.napoleon",
     "sphinxcontrib.bibtex",
+    "sphinx_copybutton",
     "sphinx_autodoc_typehints",
-    "sphinx.ext.mathjax",
-    "IPython.sphinxext.ipython_console_highlighting",
-    "sphinxext.opengraph",
-    *[p.stem for p in (HERE / "extensions").glob("*.py")],
+    "myst_nb",
+    "sphinx_design",  # for cards
+    "sphinx_tippy",
+    "typed_returns",
+]
+intersphinx_mapping = {
+    "python": ("https://docs.python.org/3", None),
+    "numpy": ("https://numpy.org/doc/stable/", None),
+    "scipy": ("https://docs.scipy.org/doc/scipy/", None),
+    "pandas": ("https://pandas.pydata.org/docs/", None),
+    "jax": ("https://jax.readthedocs.io/en/latest/", None),
+    "ott": ("https://ott-jax.readthedocs.io/en/latest/", None),
+    "matplotlib": ("https://matplotlib.org/stable/", None),
+    "anndata": ("https://anndata.readthedocs.io/en/latest/", None),
+    "scanpy": ("https://scanpy.readthedocs.io/en/latest/", None),
+}
+master_doc = "index"
+pygments_style = "tango"
+pygments_dark_style = "monokai"
+
+nitpicky = True
+nitpick_ignore = [
+    ("py:class", "numpy.float64"),
+]
+# TODO(michalk8): remove once typing has been cleaned-up
+nitpick_ignore_regex = [
+    (r"py:class", r"cfp\..*(K|B|O)"),
+    (r"py:class", r"cfp\._typing.*"),
+    (r"py:class", r"cfp\..*Protocol.*"),
 ]
 
-autosummary_generate = True
-autodoc_member_order = "groupwise"
-default_role = "literal"
-napoleon_google_docstring = False
-napoleon_numpy_docstring = True
-napoleon_include_init_with_doc = False
-napoleon_use_rtype = True  # having a separate entry generally helps readability
-napoleon_use_param = True
-myst_heading_anchors = 6  # create anchors for h1-h6
-myst_enable_extensions = [
-    "amsmath",
-    "colon_fence",
-    "deflist",
-    "dollarmath",
-    "html_image",
-    "html_admonition",
-]
-myst_url_schemes = ("http", "https", "mailto")
-nb_output_stderr = "remove"
-nb_execution_mode = "off"
-nb_merge_streams = True
-typehints_defaults = "braces"
 
+# bibliography
+bibtex_bibfiles = ["references.bib"]
+bibtex_reference_style = "author_year"
+bibtex_default_style = "alpha"
+
+# Add any paths that contain templates here, relative to this directory.
+templates_path = ["_templates"]
 source_suffix = {
     ".rst": "restructuredtext",
     ".ipynb": "myst-nb",
-    ".myst": "myst-nb",
 }
 
-intersphinx_mapping = {
-    "python": ("https://docs.python.org/3", None),
-    "anndata": ("https://anndata.readthedocs.io/en/stable/", None),
-    "numpy": ("https://numpy.org/doc/stable/", None),
-}
+# myst
+nb_execution_mode = "off"
+myst_enable_extensions = [
+    "colon_fence",
+    "dollarmath",
+    "amsmath",
+]
+myst_heading_anchors = 3
 
-# List of patterns, relative to source directory, that match files and
-# directories to ignore when looking for source files.
-# This pattern also affects html_static_path and html_extra_path.
-exclude_patterns = ["_build", "Thumbs.db", ".DS_Store", "**.ipynb_checkpoints"]
 
+# autodoc + napoleon
+autosummary_generate = True
+autodoc_member_order = "alphabetical"
+autodoc_typehints = "description"
+napoleon_google_docstring = False
+napoleon_numpy_docstring = True
+
+# spelling
+spelling_lang = "en_US"
+spelling_warning = True
+spelling_word_list_filename = "spelling_wordlist.txt"
+spelling_add_pypi_package_names = True
+spelling_exclude_patterns = ["references.rst"]
+# see: https://pyenchant.github.io/pyenchant/api/enchant.tokenize.html
+spelling_filters = [
+    "enchant.tokenize.URLFilter",
+    "enchant.tokenize.EmailFilter",
+    "enchant.tokenize.MentionFilter",
+]
+
+# hover
+tippy_anchor_parent_selector = "div.content"
+tippy_enable_mathjax = True
+# no need because of sphinxcontrib-bibtex
+tippy_enable_doitips = False
+linkcheck_report_timeouts_as_broken = True
+linkcheck_ignore = [
+    # 403 Client Error
+    r"https://doi.org/10.1126/science.aad0501",
+    r"https://resources.aertslab.org/cistarget/tf_lists/",
+    r"https://doi.org/10.1126/science.aax1971",
+    r"https://doi.org/10.1093/nar/gkac235",
+    r"https://www.science.org/doi/abs/10.1126/science.aax1971",
+]
+
+exclude_patterns = ["_build", "**.ipynb_checkpoints", "notebooks/README.rst", "notebooks/CONTRIBUTING.rst"]
 
 # -- Options for HTML output -------------------------------------------------
 
 # The theme to use for HTML and HTML Help pages.  See the documentation for
 # a list of builtin themes.
-#
-html_theme = "sphinx_book_theme"
+html_theme = "furo"
 html_static_path = ["_static"]
-html_css_files = ["css/custom.css"]
-
-html_title = project_name
-
-html_theme_options = {
-    "repository_url": repository_url,
-    "use_repository_button": True,
-    "path_to_docs": "docs/",
-    "navigation_with_keys": False,
-}
-
-pygments_style = "default"
-
-nitpick_ignore = [
-    # If building the documentation fails because of a missing link that is outside your control,
-    # you can add an exception to this list.
-    #     ("py:class", "igraph.Graph"),
+html_css_files = [
+    "https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.1.1/css/all.min.css",
 ]
+
+html_show_sphinx = False
+html_show_sourcelink = False
+html_theme_options = {
+    "sidebar_hide_name": True,
+    #"light_logo": "img/light_mode_logo.png",
+    #"dark_logo": "img/dark_mode_logo.png",
+    "light_css_variables": {
+        "color-brand-primary": "#003262",
+        "color-brand-content": "#003262",
+        "admonition-font-size": "var(--font-size-normal)",
+        "admonition-title-font-size": "var(--font-size-normal)",
+        "code-font-size": "var(--font-size--small)",
+    },
+    "footer_icons": [
+        {
+            "name": "GitHub",
+            "url": "https://github.com/theislab/cell_flow_perturbation",
+            "html": "",
+            "class": "fab fa-github",
+        },
+    ],
+}
