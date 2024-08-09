@@ -1,57 +1,55 @@
-# cell_flow_perturbation
+[![Python version](https://img.shields.io/badge/python-3.10%20%7C%203.11%20%7C%203.12-blue)]()
+[![Black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
 
-[![Tests][badge-tests]][link-tests]
-[![Documentation][badge-docs]][link-docs]
-
-[badge-tests]: https://img.shields.io/github/actions/workflow/status/MUCDK/cell_flow_perturbation/test.yaml?branch=main
-[link-tests]: https://github.com/theislab/cell_flow_perturbation/actions/workflows/test.yml
-[badge-docs]: https://img.shields.io/readthedocs/cell_flow_perturbation
+# CellFlow
 
 Modeling complex perturbations with flow matching and optimal transport
 
-## Getting started
+## Quick start ⚡️
 
-Please refer to the [documentation][link-docs]. In particular, the
+```python
+import cfp
 
--   [API documentation][link-api].
+# Initialize CellFlow 
+cf = cfp.model.CellFlow(adata, model="otfm")
 
-## Installation
+# Prepare the training data and perturbation conditions
+cf.prepare_data(
+    sample_rep="X_pca",
+    control_key="CTRL",
+    perturbation_covariates={
+        "drugs": ["Dabrafenib", "Trametinib"],
+        "times": ["Dabrafenib_time", "Trametinib_time"],
+    },
+    perturbation_covariate_reps={
+        "drugs": "drug_embeddings",
+    },
+    sample_covariates=["cell_line"],
+    sample_covariate_reps={
+        "cell_line": "cell_line_embeddings",
+    },
+)
 
-You need to have Python 3.10 or newer installed on your system. If you don't have
-Python installed, we recommend installing [Mambaforge](https://github.com/conda-forge/miniforge#mambaforge).
+# Prepare the model
+cf.prepare_model(
+    encode_conditions=True,
+    condition_embedding_dim=32,
+    hidden_dims=(128, 128),
+    decoder_dims=(128, 128),
+)
 
-There are several alternative options to install cell_flow_perturbation:
+# Train the model
+cf.train(
+    num_iterations=1000,
+    batch_size=128,
+)
 
-<!--
-1) Install the latest release of `cell_flow_perturbation` from [PyPI][link-pypi]:
+# Make predictions
+X_pca_pred = cf.predict(
+    adata_ctrl,
+    condition_data=test_condition_df,
+)
 
-```bash
-pip install cell_flow_perturbation
+# Get condition embeddings
+condition_embeddings = cf.get_condition_embeddings(adata)
 ```
--->
-
-1. Install the latest development version:
-
-```bash
-pip install git+https://github.com/theislab/cell_flow_perturbation.git@main
-```
-
-## Release notes
-
-See the [changelog][changelog].
-
-## Contact
-
-For questions and help requests, you can reach out in the [scverse discourse][scverse-discourse].
-If you found a bug, please use the [issue tracker][issue-tracker].
-
-## Citation
-
-> t.b.a
-
-[scverse-discourse]: https://discourse.scverse.org/
-[issue-tracker]: https://github.com/MUCDK/cell_flow_perturbation/issues
-[changelog]: https://cell_flow_perturbation.readthedocs.io/latest/changelog.html
-[link-docs]: https://cell_flow_perturbation.readthedocs.io
-[link-api]: https://cell_flow_perturbation.readthedocs.io/latest/api.html
-[link-pypi]: https://pypi.org/project/cell_flow_perturbation
