@@ -387,3 +387,34 @@ class CellFlow:
             )
         with open(file_dir, "wb") as f:
             cloudpickle.dump(self, f)
+
+    @classmethod
+    def load(
+        cls,
+        filename: str,
+    ):
+        """
+        Instantiate a CellFlow model from a saved output.
+
+        Args:
+        filename: Path to the saved file
+
+        Returns
+        -------
+            Loaded instance of the model.
+        """
+        # Check if filename is a directory
+        file_name = (
+            os.path.join(filename, f"{cls.__name__}.pkl")
+            if os.path.isdir(filename)
+            else filename
+        )
+
+        with open(file_name, "rb") as f:
+            model = cloudpickle.load(f)
+
+        if type(model) is not cls:
+            raise TypeError(
+                f"Expected the model to be type of `{cls}`, found `{type(model)}`."
+            )
+        return model
