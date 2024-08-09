@@ -1,9 +1,9 @@
 # API
 
-## Preprocessing
+## CellFlow perturbation model
 
 ```{eval-rst}
-.. module:: cfp.pp
+.. module:: cfp.model
 .. currentmodule:: cfp
 
 .. autosummary::
@@ -12,10 +12,10 @@
     pp.basic_preproc
 ```
 
-## Tools
+## Solvers
 
 ```{eval-rst}
-.. module:: cfp.tl
+.. module:: cfp.model
 .. currentmodule:: cfp
 
 .. autosummary::
@@ -24,10 +24,10 @@
     tl.basic_tool
 ```
 
-## Plotting
+## Networks
 
 ```{eval-rst}
-.. module:: cfp.pl
+.. module:: cfp.networks
 .. currentmodule:: cfp
 
 .. autosummary::

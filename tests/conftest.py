@@ -5,7 +5,7 @@ import pandas as pd
 import pytest
 
 from cfp.data.data import TrainingData
-from cfp.data.dataloader import TrainSampler
+from cfp.data.dataloader import TrainSampler, ValidationSampler
 
 
 @pytest.fixture
@@ -29,14 +29,28 @@ def validdata():
         n_conditions = 10
 
         def __init__(self):
-            self.src_data = {0: jnp.ones((10, 5)) * 10}
-            self.tgt_data = {0: {0: jnp.ones((10, 5))}}
-            self.condition_data = {0: {0: {"pert1": jnp.ones((1, 2, 3))}}}
+            self.cell_data = jnp.ones((10, 5))
+            self.condition_data = {"pert1": jnp.ones((1, 2, 3))}
             self.n_conditions_on_log_iteration = 1
             self.n_conditions_on_train_end = 1
             self.max_combination_length = 2
+            self.control_to_perturbation = {0: [0]}
+            self.n_perturbations = 1
+            self.split_covariates_mask = jnp.zeros(
+                len(self.cell_data),
+            )
+            self.perturbation_covariates_mask = jnp.zeros(
+                len(self.cell_data),
+            )
+            self.perturbation_idx_to_covariates = {0: np.array(["my_pert"])}
+            self.perturbation_idx_to_id = {0: "my_naming_of_pert"}
 
     return {"val": ValidData()}
+
+
+@pytest.fixture()
+def valid_loader(validdata):
+    return {k: ValidationSampler(v) for k, v in validdata.items()}
 
 
 @pytest.fixture
@@ -168,28 +182,5 @@ def adata_perturbation_with_nulls(adata_perturbation: ad.AnnData) -> ad.AnnData:
 
 
 @pytest.fixture()
-def pdata(adata_perturbation: ad.AnnData) -> TrainingData:
-    sample_rep = "X"
-    split_covariates = ["cell_type"]
-    control_key = "control"
-    perturbation_covariates = {
-        "drug": ("drug1", "drug2"),
-        "dosage": ("dosage_a", "dosage_b"),
-    }
-    perturbation_covariate_reps = {"drug": "drug"}
-
-    pdata = TrainingData.load_from_adata(
-        adata_perturbation,
-        sample_rep=sample_rep,
-        split_covariates=split_covariates,
-        control_key=control_key,
-        perturbation_covariates=perturbation_covariates,
-        perturbation_covariate_reps=perturbation_covariate_reps,
-    )
-
-    return pdata
-
-
-@pytest.fixture()
-def sampler(pdata: TrainingData):
-    return TrainSampler(pdata, batch_size=32)
+def sampler(train_data: TrainingData):
+    return TrainSampler(train_data, batch_size=32)

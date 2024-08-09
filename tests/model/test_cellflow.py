@@ -1,3 +1,4 @@
+import jax
 import pytest
 
 import cfp
@@ -12,7 +13,7 @@ perturbation_covariate_comb_args = [
 
 
 class TestCellFlow:
-    @pytest.mark.parametrize("solver", ["genot", "otfm"])
+    @pytest.mark.parametrize("solver", ["otfm", "genot"])
     def test_cellflow_solver(
         self,
         adata_perturbation,
@@ -31,7 +32,7 @@ class TestCellFlow:
             perturbation_covariates=perturbation_covariates,
             perturbation_covariate_reps=perturbation_covariate_reps,
         )
-        assert cf.pdata is not None
+        assert cf.train_data is not None
         assert hasattr(cf, "_data_dim")
 
         condition_encoder_kwargs = {}
@@ -52,12 +53,18 @@ class TestCellFlow:
         cf.train(num_iterations=3)
         assert cf.dataloader is not None
 
-        pred = cf.predict(adata_perturbation)
+        # we assume these are all source cells now in adata_perturbation
+        adata_perturbation_pred = adata_perturbation.copy()
+        adata_perturbation_pred.obs["control"] = True
+        pred = cf.predict(adata_perturbation_pred, sample_rep=sample_rep)
         assert isinstance(pred, dict)
-        assert pred[0].shape[0] == adata_perturbation.n_obs
-        assert pred[0].shape[1] == cf._data_dim
+        out = next(iter(pred.values()))
+        assert out.shape[0] == adata_perturbation.n_obs
+        assert out.shape[1] == cf._data_dim
 
-        cond_embed = cf.get_condition_embedding(adata_perturbation)
+        cond_embed = cf.get_condition_embedding(
+            adata_perturbation.obs, rep_dict=adata_perturbation.uns
+        )
         assert isinstance(cond_embed, dict)
         assert cond_embed[0].shape[0] == 1
         assert cond_embed[0].shape[1] == condition_embedding_dim
@@ -83,7 +90,7 @@ class TestCellFlow:
             perturbation_covariates=perturbation_covariates,
             perturbation_covariate_reps=perturbation_covariate_reps,
         )
-        assert cf.pdata is not None
+        assert cf.train_data is not None
         assert hasattr(cf, "_data_dim")
 
         condition_encoder_kwargs = {}
@@ -104,12 +111,18 @@ class TestCellFlow:
         cf.train(num_iterations=3)
         assert cf.dataloader is not None
 
-        pred = cf.predict(adata_perturbation)
+        # we assume these are all source cells now in adata_perturbation
+        adata_perturbation_pred = adata_perturbation.copy()
+        adata_perturbation_pred.obs["control"] = True
+        pred = cf.predict(adata_perturbation_pred, sample_rep=sample_rep)
         assert isinstance(pred, dict)
-        assert pred[0].shape[0] == adata_perturbation.n_obs
-        assert pred[0].shape[1] == cf._data_dim
+        out = next(iter(pred.values()))
+        assert out.shape[0] == adata_perturbation.n_obs
+        assert out.shape[1] == cf._data_dim
 
-        cond_embed = cf.get_condition_embedding(adata_perturbation)
+        cond_embed = cf.get_condition_embedding(
+            adata_perturbation.obs, rep_dict=adata_perturbation.uns
+        )
         assert isinstance(cond_embed, dict)
         assert cond_embed[0].shape[0] == 1
         assert cond_embed[0].shape[1] == condition_embedding_dim
@@ -138,16 +151,20 @@ class TestCellFlow:
             perturbation_covariates=perturbation_covariates,
             perturbation_covariate_reps={"drug": "drug"},
         )
-        assert cf.pdata is not None
+        assert cf.train_data is not None
         assert hasattr(cf, "_data_dim")
 
         for k in perturbation_covariates.keys():
-            assert k in cf.pdata.condition_data.keys()
-            assert cf.pdata.condition_data[k].ndim == 3
+            assert k in cf.train_data.condition_data.keys()
+            assert cf.train_data.condition_data[k].ndim == 3
             assert (
-                cf.pdata.condition_data[k].shape[1] == cf.pdata.max_combination_length
+                cf.train_data.condition_data[k].shape[1]
+                == cf.train_data.max_combination_length
             )
-            assert cf.pdata.condition_data[k].shape[0] == cf.pdata.n_perturbations
+            assert (
+                cf.train_data.condition_data[k].shape[0]
+                == cf.train_data.n_perturbations
+            )
 
         cf.prepare_validation_data(
             adata_perturbation,
@@ -157,11 +174,10 @@ class TestCellFlow:
         )
         assert isinstance(cf._validation_data, dict)
         assert "val" in cf._validation_data
-        assert isinstance(cf._validation_data["val"].src_data, dict)
-        assert isinstance(cf._validation_data["val"].tgt_data, dict)
+        assert isinstance(cf._validation_data["val"].cell_data, jax.Array)
         assert isinstance(cf._validation_data["val"].condition_data, dict)
 
-        cond_data = cf._validation_data["val"].condition_data[0][0]
+        cond_data = cf._validation_data["val"].condition_data
         assert (
             cf._validation_data["val"].n_conditions_on_log_iteration
             == n_conditions_on_log_iteration
@@ -173,8 +189,7 @@ class TestCellFlow:
         for k in perturbation_covariates.keys():
             assert k in cond_data.keys()
             assert cond_data[k].ndim == 3
-            assert cond_data[k].shape[1] == cf.pdata.max_combination_length
-            assert cond_data[k].shape[0] == 1
+            assert cond_data[k].shape[1] == cf.train_data.max_combination_length
 
     @pytest.mark.parametrize("solver", ["otfm", "genot"])
     @pytest.mark.parametrize("n_conditions_on_log_iteration", [None, 0, 1])
@@ -194,7 +209,7 @@ class TestCellFlow:
             perturbation_covariates={"drug": ["drug1"]},
             perturbation_covariate_reps={"drug": "drug"},
         )
-        assert cf.pdata is not None
+        assert cf.train_data is not None
         assert hasattr(cf, "_data_dim")
 
         cf.prepare_validation_data(
@@ -205,18 +220,16 @@ class TestCellFlow:
         )
         assert isinstance(cf._validation_data, dict)
         assert "val" in cf._validation_data
-        assert isinstance(cf._validation_data["val"].src_data, dict)
-        assert isinstance(cf._validation_data["val"].tgt_data, dict)
+        assert isinstance(cf._validation_data["val"].cell_data, jax.Array)
         assert isinstance(cf._validation_data["val"].condition_data, dict)
         assert (
             cf._validation_data["val"].max_combination_length
-            == cf.pdata.max_combination_length
+            == cf.train_data.max_combination_length
         )
-        cond_data = cf._validation_data["val"].condition_data[0][0]
+        cond_data = cf._validation_data["val"].condition_data
         assert "drug" in cond_data.keys()
         assert cond_data["drug"].ndim == 3
-        assert cond_data["drug"].shape[1] == cf.pdata.max_combination_length
-        assert cond_data["drug"].shape[0] == 1
+        assert cond_data["drug"].shape[1] == cf.train_data.max_combination_length
 
         condition_encoder_kwargs = {}
         if solver == "genot":
@@ -241,3 +254,50 @@ class TestCellFlow:
         cf.train(num_iterations=3, callbacks=[metrics_callback], valid_freq=1)
         assert cf.dataloader is not None
         assert f"val_{metric_to_compute}_mean" in cf.trainer.training_logs
+
+    @pytest.mark.parametrize("solver", ["otfm", "genot"])
+    def test_cellflow_predict(
+        self,
+        adata_perturbation,
+        solver,
+    ):
+        cf = cfp.model.cellflow.CellFlow(adata_perturbation, solver=solver)
+        cf.prepare_data(
+            sample_rep="X",
+            control_key="control",
+            perturbation_covariates={"drug": ["drug1"]},
+            perturbation_covariate_reps={"drug": "drug"},
+        )
+
+        condition_encoder_kwargs = {}
+        if solver == "genot":
+            condition_encoder_kwargs["genot_source_layers"] = (
+                ("mlp", {"dims": (32, 32)}),
+            )
+            condition_encoder_kwargs["genot_source_dim"] = 32
+
+        cf.prepare_model(
+            condition_embedding_dim=32,
+            hidden_dims=(32, 32),
+            decoder_dims=(32, 32),
+            condition_encoder_kwargs=condition_encoder_kwargs,
+        )
+
+        cf.train(num_iterations=3)
+
+        adata_pred = adata_perturbation[:100].copy()
+        adata_pred.obs["control"] = True
+        covariate_data = adata_perturbation.obs.iloc[:10]
+        pred = cf.predict(adata_pred, sample_rep="X", covariate_data=covariate_data)
+
+        assert isinstance(pred, dict)
+        out = next(iter(pred.values()))
+        assert out.shape[0] == 100
+        assert out.shape[1] == cf._data_dim
+
+        adata_pred.obs["control"].iloc[0:20] = False
+        with pytest.raises(
+            ValueError,
+            match=r".*If both `adata` and `covariate_data` are given, all samples in `adata` must be control samples*",
+        ):
+            cf.predict(adata_pred, sample_rep="X", covariate_data=covariate_data)

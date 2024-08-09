@@ -4,17 +4,17 @@ from functools import partial
 from typing import Any, Literal
 
 import anndata as ad
-import pandas as pd
 import cloudpickle
 import jax
 import optax
+import pandas as pd
 from numpy.typing import ArrayLike
-from tqdm import tqdm
 from ott.neural.methods.flows import dynamics
 from ott.solvers import utils as solver_utils
 
-from cfp.data.data import TrainingData, ValidationData, PredictionData, ConditionData
-from cfp.data.dataloader import TrainSampler
+from cfp.data.data import BaseData, ValidationData
+from cfp.data.dataloader import PredictionSampler, TrainSampler, ValidationSampler
+from cfp.data.datamanager import DataManager
 from cfp.networks.velocity_field import ConditionalVelocityField
 from cfp.solvers import genot, otfm
 from cfp.training.trainer import CellFlowTrainer
@@ -73,28 +73,23 @@ class CellFlow:
             None
 
         """
-        self.sample_rep = sample_rep
-        self.control_key = control_key
-        self.perturbation_covariates = perturbation_covariates
-        self.perturbation_covariate_reps = perturbation_covariate_reps
-        self.sample_covariates = sample_covariates
-        self.sample_covariate_reps = sample_covariate_reps
-        self.split_covariates = split_covariates
-
-        self.pdata = TrainingData.load_from_adata(
+        self.dm = DataManager(
             self.adata,
-            sample_rep=self.sample_rep,
-            control_key=self.control_key,
-            perturbation_covariates=self.perturbation_covariates,
-            perturbation_covariate_reps=self.perturbation_covariate_reps,
-            sample_covariates=self.sample_covariates,
-            sample_covariate_reps=self.sample_covariate_reps,
-            split_covariates=self.split_covariates,
+            sample_rep=sample_rep,
+            control_key=control_key,
+            perturbation_covariates=perturbation_covariates,
+            perturbation_covariate_reps=perturbation_covariate_reps,
+            sample_covariates=sample_covariates,
+            sample_covariate_reps=sample_covariate_reps,
+            split_covariates=split_covariates,
             max_combination_length=max_combination_length,
             null_value=null_value,
         )
 
-        self._data_dim = self.pdata.cell_data.shape[-1]
+        # TODO: rename to self.train_data
+        self.train_data = self.dm.get_train_data(self.adata)
+
+        self._data_dim = self.train_data.cell_data.shape[-1]
 
     def prepare_validation_data(
         self,
@@ -116,23 +111,12 @@ class CellFlow:
         -------
             None
         """
-        if self.pdata is None:
+        if self.train_data is None:
             raise ValueError(
                 "Dataloader not initialized. Training data needs to be set up before preparing validation data. Please call prepare_data first."
             )
-        val_data = ValidationData.load_from_adata(
+        val_data = self.dm.get_validation_data(
             adata,
-            sample_rep=self.sample_rep,
-            control_key=self.control_key,
-            covariate_encoder=self.pdata.covariate_encoder,
-            categorical=self.pdata.categorical,
-            max_combination_length=self.pdata.max_combination_length,
-            perturbation_covariates=self.perturbation_covariates,
-            perturbation_covariate_reps=self.perturbation_covariate_reps,
-            sample_covariates=self.sample_covariates,
-            sample_covariate_reps=self.sample_covariate_reps,
-            split_covariates=self.split_covariates,
-            null_value=self.pdata.null_value,
             n_conditions_on_log_iteration=n_conditions_on_log_iteration,
             n_conditions_on_train_end=n_conditions_on_train_end,
         )
@@ -184,7 +168,7 @@ class CellFlow:
         -------
             None
         """
-        if self.pdata is None:
+        if self.train_data is None:
             raise ValueError(
                 "Dataloader not initialized. Please call `prepare_data` first."
             )
@@ -196,7 +180,7 @@ class CellFlow:
 
         vf = ConditionalVelocityField(
             output_dim=self._data_dim,
-            max_combination_length=self.pdata.max_combination_length,
+            max_combination_length=self.train_data.max_combination_length,
             encode_conditions=encode_conditions,
             condition_embedding_dim=condition_embedding_dim,
             condition_encoder_kwargs=condition_encoder_kwargs,
@@ -224,7 +208,7 @@ class CellFlow:
                 match_fn=match_fn,
                 flow=flow,
                 optimizer=optimizer,
-                conditions=self.pdata.condition_data,
+                conditions=self.train_data.condition_data,
                 rng=jax.random.PRNGKey(seed),
                 **solver_kwargs,
             )
@@ -236,7 +220,7 @@ class CellFlow:
                 source_dim=self._data_dim,
                 target_dim=self._data_dim,
                 optimizer=optimizer,
-                conditions=self.pdata.condition_data,
+                conditions=self.train_data.condition_data,
                 rng=jax.random.PRNGKey(seed),
                 **solver_kwargs,
             )
@@ -263,7 +247,7 @@ class CellFlow:
         -------
             None
         """
-        if self.pdata is None:
+        if self.train_data is None:
             raise ValueError("Data not initialized. Please call `prepare_data` first.")
 
         if self.trainer is None:
@@ -271,13 +255,16 @@ class CellFlow:
                 "Model not initialized. Please call `prepare_model` first."
             )
 
-        self.dataloader = TrainSampler(data=self.pdata, batch_size=batch_size)
+        self.dataloader = TrainSampler(data=self.train_data, batch_size=batch_size)
+        validation_loaders = {
+            k: ValidationSampler(v) for k, v in self._validation_data.items()
+        }
 
         self.trainer.train(
             dataloader=self.dataloader,
             num_iterations=num_iterations,
             valid_freq=valid_freq,
-            valid_data=self._validation_data,
+            valid_loaders=validation_loaders,
             callbacks=callbacks,
             monitor_metrics=monitor_metrics,
         )
@@ -286,17 +273,17 @@ class CellFlow:
     def predict(
         self,
         adata: ad.AnnData,
+        sample_rep: str,
         covariate_data: pd.DataFrame | None = None,
         condition_id_key: str | None = None,
-        sample_rep: str | None = None,
     ) -> dict[str, dict[str, ArrayLike]] | dict[str, ArrayLike]:
         """Predict perturbation.
 
         Args:
             adata: An :class:`~anndata.AnnData` object with the source representation.
+            sample_rep: Key in `adata.obsm` where the sample representation is stored or "X" to use `adata.X`.
             covariate_data: Covariate data defining the condition to predict. If not provided, `adata.obs` is used.
             condition_id_key: Key in `adata.obs` or `covariate_data` indicating the condition name.
-            sample_rep: Key in `adata.obsm` where the sample representation is stored or "X" to use `adata.X`.
 
         Returns
         -------
@@ -305,42 +292,33 @@ class CellFlow:
         if self.model is None:
             raise ValueError("Model not trained. Please call `train` first.")
 
-        sample_rep = sample_rep or self.sample_rep
-
-        pred_data = PredictionData.load_from_adata(
+        if adata is not None and covariate_data is not None:
+            if self.dm.control_key not in adata.obs.columns:
+                raise ValueError(
+                    f"If both `adata` and `covariate_data` are given, the control key `{self.dm.control_key}` must be in `adata.obs`."
+                )
+            if not adata.obs[self.dm.control_key].all():
+                raise ValueError(
+                    f"If both `adata` and `covariate_data` are given, all samples in `adata` must be control samples, and thus `adata.obs[`{self.dm.control_key}`] must be set to `True` everywhere."
+                )
+        pred_data = self.dm.get_prediction_data(
             adata,
-            covariate_encoder=self.pdata.covariate_encoder,
-            max_combination_length=self.pdata.max_combination_length,
-            categorical=self.pdata.categorical,
             sample_rep=sample_rep,
             covariate_data=covariate_data,
             condition_id_key=condition_id_key,
-            perturbation_covariates=self.perturbation_covariates,
-            perturbation_covariate_reps=self.perturbation_covariate_reps,
-            sample_covariates=self.sample_covariates,
-            sample_covariate_reps=self.sample_covariate_reps,
-            split_covariates=self.split_covariates,
-            null_value=self.pdata.null_value,
         )
+        pred_loader = PredictionSampler(pred_data)
+        batch = pred_loader.sample()
+        src = batch["source"]
+        condition = batch.get("condition", None)
+        out = jax.tree.map(self.model.predict, src, condition)
 
-        predicted_data: dict[str, dict[str, ArrayLike]] = {}
-        for src_dist in pred_data.src_data:
-            predicted_data[src_dist] = {}
-            src = pred_data.src_data[src_dist]
-            conds = pred_data.condition_data[src_dist]
-            for cond_id, condition in tqdm(conds.items()):
-                pred = self.model.predict(src, condition)
-                predicted_data[src_dist][cond_id] = pred
-
-        if len(predicted_data) == 1:
-            return next(iter(predicted_data.values()))
-
-        return predicted_data
+        return out
 
     def get_condition_embedding(
         self,
-        adata: ad.AnnData | None = None,
-        covariate_data: pd.DataFrame | None = None,
+        covariate_data: pd.DataFrame | BaseData | None = None,
+        rep_dict: dict[str, str] | None = None,
         condition_id_key: str | None = None,
     ) -> dict[str, ArrayLike]:
         """Get condition embedding.
@@ -357,28 +335,23 @@ class CellFlow:
         if self.model is None:
             raise ValueError("Model not trained. Please call `train` first.")
 
-        adata = adata if adata is not None else self.adata
-
-        cond_data = ConditionData.load_from_adata(
-            adata,
-            covariate_encoder=self.pdata.covariate_encoder,
-            max_combination_length=self.pdata.max_combination_length,
-            categorical=self.pdata.categorical,
-            covariate_data=covariate_data,
-            condition_id_key=condition_id_key,
-            perturbation_covariates=self.perturbation_covariates,
-            perturbation_covariate_reps=self.perturbation_covariate_reps,
-            sample_covariates=self.sample_covariates,
-            sample_covariate_reps=self.sample_covariate_reps,
-            null_value=self.pdata.null_value,
-        )
-
-        condition_embeddings = {}
-        for cond_id, condition in cond_data.condition_data.items():
-            condition_embeddings[cond_id] = self.model.get_condition_embedding(
-                condition
+        if hasattr(covariate_data, "condition_data"):
+            cond_data = covariate_data
+        elif isinstance(covariate_data, pd.DataFrame):
+            cond_data = self.dm.get_condition_data(
+                covariate_data=covariate_data,
+                rep_dict=rep_dict,
+                condition_id_key=condition_id_key,
             )
-
+        else:
+            raise ValueError(
+                "Covariate data must be a `pandas.DataFrame` or an instance of `BaseData`."
+            )
+        condition_embeddings = {}
+        n_conditions = len(next(iter(cond_data.condition_data.values())))
+        for i in range(n_conditions):
+            condition = {k: v[[i], :] for k, v in cond_data.condition_data.items()}
+            condition_embeddings[i] = self.model.get_condition_embedding(condition)
         return condition_embeddings
 
     def save(
