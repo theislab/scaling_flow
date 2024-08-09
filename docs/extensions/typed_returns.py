@@ -1,6 +1,6 @@
 import re
-from typing import Any
 from collections.abc import Iterable, Iterator
+from typing import Any
 
 from sphinx.application import Sphinx
 from sphinx.ext.napoleon import NumpyDocstring

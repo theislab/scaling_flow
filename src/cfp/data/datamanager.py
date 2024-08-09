@@ -142,17 +142,18 @@ class DataManager:
         -------
         TrainingData: Training data for the model.
         """
+        adata_to_pass = None if covariate_data is not None else adata
         rd = self._get_data(
-            None,
+            adata=adata_to_pass,
             sample_rep=sample_rep,
             covariate_data=covariate_data,
-            rep_dict=adata.uns,
+            rep_dict=adata.uns if rep_dict is None else rep_dict,
             condition_id_key=condition_id_key,
             return_ground_truth_data=False,
         )
         cell_data = self._get_cell_data(adata, sample_rep)
-        # we assume there is only one
-        split_covariates_mask = np.ones((len(cell_data),))
+        split_covariates_mask = self._get_split_covariates_mask(adata)
+
         return PredictionData(
             cell_data=cell_data,
             split_covariates_mask=split_covariates_mask,
@@ -244,7 +245,6 @@ class DataManager:
         *,
         return_ground_truth_data: bool = True,
     ) -> TrainingData:
-        print("in _get_data")
         if adata is None and covariate_data is None:
             raise ValueError("Either `adata` or `covariate_data` must be provided.")
         covariate_data = covariate_data if covariate_data is not None else adata.obs
@@ -294,7 +294,6 @@ class DataManager:
             )
         else:
             split_cov_combs = [[]]
-        print("split_cov_combs", split_cov_combs)
         for split_combination in split_cov_combs:
             if adata is not None:
                 filter_dict = dict(
@@ -305,10 +304,10 @@ class DataManager:
                     == list(filter_dict.values())
                 ).all(axis=1)
                 mask = np.array(control_mask * split_cov_mask)
-                print("split_covariates_mask.shape", split_covariates_mask.shape)
-                print("mask.shape", mask.shape)
                 split_covariates_mask[mask] = src_counter
-                self._split_idx_to_covariates[src_counter] = split_combination
+                self._split_idx_to_covariates[src_counter] = tuple(
+                    list(split_combination)
+                )
 
             conditional_distributions = []
 
@@ -435,6 +434,33 @@ class DataManager:
                 ) from e
         if adata.obs[self._control_key].sum() == 0:
             raise ValueError("No control cells found in adata.")
+
+    def _get_split_covariates_mask(self, adata: anndata.AnnData) -> Any:
+        # here we assume that adata only contains source cells
+        if len(self.split_covariates) == 0:
+            return jnp.full((len(adata),), 0, dtype=jnp.int32)
+        split_covariates_mask = np.full((len(adata),), -1, dtype=jnp.int32)
+
+        split_cov_combs = adata.obs[self.split_covariates].drop_duplicates().values
+        cov_to_split_idx = {v: k for k, v in self.split_idx_to_covariates.items()}
+
+        for split_combination in split_cov_combs:
+            split_combination = tuple(list(split_combination))
+            if split_combination not in cov_to_split_idx:
+                raise ValueError(
+                    f"Split combination {split_combination} not found in DataManager.split_idx_to_covariates.values()."
+                )
+
+            filter_dict = dict(
+                zip(self.split_covariates, split_combination, strict=False)
+            )
+            split_cov_mask = (
+                adata.obs[list(filter_dict.keys())] == list(filter_dict.values())
+            ).all(axis=1)
+
+            split_covariates_mask[split_cov_mask] = cov_to_split_idx[split_combination]
+
+        return jnp.asarray(split_covariates_mask)
 
     @staticmethod
     def _verify_perturbation_covariates(

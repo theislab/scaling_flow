@@ -292,6 +292,15 @@ class CellFlow:
         if self.model is None:
             raise ValueError("Model not trained. Please call `train` first.")
 
+        if adata is not None and covariate_data is not None:
+            if self.dm.control_key not in adata.obs.columns:
+                raise ValueError(
+                    f"If both `adata` and `covariate_data` are given, the control key `{self.dm.control_key}` must be in `adata.obs`."
+                )
+            if not adata.obs[self.dm.control_key].all():
+                raise ValueError(
+                    f"If both `adata` and `covariate_data` are given, all samples in `adata` must be control samples, and thus `adata.obs[`{self.dm.control_key}`] must be set to `True` everywhere."
+                )
         pred_data = self.dm.get_prediction_data(
             adata,
             sample_rep=sample_rep,
@@ -302,8 +311,6 @@ class CellFlow:
         batch = pred_loader.sample()
         src = batch["source"]
         condition = batch.get("condition", None)
-        print("src shape", src)
-        print("condiiton shape", condition)
         out = jax.tree.map(self.model.predict, src, condition)
 
         return out
