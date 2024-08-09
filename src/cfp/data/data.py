@@ -15,6 +15,7 @@ class ReturnData:
     split_idx_to_covariates: dict[int, str] | None
     perturbation_covariates_mask: jnp.ndarray | None
     perturbation_idx_to_covariates: dict[int, tuple[str, ...]] | None
+    perturbation_idx_to_id: dict[int, Any]
     condition_data: dict[str | int, jnp.ndarray] | None
     control_to_perturbation: dict[int, jnp.ndarray] | None
     max_combination_length: int | None
@@ -67,6 +68,8 @@ class ConditionData(BaseData):
 
     condition_data: dict[int | str, jnp.ndarray] | None
     max_combination_length: int
+    perturbation_idx_to_covariates: dict[int, tuple[str, ...]]
+    perturbation_idx_to_id: dict[int, Any]
     null_value: Any
     data_manager: Any
 
@@ -110,6 +113,7 @@ class TrainingData(BaseData):
     perturbation_idx_to_covariates: dict[
         int, tuple[str, ...]
     ]  # (n_targets,), dictionary explaining perturbation_covariates_mask
+    perturbation_idx_to_id: dict[int, Any]
     condition_data: dict[
         str | int, jnp.ndarray
     ]  # (n_targets,) all embeddings for conditions
@@ -166,6 +170,7 @@ class ValidationData(BaseData):
     perturbation_idx_to_covariates: dict[
         int, tuple[str, ...]
     ]  # (n_targets,), dictionary explaining perturbation_covariates_mask
+    perturbation_idx_to_id: dict[int, Any]
     condition_data: dict[
         str | int, jnp.ndarray
     ]  # (n_targets,) all embeddings for conditions
@@ -224,6 +229,7 @@ class PredictionData(BaseData):
     perturbation_idx_to_covariates: dict[
         int, tuple[str, ...]
     ]  # (n_targets,), dictionary explaining perturbation_covariates_mask
+    perturbation_idx_to_id: dict[int, Any]
     condition_data: dict[
         str | int, jnp.ndarray
     ]  # (n_targets,) all embeddings for conditions

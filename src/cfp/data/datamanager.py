@@ -117,6 +117,7 @@ class DataManager:
             split_idx_to_covariates=rd.split_idx_to_covariates,
             perturbation_covariates_mask=rd.perturbation_covariates_mask,
             perturbation_idx_to_covariates=rd.perturbation_idx_to_covariates,
+            perturbation_idx_to_id=rd.perturbation_idx_to_id,
             condition_data=rd.condition_data,
             control_to_perturbation=rd.control_to_perturbation,
             max_combination_length=rd.max_combination_length,
@@ -161,6 +162,7 @@ class DataManager:
             condition_data=rd.condition_data,
             control_to_perturbation=rd.control_to_perturbation,
             perturbation_idx_to_covariates=rd.perturbation_idx_to_covariates,
+            perturbation_idx_to_id=rd.perturbation_idx_to_id,
             max_combination_length=rd.max_combination_length,
             null_value=self._null_value,
             data_manager=self,
@@ -191,6 +193,7 @@ class DataManager:
             split_idx_to_covariates=rd.split_idx_to_covariates,
             perturbation_covariates_mask=rd.perturbation_covariates_mask,
             perturbation_idx_to_covariates=rd.perturbation_idx_to_covariates,
+            perturbation_idx_to_id=rd.perturbation_idx_to_id,
             condition_data=rd.condition_data,
             control_to_perturbation=rd.control_to_perturbation,
             max_combination_length=rd.max_combination_length,
@@ -218,10 +221,8 @@ class DataManager:
         ConditionData: Condition data for the model.
         """
         self._verify_covariate_data(covariate_data, self._perturb_covar_keys)
-        self._verify_covariate_type(
-            covariate_data, self._perturb_covar_keys, self.is_categorical
-        )
-        bd = self._get_data(
+
+        rd = self._get_data(
             adata=None,
             covariate_data=covariate_data,
             rep_dict=rep_dict,
@@ -229,8 +230,10 @@ class DataManager:
             return_ground_truth_data=False,
         )
         return ConditionData(
-            condition_data=bd.condition_data,
-            max_combination_length=bd.max_combination_length,
+            condition_data=rd.condition_data,
+            max_combination_length=rd.max_combination_length,
+            perturbation_idx_to_covariates=rd.perturbation_idx_to_covariates,
+            perturbation_idx_to_id=rd.perturbation_idx_to_id,
             null_value=self._null_value,
             data_manager=self,
         )
@@ -284,6 +287,7 @@ class DataManager:
         control_to_perturbation: dict[int, int] = {}
         self._split_idx_to_covariates = {}
         self._perturbation_idx_to_covariates = {}
+        perturbation_idx_to_id = {}
 
         src_counter = 0
         tgt_counter = 0
@@ -312,7 +316,7 @@ class DataManager:
             conditional_distributions = []
 
             pbar = tqdm(perturb_covar_df.iterrows(), total=perturb_covar_df.shape[0])
-            for _, tgt_cond in pbar:
+            for i, tgt_cond in pbar:
                 tgt_cond = tgt_cond[self._perturb_covar_keys]
                 if return_ground_truth_data:
                     mask = (
@@ -328,7 +332,10 @@ class DataManager:
 
                 conditional_distributions.append(tgt_counter)
                 self._perturbation_idx_to_covariates[tgt_counter] = tgt_cond.values
-
+                if condition_id_key is not None:
+                    perturbation_idx_to_id[tgt_counter] = perturb_covar_df[
+                        condition_id_key
+                    ].iloc[i]
                 if self.is_conditional:
                     embedding = self._get_perturbation_covariates(
                         condition_data=tgt_cond,
@@ -370,6 +377,7 @@ class DataManager:
             split_idx_to_covariates=self._split_idx_to_covariates,
             perturbation_covariates_mask=perturbation_covariates_mask,
             perturbation_idx_to_covariates=self._perturbation_idx_to_covariates,
+            perturbation_idx_to_id=perturbation_idx_to_id,
             condition_data=condition_data,
             control_to_perturbation=control_to_perturbation,
             max_combination_length=self._max_combination_length,
@@ -385,6 +393,10 @@ class DataManager:
         ):
             raise ValueError(
                 f"Condition id key '{condition_id_key}' is required for prediction but was not found in provided data."
+            )
+        if not covariate_data[condition_id_key].value_counts().eq(1).all():
+            raise ValueError(
+                f"The column `condition_id_key` '{condition_id_key}' must contain unique values."
             )
 
     @staticmethod

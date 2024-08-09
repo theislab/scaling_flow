@@ -84,6 +84,12 @@ class BaseValidSampler(abc.ABC):
     def sample(*args, **kwargs):
         pass
 
+    def _get_key(self, cond_idx: int) -> tuple:
+        if len(self.data.perturbation_idx_to_id):
+            return self.data.perturbation_idx_to_id[cond_idx]
+        cov_combination = self.data.perturbation_idx_to_covariates[cond_idx]
+        return tuple(cov_combination[i] for i in range(len(cov_combination)))
+
     def _get_perturbation_to_control(self, val_data: ValidationData) -> dict[int, int]:
         d = {}
         for k, v in val_data.control_to_perturbation.items():
@@ -140,8 +146,7 @@ class ValidationSampler(BaseValidSampler):
         cond_dict = {}
         true_dict = {}
         for i in range(len(condition_idcs)):
-            arr = self.data.perturbation_idx_to_covariates[condition_idcs[i]]
-            k = tuple(arr[i] for i in range(len(arr)))
+            k = self._get_key(condition_idcs[i])
             cell_rep_dict[k] = source_cells[i]
             cond_dict[k] = conditions[i]
             true_dict[k] = target_cells[i]
@@ -170,10 +175,8 @@ class PredictionSampler(BaseValidSampler):
         cell_rep_dict = {}
         cond_dict = {}
         for i in range(len(condition_idcs)):
-            cov_combination = self.data.perturbation_idx_to_covariates[
-                condition_idcs[i]
-            ]
-            k = tuple(cov_combination[i] for i in range(len(cov_combination)))
+
+            k = self._get_key(condition_idcs[i])
             cell_rep_dict[k] = source_cells[i]
             cond_dict[k] = conditions[i]
 
