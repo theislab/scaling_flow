@@ -421,7 +421,7 @@ class CellFlow:
         filename: str,
     ):
         """
-        Instantiate a moscot problem from a saved output.
+        Instantiate a CellFlow model from a saved output.
 
         Args:
         filename: Path to the saved file
