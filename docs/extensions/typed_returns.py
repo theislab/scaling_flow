@@ -1,5 +1,6 @@
 import re
-from typing import Any, Iterable, Iterator, List
+from typing import Any
+from collections.abc import Iterable, Iterator
 
 from sphinx.application import Sphinx
 from sphinx.ext.napoleon import NumpyDocstring
@@ -18,7 +19,7 @@ def process_return(lines: Iterable[str]) -> Iterator[str]:
             yield line
 
 
-def scanpy_parse_returns_section(self: NumpyDocstring, _: Any) -> List[str]:
+def scanpy_parse_returns_section(self: NumpyDocstring, _: Any) -> list[str]:
     lines_raw = list(process_return(self._dedent(self._consume_to_next_section())))
     lines = self._format_block(":returns: ", lines_raw)
     if lines and lines[-1]:

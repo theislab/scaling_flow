@@ -87,9 +87,9 @@ class CellFlow:
         )
 
         # TODO: rename to self.train_data
-        self.pdata = self.dm.get_train_data(self.adata)
+        self.train_data = self.dm.get_train_data(self.adata)
 
-        self._data_dim = self.pdata.cell_data.shape[-1]
+        self._data_dim = self.train_data.cell_data.shape[-1]
 
     def prepare_validation_data(
         self,
@@ -111,7 +111,7 @@ class CellFlow:
         -------
             None
         """
-        if self.pdata is None:
+        if self.train_data is None:
             raise ValueError(
                 "Dataloader not initialized. Training data needs to be set up before preparing validation data. Please call prepare_data first."
             )
@@ -168,7 +168,7 @@ class CellFlow:
         -------
             None
         """
-        if self.pdata is None:
+        if self.train_data is None:
             raise ValueError(
                 "Dataloader not initialized. Please call `prepare_data` first."
             )
@@ -180,7 +180,7 @@ class CellFlow:
 
         vf = ConditionalVelocityField(
             output_dim=self._data_dim,
-            max_combination_length=self.pdata.max_combination_length,
+            max_combination_length=self.train_data.max_combination_length,
             encode_conditions=encode_conditions,
             condition_embedding_dim=condition_embedding_dim,
             condition_encoder_kwargs=condition_encoder_kwargs,
@@ -208,7 +208,7 @@ class CellFlow:
                 match_fn=match_fn,
                 flow=flow,
                 optimizer=optimizer,
-                conditions=self.pdata.condition_data,
+                conditions=self.train_data.condition_data,
                 rng=jax.random.PRNGKey(seed),
                 **solver_kwargs,
             )
@@ -220,7 +220,7 @@ class CellFlow:
                 source_dim=self._data_dim,
                 target_dim=self._data_dim,
                 optimizer=optimizer,
-                conditions=self.pdata.condition_data,
+                conditions=self.train_data.condition_data,
                 rng=jax.random.PRNGKey(seed),
                 **solver_kwargs,
             )
@@ -247,7 +247,7 @@ class CellFlow:
         -------
             None
         """
-        if self.pdata is None:
+        if self.train_data is None:
             raise ValueError("Data not initialized. Please call `prepare_data` first.")
 
         if self.trainer is None:
@@ -255,7 +255,7 @@ class CellFlow:
                 "Model not initialized. Please call `prepare_model` first."
             )
 
-        self.dataloader = TrainSampler(data=self.pdata, batch_size=batch_size)
+        self.dataloader = TrainSampler(data=self.train_data, batch_size=batch_size)
         validation_loaders = {
             k: ValidationSampler(v) for k, v in self._validation_data.items()
         }
@@ -302,6 +302,8 @@ class CellFlow:
         batch = pred_loader.sample()
         src = batch["source"]
         condition = batch.get("condition", None)
+        print("src shape", src)
+        print("condiiton shape", condition)
         out = jax.tree.map(self.model.predict, src, condition)
 
         return out
@@ -338,7 +340,6 @@ class CellFlow:
             raise ValueError(
                 "Covariate data must be a `pandas.DataFrame` or an instance of `BaseData`."
             )
-        print("cond_data.condition_data.keys()", cond_data.condition_data.keys())
         condition_embeddings = {}
         n_conditions = len(next(iter(cond_data.condition_data.values())))
         for i in range(n_conditions):

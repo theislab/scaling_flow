@@ -127,7 +127,12 @@ linkcheck_ignore = [
     r"https://www.science.org/doi/abs/10.1126/science.aax1971",
 ]
 
-exclude_patterns = ["_build", "**.ipynb_checkpoints", "notebooks/README.rst", "notebooks/CONTRIBUTING.rst"]
+exclude_patterns = [
+    "_build",
+    "**.ipynb_checkpoints",
+    "notebooks/README.rst",
+    "notebooks/CONTRIBUTING.rst",
+]
 
 # -- Options for HTML output -------------------------------------------------
 
@@ -143,8 +148,8 @@ html_show_sphinx = False
 html_show_sourcelink = False
 html_theme_options = {
     "sidebar_hide_name": True,
-    #"light_logo": "img/light_mode_logo.png",
-    #"dark_logo": "img/dark_mode_logo.png",
+    # "light_logo": "img/light_mode_logo.png",
+    # "dark_logo": "img/dark_mode_logo.png",
     "light_css_variables": {
         "color-brand-primary": "#003262",
         "color-brand-content": "#003262",
