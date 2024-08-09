@@ -333,9 +333,7 @@ class DataManager:
                 conditional_distributions.append(tgt_counter)
                 self._perturbation_idx_to_covariates[tgt_counter] = tgt_cond.values
                 if condition_id_key is not None:
-                    perturbation_idx_to_id[tgt_counter] = perturb_covar_df[
-                        condition_id_key
-                    ].iloc[i]
+                    perturbation_idx_to_id[tgt_counter] = i
                 if self.is_conditional:
                     embedding = self._get_perturbation_covariates(
                         condition_data=tgt_cond,
