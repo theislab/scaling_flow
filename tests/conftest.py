@@ -43,6 +43,7 @@ def validdata():
                 len(self.cell_data),
             )
             self.perturbation_idx_to_covariates = {0: np.array(["my_pert"])}
+            self.perturbation_idx_to_id = {0: "my_naming_of_pert"}
 
     return {"val": ValidData()}
 
