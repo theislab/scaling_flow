@@ -149,8 +149,13 @@ class DataManager:
         -------
         TrainingData: Training data for the model.
         """
+        if covariate_data is not None:
+            adata_to_pass = None
+        else:
+            adata.obs[self._control_key] = True
+            adata_to_pass = adata
         rd = self._get_data(
-            adata=adata,
+            adata=adata_to_pass,
             sample_rep=sample_rep,
             covariate_data=covariate_data,
             rep_dict=adata.uns if rep_dict is None else rep_dict,
@@ -259,10 +264,11 @@ class DataManager:
         if rep_dict is None:
             rep_dict = adata.uns if adata is not None else {}
         self._verify_covariate_data(
-            adata, {covar: _to_list(covar) for covar in self._sample_covariates}
+            covariate_data,
+            {covar: _to_list(covar) for covar in self._sample_covariates},
         )
         self._verify_control_data(adata)
-        self._verify_covariate_data(adata, _to_list(self._split_covariates))
+        self._verify_covariate_data(covariate_data, _to_list(self._split_covariates))
 
         if condition_id_key is not None:
             self._verify_condition_id_key(covariate_data, condition_id_key)
@@ -540,12 +546,12 @@ class DataManager:
         return data
 
     @staticmethod
-    def _verify_covariate_data(adata: anndata.AnnData | None, covars) -> None:
-        if adata is not None:
-            return None
+    def _verify_covariate_data(covariate_data: pd.DataFrame, covars) -> None:
         for covariate in covars:
-            if covariate is not None and covariate not in adata.obs:
-                raise ValueError(f"Covariate {covariate} not found in adata.obs.")
+            if covariate is not None and covariate not in covariate_data:
+                raise ValueError(
+                    f"Covariate {covariate} not found in adata.obs or covariate_data."
+                )
 
     @staticmethod
     def _get_linked_perturbation_covariates(
