@@ -13,7 +13,13 @@ from tqdm import tqdm
 
 from cfp._logging import logger
 from cfp._types import ArrayLike
-from cfp.data.data import ConditionData, PredictionData, ReturnData, TrainingData, ValidationData
+from cfp.data.data import (
+    ConditionData,
+    PredictionData,
+    ReturnData,
+    TrainingData,
+    ValidationData,
+)
 
 from .utils import _flatten_list, _to_list
 
@@ -143,9 +149,8 @@ class DataManager:
         -------
         TrainingData: Training data for the model.
         """
-        adata_to_pass = None if covariate_data is not None else adata
         rd = self._get_data(
-            adata=adata_to_pass,
+            adata=adata,
             sample_rep=sample_rep,
             covariate_data=covariate_data,
             rep_dict=adata.uns if rep_dict is None else rep_dict,
@@ -560,9 +565,11 @@ class DataManager:
     @staticmethod
     def _verify_perturbation_covariate_reps(
         adata: anndata.AnnData,
-        perturbation_covariate_reps: dict[str, Sequence[str]],
-        perturbation_covariates: dict[str, str],
+        perturbation_covariate_reps: dict[str, Sequence[str]] | None,
+        perturbation_covariates: dict[str, str] | None,
     ) -> dict[str, Sequence[str]]:
+        if perturbation_covariate_reps is None:
+            return None
         for key, value in perturbation_covariate_reps.items():
             if key not in perturbation_covariates:
                 raise ValueError(f"Key '{key}' not found in covariates.")
@@ -632,11 +639,11 @@ class DataManager:
         self,
         adata: anndata.AnnData,
         perturbation_covariates: dict[str, Sequence[str]],
-        perturbation_covariate_reps: dict[str, str],
+        perturbation_covariate_reps: dict[str, str] | None,
     ) -> tuple[preprocessing.OneHotEncoder | None, bool]:
         primary_group, primary_covars = next(iter(perturbation_covariates.items()))
         is_categorical = self._check_covariate_type(adata, primary_covars)
-        if primary_group in perturbation_covariate_reps:
+        if perturbation_covariate_reps and primary_group in perturbation_covariate_reps:
             return None, is_categorical
         if is_categorical:
             encoder = preprocessing.OneHotEncoder(sparse_output=False)
