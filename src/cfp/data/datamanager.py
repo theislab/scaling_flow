@@ -149,6 +149,7 @@ class DataManager:
         -------
         TrainingData: Training data for the model.
         """
+        self._verify_prediction_data(adata)
         rd = self._get_data(
             adata=adata,
             sample_rep=sample_rep,
