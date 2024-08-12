@@ -249,6 +249,7 @@ class DataManager:
         *,
         return_ground_truth_data: bool = True,
     ) -> TrainingData:
+        # check inputs
         if adata is None and covariate_data is None:
             raise ValueError("Either `adata` or `covariate_data` must be provided.")
         covariate_data = covariate_data if covariate_data is not None else adata.obs
@@ -261,12 +262,12 @@ class DataManager:
         self._verify_control_data(adata)
         self._verify_covariate_data(covariate_data, _to_list(self._split_covariates))
 
+        # extract unique conditions
         if condition_id_key is not None:
             self._verify_condition_id_key(covariate_data, condition_id_key)
             select_keys = self._perturb_covar_keys + [condition_id_key]
         else:
             select_keys = self._perturb_covar_keys
-
         perturb_covar_df = covariate_data[select_keys].drop_duplicates()
 
         if condition_id_key is not None:
@@ -274,6 +275,25 @@ class DataManager:
         else:
             perturb_covar_df = perturb_covar_df.reset_index()
 
+        # get indices of cells belonging to each unique condition
+        _perturb_covar_df, _covariate_data = (
+            perturb_covar_df[self._perturb_covar_keys],
+            covariate_data[self._perturb_covar_keys],
+        )
+        _perturb_covar_df["row_id"] = range(len(perturb_covar_df))
+        _covariate_data["cell_index"] = _covariate_data.index
+        _perturb_covar_merged = _perturb_covar_df.merge(
+            _covariate_data, on=self._perturb_covar_keys, how="inner"
+        )
+        perturb_covar_to_cells = (
+            _perturb_covar_merged.groupby("row_id")["cell_index"].apply(list).to_list()
+        )
+        perturb_covar_to_cells = [
+            covariate_data.index.isin(c) for c in perturb_covar_to_cells
+        ]
+        perturb_covar_to_cells = np.array(perturb_covar_to_cells)
+
+        # intialize data containers
         if adata is None:
             split_covariates_mask = None
             perturbation_covariates_mask = None
@@ -301,7 +321,11 @@ class DataManager:
             )
         else:
             split_cov_combs = [[]]
+
+        # iterate over unique split covariate combinations
         for split_combination in split_cov_combs:
+
+            # get mask for split covariates
             if adata is not None:
                 filter_dict = dict(
                     zip(self._split_covariates, split_combination, strict=False)
@@ -318,25 +342,26 @@ class DataManager:
 
             conditional_distributions = []
 
+            # iterate over target conditions
             pbar = tqdm(perturb_covar_df.iterrows(), total=perturb_covar_df.shape[0])
             for i, tgt_cond in pbar:
                 tgt_cond = tgt_cond[self._perturb_covar_keys]
                 if return_ground_truth_data:
-                    mask = (
-                        covariate_data[self._perturb_covar_keys] == tgt_cond.values
-                    ).all(axis=1)
+                    # mask using split covariates, skip if no cells
+                    mask = perturb_covar_to_cells[i].copy()
                     mask *= (1 - control_mask) * split_cov_mask
                     mask = np.array(mask == 1)
-
                     if mask.sum() == 0:
                         continue
-
                     perturbation_covariates_mask[mask] = tgt_counter
 
+                # save condition IDs and their mappings to initial indices
                 conditional_distributions.append(tgt_counter)
                 self._perturbation_idx_to_covariates[tgt_counter] = tgt_cond.values
                 if condition_id_key is not None:
                     perturbation_idx_to_id[tgt_counter] = i
+
+                # get embeddings for conditions
                 if self.is_conditional:
                     embedding = self._get_perturbation_covariates(
                         condition_data=tgt_cond,
@@ -346,19 +371,19 @@ class DataManager:
                             for k, v in self._perturbation_covariates.items()
                         },
                     )
-
                     for pert_cov, emb in embedding.items():
                         condition_data[pert_cov].append(emb)
 
                 tgt_counter += 1
 
+            # save control to target mapping
             control_to_perturbation[src_counter] = np.array(conditional_distributions)
             src_counter += 1
 
+        # convert to jax arrays
         if self.is_conditional:
             for pert_cov, emb in condition_data.items():
                 condition_data[pert_cov] = jnp.array(emb)
-
         split_covariates_mask = (
             jnp.asarray(split_covariates_mask)
             if split_covariates_mask is not None
