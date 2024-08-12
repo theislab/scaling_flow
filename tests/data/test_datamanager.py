@@ -408,7 +408,6 @@ class TestPredictionData:
         pred_data = dm.get_prediction_data(adata_pred, sample_rep=sample_rep)
 
         assert isinstance(pred_data.cell_data, jax.Array)
-        print("pred_data.split_covariates_mask", pred_data.split_covariates_mask)
         assert isinstance(pred_data.split_covariates_mask, jax.Array)
         assert isinstance(pred_data.split_idx_to_covariates, dict)
         assert isinstance(pred_data.perturbation_idx_to_covariates, dict)
