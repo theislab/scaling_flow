@@ -277,7 +277,7 @@ class DataManager:
         if adata is None:
             split_covariates_mask = None
             perturbation_covariates_mask = None
-            control_mask  = jnp.ones((len(covariate_data),))
+            control_mask = jnp.ones((len(covariate_data),))
         if adata is not None:
             split_covariates_mask = np.full((len(adata),), -1, dtype=jnp.int32)
             perturbation_covariates_mask = np.full((len(adata),), -1, dtype=jnp.int32)
@@ -288,8 +288,8 @@ class DataManager:
         )
 
         control_to_perturbation: dict[int, int] = {}
-        self._split_idx_to_covariates = {}
-        self._perturbation_idx_to_covariates = {}
+        split_idx_to_covariates = {}
+        perturbation_idx_to_covariates = {}
         perturbation_idx_to_id = {}
 
         src_counter = 0
@@ -312,9 +312,7 @@ class DataManager:
                 ).all(axis=1)
                 mask = np.array(control_mask * split_cov_mask)
                 split_covariates_mask[mask] = src_counter
-                self._split_idx_to_covariates[src_counter] = tuple(
-                    list(split_combination)
-                )
+                split_idx_to_covariates[src_counter] = tuple(list(split_combination))
 
             conditional_distributions = []
 
@@ -334,7 +332,7 @@ class DataManager:
                     perturbation_covariates_mask[mask] = tgt_counter
 
                 conditional_distributions.append(tgt_counter)
-                self._perturbation_idx_to_covariates[tgt_counter] = tgt_cond.values
+                perturbation_idx_to_covariates[tgt_counter] = tgt_cond.values
                 if condition_id_key is not None:
                     perturbation_idx_to_id[tgt_counter] = i
                 if self.is_conditional:
@@ -375,9 +373,9 @@ class DataManager:
         return ReturnData(
             cell_data=cell_data,
             split_covariates_mask=split_covariates_mask,
-            split_idx_to_covariates=self._split_idx_to_covariates,
+            split_idx_to_covariates=split_idx_to_covariates,
             perturbation_covariates_mask=perturbation_covariates_mask,
-            perturbation_idx_to_covariates=self._perturbation_idx_to_covariates,
+            perturbation_idx_to_covariates=perturbation_idx_to_covariates,
             perturbation_idx_to_id=perturbation_idx_to_id,
             condition_data=condition_data,
             control_to_perturbation=control_to_perturbation,
@@ -467,32 +465,44 @@ class DataManager:
                 f"For prediction, all cells in `adata` should be from control condition. Ensure that '{self._control_key}' is `True` for all cells, even if you're setting `.obs` to predicted condition."
             )
 
+    def _get_split_combination_mask(
+        self,
+        split_covariates_mask: ArrayLike,
+        split_combination: ArrayLike,
+        split_idx_to_covariates: dict[str, tuple[Any]],
+        src_counter: int,
+    ):
+        split_combination = tuple(list(split_combination))
+        filter_dict = dict(zip(self._split_covariates, split_combination, strict=False))
+        split_cov_mask = (
+            covariate_data[list(filter_dict.keys())] == list(filter_dict.values())
+        ).all(axis=1)
+        mask = np.array(split_cov_mask)
+        split_covariates_mask[mask] = src_counter
+        split_idx_to_covariates[src_counter] = tuple(list(split_combination))
+        return split_covariates_mask, split_idx_to_covariates
+
     def _get_split_covariates_mask(self, adata: anndata.AnnData) -> Any:
         # here we assume that adata only contains source cells
         if len(self.split_covariates) == 0:
             return jnp.full((len(adata),), 0, dtype=jnp.int32)
         split_covariates_mask = np.full((len(adata),), -1, dtype=jnp.int32)
-
         split_cov_combs = adata.obs[self.split_covariates].drop_duplicates().values
-        cov_to_split_idx = {v: k for k, v in self.split_idx_to_covariates.items()}
-
+        split_idx_to_covariates = {}
+        src_counter = 0
         for split_combination in split_cov_combs:
-            split_combination = tuple(list(split_combination))
-            if split_combination not in cov_to_split_idx:
-                raise ValueError(
-                    f"Split combination {split_combination} not found in DataManager.split_idx_to_covariates.values()."
+
+            split_covariates_mask, split_idx_to_covariates = (
+                self._get_split_combination_mask(
+                    covariate_data=adata.obs,
+                    split_covariates_mask=split_covariates_mask,
+                    split_combination=split_combination,
+                    split_idx_to_covariates=split_idx_to_covariates,
+                    src_counter=src_counter,
                 )
-
-            filter_dict = dict(
-                zip(self.split_covariates, split_combination, strict=False)
             )
-            split_cov_mask = (
-                adata.obs[list(filter_dict.keys())] == list(filter_dict.values())
-            ).all(axis=1)
 
-            split_covariates_mask[split_cov_mask] = cov_to_split_idx[split_combination]
-
-        return jnp.asarray(split_covariates_mask)
+        return jnp.asarray(split_covariates_mask), split_idx_to_covariates
 
     @staticmethod
     def _verify_perturbation_covariates(
@@ -942,13 +952,3 @@ class DataManager:
     def perturb_covar_keys(self) -> list[str]:
         """List of all perturbation covariates."""
         return self._perturb_covar_keys
-
-    @property
-    def split_idx_to_covariates(self) -> dict[int, Any]:
-        """Dictionary with keys indicating the index of the split covariate and values are the split covariates."""
-        return self._split_idx_to_covariates
-
-    @property
-    def perturbation_idx_to_covariates(self) -> dict[int, Any]:
-        """Dictionary with keys indicating the index of the perturbation covariate and values are the perturbation covariates."""
-        return self._perturbation_idx_to_covariates
