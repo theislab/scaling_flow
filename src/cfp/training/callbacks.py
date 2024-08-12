@@ -216,12 +216,14 @@ class WandbLogger(LoggingCallback):
 
         try:
             import wandb
+            self.wandb = wandb
         except ImportError:
             raise ImportError(
                 "wandb is not installed, please install it via `pip install wandb`"
             ) from None
         try:
             import omegaconf
+            self.omegaconf = omegaconf
         except ImportError:
             raise ImportError(
                 "omegaconf is not installed, please install it via `pip install omegaconf`"

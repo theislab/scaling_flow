@@ -230,7 +230,7 @@ class CellFlow:
         self,
         num_iterations: int,
         batch_size: int = 64,
-        valid_freq: int = 10,
+        valid_freq: int = 1000,
         callbacks: Sequence[Callable] = [],
         monitor_metrics: Sequence[str] = [],
     ) -> None:
