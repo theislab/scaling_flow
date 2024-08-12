@@ -347,11 +347,18 @@ class CellFlow:
             raise ValueError(
                 "Covariate data must be a `pandas.DataFrame` or an instance of `BaseData`."
             )
+
         condition_embeddings = {}
         n_conditions = len(next(iter(cond_data.condition_data.values())))
         for i in range(n_conditions):
             condition = {k: v[[i], :] for k, v in cond_data.condition_data.items()}
-            condition_embeddings[i] = self.model.get_condition_embedding(condition)
+            if len(cond_data.perturbation_idx_to_id):
+                c_key = cond_data.perturbation_idx_to_id[i]
+            else:
+                cov_combination = cond_data.perturbation_idx_to_covariates[i]
+                c_key = tuple(cov_combination[i] for i in range(len(cov_combination)))
+            condition_embeddings[c_key] = self.model.get_condition_embedding(condition)
+
         return condition_embeddings
 
     def save(
