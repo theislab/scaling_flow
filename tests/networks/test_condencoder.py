@@ -23,7 +23,10 @@ layers_before_pool = [
     },
     (
         ("mlp", {"dims": (32, 32)}),
-        ("self_attention", {"num_heads": 4, "qkv_dim": 32, "transformer_block": True}),
+        (
+            "self_attention",
+            {"num_heads": [4, 8], "qkv_dim": [32, 64], "transformer_block": True},
+        ),
     ),
     (),
 ]
