@@ -202,30 +202,30 @@ class WandbLogger(LoggingCallback):
         None
     """
 
-    try:
-        import wandb
-    except ImportError:
-        raise ImportError(
-            "wandb is not installed, please install it via `pip install wandb`"
-        ) from None
-    try:
-        import omegaconf
-    except ImportError:
-        raise ImportError(
-            "omegaconf is not installed, please install it via `pip install omegaconf`"
-        ) from None
-
     def __init__(
         self,
         project: str,
         out_dir: str,
-        config: omegaconf.OmegaConf | dict[str, Any],
+        config: dict[str, Any],
         **kwargs,
     ):
         self.project = project
         self.out_dir = out_dir
         self.config = config
         self.kwargs = kwargs
+
+        try:
+            import wandb
+        except ImportError:
+            raise ImportError(
+                "wandb is not installed, please install it via `pip install wandb`"
+            ) from None
+        try:
+            import omegaconf
+        except ImportError:
+            raise ImportError(
+                "omegaconf is not installed, please install it via `pip install omegaconf`"
+            ) from None
 
     def on_train_begin(self) -> Any:
         """Called at the beginning of training to initiate WandB logging"""
