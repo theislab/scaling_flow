@@ -149,13 +149,8 @@ class DataManager:
         -------
         TrainingData: Training data for the model.
         """
-        if covariate_data is not None:
-            adata_to_pass = None
-        else:
-            adata.obs[self._control_key] = True
-            adata_to_pass = adata
         rd = self._get_data(
-            adata=adata_to_pass,
+            adata=adata,
             sample_rep=sample_rep,
             covariate_data=covariate_data,
             rep_dict=adata.uns if rep_dict is None else rep_dict,
