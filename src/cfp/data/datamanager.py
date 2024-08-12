@@ -144,6 +144,12 @@ class DataManager:
         TrainingData: Training data for the model.
         """
         adata_to_pass = None if covariate_data is not None else adata
+        self._verify_prediction_data(adata)
+        if adata is None:
+            adata_to_pass = None
+        else:
+            self._verify_prediction_data(adata)
+            adata_to_pass = adata
         rd = self._get_data(
             adata=adata_to_pass,
             sample_rep=sample_rep,
