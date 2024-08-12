@@ -1,4 +1,3 @@
-import pandas as pd
 import jax
 import pytest
 
@@ -288,10 +287,8 @@ class TestCellFlow:
 
         adata_pred = adata_perturbation[:100].copy()
         adata_pred.obs["control"] = True
-        covariate_data = adata_perturbation.obs.iloc[:1]
-        covariate_data = pd.concat(
-            [covariate_data] * len(adata_pred), ignore_index=True
-        )
+        covariate_data = adata_perturbation.obs.iloc[:3]
+
         pred = cf.predict(adata_pred, sample_rep="X", covariate_data=covariate_data)
 
         assert isinstance(pred, dict)

@@ -13,13 +13,7 @@ from tqdm import tqdm
 
 from cfp._logging import logger
 from cfp._types import ArrayLike
-from cfp.data.data import (
-    ConditionData,
-    PredictionData,
-    ReturnData,
-    TrainingData,
-    ValidationData,
-)
+from cfp.data.data import ConditionData, PredictionData, ReturnData, TrainingData, ValidationData
 
 from .utils import _flatten_list, _to_list
 
@@ -149,9 +143,13 @@ class DataManager:
         -------
         TrainingData: Training data for the model.
         """
-        self._verify_prediction_data(adata)
+        if covariate_data is None:
+            self._verify_prediction_data(adata)
+            adata_to_pass = adata
+        else:
+            adata_to_pass = None
         rd = self._get_data(
-            adata=adata,
+            adata=adata_to_pass,
             sample_rep=sample_rep,
             covariate_data=covariate_data,
             rep_dict=adata.uns if rep_dict is None else rep_dict,
