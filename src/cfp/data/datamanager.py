@@ -280,10 +280,11 @@ class DataManager:
         if adata is None:
             split_covariates_mask = None
             perturbation_covariates_mask = None
+            control_mask  = jnp.ones((len(covariate_data),))
         if adata is not None:
             split_covariates_mask = np.full((len(adata),), -1, dtype=jnp.int32)
             perturbation_covariates_mask = np.full((len(adata),), -1, dtype=jnp.int32)
-        control_mask = covariate_data[self._control_key]
+            control_mask = covariate_data[self._control_key]
 
         condition_data: dict[int | str, list[jnp.ndarray]] | None = (
             {i: [] for i in self._covar_to_idx.keys()} if self.is_conditional else None
