@@ -11,7 +11,7 @@ Modeling complex perturbations with flow matching and optimal transport
 import cfp
 
 # Initialize CellFlow
-cf = cfp.model.CellFlow(adata, model="otfm")
+cf = cfp.model.CellFlow(adata, solver="otfm")
 
 # Prepare the training data and perturbation conditions
 cf.prepare_data(
