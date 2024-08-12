@@ -155,6 +155,81 @@ class SelfAttention(BaseModule):
         return z.squeeze(1) if squeeze else z
 
 
+class SelfAttentionBlock(BaseModule):
+    """
+    Several self-attention (+ optional FC layer) layers stacked together.
+
+    Parameters
+    ----------
+    num_heads : Sequence[int] | int
+        Number of heads for each layer.
+    qkv_dim : Sequence[int] | int
+        Dimensionality of the query, key, and value for each layer.
+    dropout_rate : float
+        Dropout rate.
+    transformer_block : bool
+        Whether to make layers transformer blocks (adds FC layer with residual connection).
+    layer_norm : bool
+        Whether to use layer normalization.
+
+    Returns
+    -------
+    Output tensor of shape (batch_size, set_size, input_dim).
+    """
+
+    num_heads: Sequence[int] | int
+    qkv_dim: Sequence[int] | int
+    dropout_rate: float = 0.0
+    transformer_block: bool = False
+    layer_norm: bool = False
+
+    def __post_init__(self) -> None:
+        """Initialize the module."""
+        super().__post_init__()
+        if not isinstance(self.num_heads, Sequence):
+            self.num_heads = [self.num_heads]
+        if not isinstance(self.qkv_dim, Sequence):
+            self.qkv_dim = [self.qkv_dim]
+        if len(self.num_heads) != len(self.qkv_dim):
+            raise ValueError(
+                "The number of specified layers should be the same for num_heads and qkv_dims."
+            )
+
+    @nn.compact
+    def __call__(
+        self,
+        x: jnp.ndarray,
+        mask: jnp.ndarray | None = None,
+        training: bool = True,
+    ) -> jnp.ndarray:
+        """
+        Forward pass.
+
+        Parameters
+        ----------
+        x : jnp.ndarray
+            Input tensor of shape (batch_size, set_size, input_dim).
+        mask : Optional[jnp.ndarray]
+            Mask tensor of shape (batch_size, 1 | num_heads, set_size, set_size).
+        training : bool
+            Whether the model is in training mode.
+
+        Returns
+        -------
+        Output tensor of shape (batch_size, set_size, input_dim).
+        """
+        z = x
+        for num_heads, qkv_dim in zip(self.num_heads, self.qkv_dim):
+            z = SelfAttention(
+                num_heads=num_heads,
+                qkv_dim=qkv_dim,
+                dropout_rate=self.dropout_rate,
+                transformer_block=self.transformer_block,
+                layer_norm=self.layer_norm,
+            )(z, mask, training)
+        return z
+
+
 class SeedAttentionPooling(BaseModule):
     """
     Pooling by multi-head attention with a trainable seed.
@@ -503,7 +578,7 @@ class ConditionEncoder(BaseModule):
             if layer_type == "mlp":
                 layer = MLPBlock(**layer_params)
             elif layer_type == "self_attention":
-                layer = SelfAttention(**layer_params)
+                layer = SelfAttentionBlock(**layer_params)
             else:
                 raise ValueError(f"Unknown layer type: {layer_type}")
             modules.append(layer)
@@ -536,7 +611,7 @@ class ConditionEncoder(BaseModule):
     def _apply_modules(self, modules, conditions, attention_mask, training):
         """Apply modules to conditions."""
         for module in modules:
-            if isinstance(module, SelfAttention):
+            if isinstance(module, SelfAttentionBlock):
                 conditions = module(conditions, attention_mask, training)
             elif isinstance(module, nn.Dense):
                 conditions = module(conditions)
