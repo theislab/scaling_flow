@@ -449,12 +449,31 @@ class DataManager:
                 adata.obs[self._control_key] = adata.obs[self._control_key].astype(
                     "boolean"
                 )
-            except ValueError as e:
+            except TypeError as e:
                 raise ValueError(
                     f"Control column '{self._control_key}' could not be converted to boolean."
                 ) from e
         if adata.obs[self._control_key].sum() == 0:
             raise ValueError("No control cells found in adata.")
+
+    def _verify_prediction_data(self, adata: anndata.AnnData) -> None:
+        if self._control_key not in adata.obs:
+            raise ValueError(
+                f"Control column '{self._control_key}' not found in adata.obs."
+            )
+        if not isinstance(adata.obs[self._control_key].dtype, pd.BooleanDtype):
+            try:
+                adata.obs[self._control_key] = adata.obs[self._control_key].astype(
+                    "boolean"
+                )
+            except ValueError as e:
+                raise ValueError(
+                    f"Control column '{self._control_key}' could not be converted to boolean."
+                ) from e
+        if not adata.obs[self._control_key].all():
+            raise ValueError(
+                f"For prediction, all cells in `adata` should be from control condition. Ensure that '{self._control_key}' is `True` for all cells, even if you're setting `.obs` to predicted condition."
+            )
 
     def _get_split_covariates_mask(self, adata: anndata.AnnData) -> Any:
         # here we assume that adata only contains source cells
