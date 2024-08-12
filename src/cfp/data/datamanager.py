@@ -789,10 +789,10 @@ class DataManager:
             value = condition_data[primary_cov]
             cov_name = value if self.is_categorical else primary_cov
             if primary_group in self._covariate_reps:
-                rep_key = primary_group
-                if cov_name not in rep_dict[primary_group]:
+                rep_key = self._covariate_reps[primary_group]
+                if cov_name not in rep_dict[rep_key]:
                     raise ValueError(
-                        f"Representation for '{cov_name}' not found in `adata.uns['{primary_group}']`."
+                        f"Representation for '{cov_name}' not found in `adata.uns['{rep_key}']`."
                     )
                 prim_arr = jnp.asarray(rep_dict[rep_key][cov_name])
             else:
@@ -820,7 +820,7 @@ class DataManager:
                 cov_name = condition_data[linked_cov]
 
                 if linked_group in self._covariate_reps:
-                    rep_key = linked_group  # self.covariate_reps[linked_group][0]
+                    rep_key = self._covariate_reps[linked_group]
                     if cov_name not in rep_dict[rep_key]:
                         raise ValueError(
                             f"Representation for '{cov_name}' not found in `adata.uns['{linked_group}']`."
@@ -850,7 +850,7 @@ class DataManager:
                     raise ValueError(
                         f"Representation for '{value}' not found in `adata.uns['{sample_cov}']`."
                     )
-                cov_arr = jnp.asarray(rep_dict[sample_cov][value])
+                cov_arr = jnp.asarray(rep_dict[rep_key][value])
             else:
                 cov_arr = jnp.asarray(value)
 
