@@ -309,6 +309,7 @@ class DataManager:
                         split_covariates_mask=split_covariates_mask,
                         split_combination=split_combination,
                         split_idx_to_covariates=split_idx_to_covariates,
+                        control_mask=control_mask,
                         src_counter=src_counter,
                     )
                 )
@@ -469,14 +470,15 @@ class DataManager:
         split_covariates_mask: ArrayLike,
         split_combination: ArrayLike,
         split_idx_to_covariates: dict[str, tuple[Any]],
+        control_mask: ArrayLike,
         src_counter: int,
     ):
-        split_combination = tuple(list(split_combination))
+        # split_combination = tuple(list(split_combination))
         filter_dict = dict(zip(self.split_covariates, split_combination, strict=False))
         split_cov_mask = (
             covariate_data[list(filter_dict.keys())] == list(filter_dict.values())
         ).all(axis=1)
-        mask = np.array(split_cov_mask)
+        mask = np.array(control_mask * split_cov_mask)
         split_covariates_mask[mask] = src_counter
         split_idx_to_covariates[src_counter] = tuple(list(split_combination))
         return split_covariates_mask, split_idx_to_covariates, split_cov_mask
@@ -497,6 +499,7 @@ class DataManager:
                     split_covariates_mask=split_covariates_mask,
                     split_combination=split_combination,
                     split_idx_to_covariates=split_idx_to_covariates,
+                    control_mask=1.0,
                     src_counter=src_counter,
                 )
             )
