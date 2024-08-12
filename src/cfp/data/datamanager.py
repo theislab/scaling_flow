@@ -13,7 +13,13 @@ from tqdm import tqdm
 
 from cfp._logging import logger
 from cfp._types import ArrayLike
-from cfp.data.data import ConditionData, PredictionData, ReturnData, TrainingData, ValidationData
+from cfp.data.data import (
+    ConditionData,
+    PredictionData,
+    ReturnData,
+    TrainingData,
+    ValidationData,
+)
 
 from .utils import _flatten_list, _to_list
 
@@ -143,9 +149,9 @@ class DataManager:
         -------
         TrainingData: Training data for the model.
         """
-        adata_to_pass = None if covariate_data is not None else adata
+        self._verify_prediction_data(adata)
         rd = self._get_data(
-            adata=adata_to_pass,
+            adata=adata,
             sample_rep=sample_rep,
             covariate_data=covariate_data,
             rep_dict=adata.uns if rep_dict is None else rep_dict,
@@ -254,10 +260,11 @@ class DataManager:
         if rep_dict is None:
             rep_dict = adata.uns if adata is not None else {}
         self._verify_covariate_data(
-            adata, {covar: _to_list(covar) for covar in self._sample_covariates}
+            covariate_data,
+            {covar: _to_list(covar) for covar in self._sample_covariates},
         )
         self._verify_control_data(adata)
-        self._verify_covariate_data(adata, _to_list(self._split_covariates))
+        self._verify_covariate_data(covariate_data, _to_list(self._split_covariates))
 
         if condition_id_key is not None:
             self._verify_condition_id_key(covariate_data, condition_id_key)
@@ -438,12 +445,31 @@ class DataManager:
                 adata.obs[self._control_key] = adata.obs[self._control_key].astype(
                     "boolean"
                 )
-            except ValueError as e:
+            except TypeError as e:
                 raise ValueError(
                     f"Control column '{self._control_key}' could not be converted to boolean."
                 ) from e
         if adata.obs[self._control_key].sum() == 0:
             raise ValueError("No control cells found in adata.")
+
+    def _verify_prediction_data(self, adata: anndata.AnnData) -> None:
+        if self._control_key not in adata.obs:
+            raise ValueError(
+                f"Control column '{self._control_key}' not found in adata.obs."
+            )
+        if not isinstance(adata.obs[self._control_key].dtype, pd.BooleanDtype):
+            try:
+                adata.obs[self._control_key] = adata.obs[self._control_key].astype(
+                    "boolean"
+                )
+            except ValueError as e:
+                raise ValueError(
+                    f"Control column '{self._control_key}' could not be converted to boolean."
+                ) from e
+        if not adata.obs[self._control_key].all():
+            raise ValueError(
+                f"For prediction, all cells in `adata` should be from control condition. Ensure that '{self._control_key}' is `True` for all cells, even if you're setting `.obs` to predicted condition."
+            )
 
     def _get_split_covariates_mask(self, adata: anndata.AnnData) -> Any:
         # here we assume that adata only contains source cells
@@ -535,12 +561,12 @@ class DataManager:
         return data
 
     @staticmethod
-    def _verify_covariate_data(adata: anndata.AnnData | None, covars) -> None:
-        if adata is not None:
-            return None
+    def _verify_covariate_data(covariate_data: pd.DataFrame, covars) -> None:
         for covariate in covars:
-            if covariate is not None and covariate not in adata.obs:
-                raise ValueError(f"Covariate {covariate} not found in adata.obs.")
+            if covariate is not None and covariate not in covariate_data:
+                raise ValueError(
+                    f"Covariate {covariate} not found in adata.obs or covariate_data."
+                )
 
     @staticmethod
     def _get_linked_perturbation_covariates(
@@ -560,9 +586,11 @@ class DataManager:
     @staticmethod
     def _verify_perturbation_covariate_reps(
         adata: anndata.AnnData,
-        perturbation_covariate_reps: dict[str, Sequence[str]],
-        perturbation_covariates: dict[str, str],
+        perturbation_covariate_reps: dict[str, Sequence[str]] | None,
+        perturbation_covariates: dict[str, str] | None,
     ) -> dict[str, Sequence[str]]:
+        if perturbation_covariate_reps is None:
+            return None
         for key, value in perturbation_covariate_reps.items():
             if key not in perturbation_covariates:
                 raise ValueError(f"Key '{key}' not found in covariates.")
@@ -632,11 +660,11 @@ class DataManager:
         self,
         adata: anndata.AnnData,
         perturbation_covariates: dict[str, Sequence[str]],
-        perturbation_covariate_reps: dict[str, str],
+        perturbation_covariate_reps: dict[str, str] | None,
     ) -> tuple[preprocessing.OneHotEncoder | None, bool]:
         primary_group, primary_covars = next(iter(perturbation_covariates.items()))
         is_categorical = self._check_covariate_type(adata, primary_covars)
-        if primary_group in perturbation_covariate_reps:
+        if perturbation_covariate_reps and primary_group in perturbation_covariate_reps:
             return None, is_categorical
         if is_categorical:
             encoder = preprocessing.OneHotEncoder(sparse_output=False)
