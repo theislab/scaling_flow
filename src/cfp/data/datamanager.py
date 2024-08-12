@@ -303,17 +303,15 @@ class DataManager:
             split_cov_combs = [[]]
         for split_combination in split_cov_combs:
             if adata is not None:
-                filter_dict = dict(
-                    zip(self._split_covariates, split_combination, strict=False)
+                split_covariates_mask, split_idx_to_covariates, split_cov_mask = (
+                    self._get_split_combination_mask(
+                        covariate_data=adata.obs,
+                        split_covariates_mask=split_covariates_mask,
+                        split_combination=split_combination,
+                        split_idx_to_covariates=split_idx_to_covariates,
+                        src_counter=src_counter,
+                    )
                 )
-                split_cov_mask = (
-                    covariate_data[list(filter_dict.keys())]
-                    == list(filter_dict.values())
-                ).all(axis=1)
-                mask = np.array(control_mask * split_cov_mask)
-                split_covariates_mask[mask] = src_counter
-                split_idx_to_covariates[src_counter] = tuple(list(split_combination))
-
             conditional_distributions = []
 
             pbar = tqdm(perturb_covar_df.iterrows(), total=perturb_covar_df.shape[0])
@@ -467,20 +465,21 @@ class DataManager:
 
     def _get_split_combination_mask(
         self,
+        covariate_data: pd.DataFrame,
         split_covariates_mask: ArrayLike,
         split_combination: ArrayLike,
         split_idx_to_covariates: dict[str, tuple[Any]],
         src_counter: int,
     ):
         split_combination = tuple(list(split_combination))
-        filter_dict = dict(zip(self._split_covariates, split_combination, strict=False))
+        filter_dict = dict(zip(self.split_covariates, split_combination, strict=False))
         split_cov_mask = (
             covariate_data[list(filter_dict.keys())] == list(filter_dict.values())
         ).all(axis=1)
         mask = np.array(split_cov_mask)
         split_covariates_mask[mask] = src_counter
         split_idx_to_covariates[src_counter] = tuple(list(split_combination))
-        return split_covariates_mask, split_idx_to_covariates
+        return split_covariates_mask, split_idx_to_covariates, split_cov_mask
 
     def _get_split_covariates_mask(self, adata: anndata.AnnData) -> Any:
         # here we assume that adata only contains source cells
@@ -492,7 +491,7 @@ class DataManager:
         src_counter = 0
         for split_combination in split_cov_combs:
 
-            split_covariates_mask, split_idx_to_covariates = (
+            split_covariates_mask, split_idx_to_covariates, _ = (
                 self._get_split_combination_mask(
                     covariate_data=adata.obs,
                     split_covariates_mask=split_covariates_mask,
