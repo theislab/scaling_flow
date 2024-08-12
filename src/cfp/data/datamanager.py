@@ -91,9 +91,7 @@ class DataManager:
             self._sample_covariate_reps or {}
         )
 
-        self._idx_to_covar, self._covar_to_idx = self._get_idx_to_covariate(
-            covariate_groups
-        )
+        self._covar_to_idx = self._get_covar_to_idx(covariate_groups)
         perturb_covar_keys = _flatten_list(perturbation_covariates.values()) + list(
             self._sample_covariates
         )
@@ -154,12 +152,14 @@ class DataManager:
             return_ground_truth_data=False,
         )
         cell_data = self._get_cell_data(adata, sample_rep)
-        split_covariates_mask = self._get_split_covariates_mask(adata)
+        split_covariates_mask, split_idx_to_covariates = (
+            self._get_split_covariates_mask(adata)
+        )
 
         return PredictionData(
             cell_data=cell_data,
             split_covariates_mask=split_covariates_mask,
-            split_idx_to_covariates=rd.split_idx_to_covariates,
+            split_idx_to_covariates=split_idx_to_covariates,
             condition_data=rd.condition_data,
             control_to_perturbation=rd.control_to_perturbation,
             perturbation_idx_to_covariates=rd.perturbation_idx_to_covariates,
@@ -478,7 +478,7 @@ class DataManager:
         split_cov_mask = (
             covariate_data[list(filter_dict.keys())] == list(filter_dict.values())
         ).all(axis=1)
-        mask = np.array(control_mask * split_cov_mask)
+        mask = jnp.array(control_mask * split_cov_mask).astype(bool)
         split_covariates_mask[mask] = src_counter
         split_idx_to_covariates[src_counter] = tuple(list(split_combination))
         return split_covariates_mask, split_idx_to_covariates, split_cov_mask
@@ -486,24 +486,22 @@ class DataManager:
     def _get_split_covariates_mask(self, adata: anndata.AnnData) -> Any:
         # here we assume that adata only contains source cells
         if len(self.split_covariates) == 0:
-            return jnp.full((len(adata),), 0, dtype=jnp.int32)
+            return jnp.full((len(adata),), 0, dtype=jnp.int32), {}
         split_covariates_mask = np.full((len(adata),), -1, dtype=jnp.int32)
         split_cov_combs = adata.obs[self.split_covariates].drop_duplicates().values
         split_idx_to_covariates = {}
         src_counter = 0
         for split_combination in split_cov_combs:
-
             split_covariates_mask, split_idx_to_covariates, _ = (
                 self._get_split_combination_mask(
                     covariate_data=adata.obs,
                     split_covariates_mask=split_covariates_mask,
                     split_combination=split_combination,
                     split_idx_to_covariates=split_idx_to_covariates,
-                    control_mask=1.0,
+                    control_mask=jnp.ones((adata.n_obs,)),
                     src_counter=src_counter,
                 )
             )
-
         return jnp.asarray(split_covariates_mask), split_idx_to_covariates
 
     @staticmethod
@@ -762,14 +760,12 @@ class DataManager:
         )
 
     @staticmethod
-    def _get_idx_to_covariate(
-        covariate_groups: dict[str, Sequence[str]]
-    ) -> tuple[dict[int, str], dict[str, int]]:
+    def _get_covar_to_idx(covariate_groups: dict[str, Sequence[str]]) -> dict[int, str]:
         idx_to_covar = {}
         for idx, cov_group in enumerate(covariate_groups):
             idx_to_covar[idx] = cov_group
         covar_to_idx = {v: k for k, v in idx_to_covar.items()}
-        return idx_to_covar, covar_to_idx
+        return covar_to_idx
 
     @staticmethod
     def _pad_to_max_length(
@@ -940,11 +936,6 @@ class DataManager:
     def covariate_reps(self) -> dict[str, str]:
         """Dictionary which stores representation of covariates, i.e. the union of `sample_covariate_reps` and `perturbation_covariate_reps`."""
         return self._covariate_reps
-
-    @property
-    def idx_to_covar(self) -> dict[int, str]:
-        """TODO: we don't need this, do we?"""
-        return self._idx_to_covar
 
     @property
     def covar_to_idx(self) -> dict[str, int]:
