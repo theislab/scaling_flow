@@ -230,13 +230,13 @@ class WandbLogger(LoggingCallback):
     def on_train_begin(self) -> Any:
         """Called at the beginning of training to initiate WandB logging"""
         if isinstance(self.config, dict):
-            config = omegaconf.OmegaConf.create(self.config)  # noqa: F821
-        wandb.login()  # noqa: F821
-        wandb.init(  # noqa: F821
+            config = self.omegaconf.OmegaConf.create(self.config)  # noqa: F821
+        self.wandb.login()  # noqa: F821
+        self.wandb.init(  # noqa: F821
             project=self.project,
-            config=omegaconf.OmegaConf.to_container(config, resolve=True),  # noqa: F821
+            config=self.omegaconf.OmegaConf.to_container(config, resolve=True),  # noqa: F821
             dir=self.out_dir,
-            settings=wandb.Settings(  # noqa: F821
+            settings=self.wandb.Settings(  # noqa: F821
                 start_method=self.kwargs.pop("start_method", "thread")
             ),
         )
@@ -247,11 +247,11 @@ class WandbLogger(LoggingCallback):
         **_: Any,
     ) -> Any:
         """Called at each validation/log iteration to log data to WandB"""
-        wandb.log(dict_to_log)  # noqa: F821
+        self.wandb.log(dict_to_log)  # noqa: F821
 
     def on_train_end(self, dict_to_log: dict[str, float]) -> Any:
         """Called at the end of training to log data to WandB"""
-        wandb.log(dict_to_log)  # noqa: F821
+        self.wandb.log(dict_to_log)  # noqa: F821
 
 
 class CallbackRunner:
