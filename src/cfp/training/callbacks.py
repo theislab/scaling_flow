@@ -216,6 +216,7 @@ class WandbLogger(LoggingCallback):
 
         try:
             import wandb
+
             self.wandb = wandb
         except ImportError:
             raise ImportError(
@@ -223,6 +224,7 @@ class WandbLogger(LoggingCallback):
             ) from None
         try:
             import omegaconf
+
             self.omegaconf = omegaconf
         except ImportError:
             raise ImportError(
@@ -232,13 +234,13 @@ class WandbLogger(LoggingCallback):
     def on_train_begin(self) -> Any:
         """Called at the beginning of training to initiate WandB logging"""
         if isinstance(self.config, dict):
-            config = self.omegaconf.OmegaConf.create(self.config)  # noqa: F821
-        self.wandb.login()  # noqa: F821
-        self.wandb.init(  # noqa: F821
+            config = self.omegaconf.OmegaConf.create(self.config)
+        self.wandb.login()
+        self.wandb.init(
             project=self.project,
-            config=self.omegaconf.OmegaConf.to_container(config, resolve=True),  # noqa: F821
+            config=self.omegaconf.OmegaConf.to_container(config, resolve=True),
             dir=self.out_dir,
-            settings=self.wandb.Settings(  # noqa: F821
+            settings=self.wandb.Settings(
                 start_method=self.kwargs.pop("start_method", "thread")
             ),
         )
@@ -249,11 +251,11 @@ class WandbLogger(LoggingCallback):
         **_: Any,
     ) -> Any:
         """Called at each validation/log iteration to log data to WandB"""
-        self.wandb.log(dict_to_log)  # noqa: F821
+        self.wandb.log(dict_to_log)
 
     def on_train_end(self, dict_to_log: dict[str, float]) -> Any:
         """Called at the end of training to log data to WandB"""
-        self.wandb.log(dict_to_log)  # noqa: F821
+        self.wandb.log(dict_to_log)
 
 
 class CallbackRunner:

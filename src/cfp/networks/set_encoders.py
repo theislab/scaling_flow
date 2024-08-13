@@ -219,7 +219,7 @@ class SelfAttentionBlock(BaseModule):
         Output tensor of shape (batch_size, set_size, input_dim).
         """
         z = x
-        for num_heads, qkv_dim in zip(self.num_heads, self.qkv_dim):
+        for num_heads, qkv_dim in zip(self.num_heads, self.qkv_dim, strict=False):
             z = SelfAttention(
                 num_heads=num_heads,
                 qkv_dim=qkv_dim,
