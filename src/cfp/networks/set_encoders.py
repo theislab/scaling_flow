@@ -182,6 +182,7 @@ class SelfAttentionBlock(BaseModule):
     dropout_rate: float = 0.0
     transformer_block: bool = False
     layer_norm: bool = False
+    act_fn: Callable[[jnp.ndarray], jnp.ndarray] = nn.silu
 
     def __post_init__(self) -> None:
         """Initialize the module."""
@@ -226,6 +227,7 @@ class SelfAttentionBlock(BaseModule):
                 dropout_rate=self.dropout_rate,
                 transformer_block=self.transformer_block,
                 layer_norm=self.layer_norm,
+                act_fn=self.act_fn,
             )(z, mask, training)
         return z
 
