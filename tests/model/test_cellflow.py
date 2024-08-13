@@ -66,8 +66,9 @@ class TestCellFlow:
             adata_perturbation.obs, rep_dict=adata_perturbation.uns
         )
         assert isinstance(cond_embed, dict)
-        assert cond_embed[0].shape[0] == 1
-        assert cond_embed[0].shape[1] == condition_embedding_dim
+        out = next(iter(cond_embed.values()))
+        assert out.shape[0] == 1
+        assert out.shape[1] == condition_embedding_dim
 
     @pytest.mark.parametrize("solver", ["otfm", "genot"])
     @pytest.mark.parametrize("perturbation_covariate_reps", [{}, {"drug": "drug"}])
@@ -123,9 +124,10 @@ class TestCellFlow:
         cond_embed = cf.get_condition_embedding(
             adata_perturbation.obs, rep_dict=adata_perturbation.uns
         )
+        out = next(iter(cond_embed.values()))
         assert isinstance(cond_embed, dict)
-        assert cond_embed[0].shape[0] == 1
-        assert cond_embed[0].shape[1] == condition_embedding_dim
+        assert out.shape[0] == 1
+        assert out.shape[1] == condition_embedding_dim
 
     @pytest.mark.parametrize("split_covariates", [[], ["cell_type"]])
     @pytest.mark.parametrize(
