@@ -108,7 +108,7 @@ class DataManager:
         -------
         TrainingData: Training data for the model.
         """
-        rd = self._get_data(adata, return_ground_truth_data=True)
+        rd = self._get_data(adata, filter_by_split_covariates=True)
         return TrainingData(
             cell_data=rd.cell_data,
             split_covariates_mask=rd.split_covariates_mask,
@@ -149,7 +149,7 @@ class DataManager:
             covariate_data=covariate_data,
             rep_dict=adata.uns if rep_dict is None else rep_dict,
             condition_id_key=condition_id_key,
-            return_ground_truth_data=False,
+            filter_by_split_covariates=False,
         )
         cell_data = self._get_cell_data(adata, sample_rep)
         split_covariates_mask, split_idx_to_covariates = (
@@ -187,7 +187,7 @@ class DataManager:
         -------
         ValidationData: Validation data for the model.
         """
-        rd = self._get_data(adata, return_ground_truth_data=True)
+        rd = self._get_data(adata, filter_by_split_covariates=True)
         return ValidationData(
             cell_data=rd.cell_data,
             split_covariates_mask=rd.split_covariates_mask,
@@ -228,7 +228,7 @@ class DataManager:
             covariate_data=covariate_data,
             rep_dict=rep_dict,
             condition_id_key=condition_id_key,
-            return_ground_truth_data=False,
+            filter_by_split_covariates=False,
         )
         return ConditionData(
             condition_data=rd.condition_data,
@@ -247,14 +247,17 @@ class DataManager:
         rep_dict: dict[str, Any] | None = None,
         condition_id_key: str | None = None,
         *,
-        return_ground_truth_data: bool = True,
+        filter_by_split_covariates: bool = True,
     ) -> TrainingData:
-        # check inputs
+        # if we only extract combinations of conditions, e.g. for PredictionData, adata is None
+        # for TrainingData and ValidationData adata is needed
         if adata is None and covariate_data is None:
             raise ValueError("Either `adata` or `covariate_data` must be provided.")
+        # covariate data can be provided instead of adata.obs, e.g. for prediction
         covariate_data = covariate_data if covariate_data is not None else adata.obs
         if rep_dict is None:
             rep_dict = adata.uns if adata is not None else {}
+        # check if all perturbation/split covariates and control cells are present in the input
         self._verify_covariate_data(
             covariate_data,
             {covar: _to_list(covar) for covar in self._sample_covariates},
@@ -262,14 +265,13 @@ class DataManager:
         self._verify_control_data(adata)
         self._verify_covariate_data(covariate_data, _to_list(self._split_covariates))
 
-        # extract unique conditions
+        # extract unique combinations of perturbation covariates
         if condition_id_key is not None:
             self._verify_condition_id_key(covariate_data, condition_id_key)
             select_keys = self._perturb_covar_keys + [condition_id_key]
         else:
             select_keys = self._perturb_covar_keys
         perturb_covar_df = covariate_data[select_keys].drop_duplicates()
-
         if condition_id_key is not None:
             perturb_covar_df = perturb_covar_df.set_index(condition_id_key)
         else:
@@ -288,20 +290,16 @@ class DataManager:
         perturb_covar_to_cells = (
             _perturb_covar_merged.groupby("row_id")["cell_index"].apply(list).to_list()
         )
-        perturb_covar_to_cells = [
-            covariate_data.index.isin(c) for c in perturb_covar_to_cells
-        ]
-        perturb_covar_to_cells = np.array(perturb_covar_to_cells)
 
         # intialize data containers
-        if adata is None:
-            split_covariates_mask = None
-            perturbation_covariates_mask = None
-            control_mask = jnp.ones((len(covariate_data),))
-        if adata is not None:
+        if filter_by_split_covariates:
             split_covariates_mask = np.full((len(adata),), -1, dtype=jnp.int32)
             perturbation_covariates_mask = np.full((len(adata),), -1, dtype=jnp.int32)
             control_mask = covariate_data[self._control_key]
+        else:
+            split_covariates_mask = None
+            perturbation_covariates_mask = None
+            control_mask = jnp.ones((len(covariate_data),))
 
         condition_data: dict[int | str, list[jnp.ndarray]] | None = (
             {i: [] for i in self._covar_to_idx.keys()} if self.is_conditional else None
@@ -326,7 +324,7 @@ class DataManager:
         for split_combination in split_cov_combs:
 
             # get mask for split covariates
-            if adata is not None:
+            if filter_by_split_covariates:
                 split_covariates_mask, split_idx_to_covariates, split_cov_mask = (
                     self._get_split_combination_mask(
                         covariate_data=adata.obs,
@@ -343,16 +341,19 @@ class DataManager:
             pbar = tqdm(perturb_covar_df.iterrows(), total=perturb_covar_df.shape[0])
             for i, tgt_cond in pbar:
                 tgt_cond = tgt_cond[self._perturb_covar_keys]
-                if return_ground_truth_data:
-                    # mask using split covariates, skip if no cells
-                    mask = perturb_covar_to_cells[i].copy()
+
+                # for train/validation, only extract sample/split/perturbation
+                # covariate combinations that are present in the data
+                if filter_by_split_covariates:
+                    mask = covariate_data.index.isin(perturb_covar_to_cells[i])
                     mask *= (1 - control_mask) * split_cov_mask
                     mask = np.array(mask == 1)
                     if mask.sum() == 0:
                         continue
+                    # map unique condition id to target id
                     perturbation_covariates_mask[mask] = tgt_counter
 
-                # save condition IDs and their mappings to initial indices
+                # map target id to unique conditions and their ids
                 conditional_distributions.append(tgt_counter)
                 perturbation_idx_to_covariates[tgt_counter] = tgt_cond.values
                 if condition_id_key is not None:
@@ -373,11 +374,11 @@ class DataManager:
 
                 tgt_counter += 1
 
-            # save control to target mapping
+            # map source (control) to target condition ids
             control_to_perturbation[src_counter] = np.array(conditional_distributions)
             src_counter += 1
 
-        # convert to jax arrays
+        # convert outputs to jax arrays
         if self.is_conditional:
             for pert_cov, emb in condition_data.items():
                 condition_data[pert_cov] = jnp.array(emb)
