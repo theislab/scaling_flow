@@ -7,7 +7,7 @@ import numpy as np
 from numpy.typing import ArrayLike
 
 from cfp.data.data import ValidationData
-from cfp.metrics.metrics import compute_e_distance, compute_r_squared, compute_scalar_mmd, compute_sinkhorn_div
+from cfp.metrics._metrics import compute_e_distance, compute_r_squared, compute_scalar_mmd, compute_sinkhorn_div
 
 
 class BaseCallback(abc.ABC):

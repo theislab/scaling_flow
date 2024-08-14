@@ -1,14 +1,16 @@
 Contributing Guide
 ==================
 
-Scanpy provides extensive `developer documentation`_, most of which applies to this project as well. This document will not reproduce the entire content from there but aims to summarize the most important information to get you started on contributing.
+TODO: fix links
 
-We assume that you are already familiar with git and making pull requests on GitHub. If not, please refer to the `Scanpy developer guide`_.
+Scanpy provides extensive developer documentation, most of which applies to this project as well. This document will not reproduce the entire content from there but aims to summarize the most important information to get you started on contributing.
+
+We assume that you are already familiar with git and making pull requests on GitHub. If not, please refer to the Scanpy developer guide.
 
 Installing Development Dependencies
 -----------------------------------
 
-In addition to the packages needed to *use* this package, you need additional Python packages to *run tests* and *build the documentation*. It's easy to install them using `pip`:
+In addition to the packages needed to *use* this package, you need additional Python packages to *run tests* and *build the documentation*. It's easy to install them using pip:
 
 .. code-block:: bash
 
@@ -18,7 +20,7 @@ In addition to the packages needed to *use* this package, you need additional Py
 Code Style
 ----------
 
-This package uses `pre-commit`_ to enforce consistent code styles. On every commit, pre-commit checks will either automatically fix issues with the code or raise an error message.
+This package uses pre-commit to enforce consistent code styles. On every commit, pre-commit checks will either automatically fix issues with the code or raise an error message.
 
 To enable pre-commit locally, simply run:
 
@@ -28,7 +30,7 @@ To enable pre-commit locally, simply run:
 
 in the root of the repository. Pre-commit will automatically download all dependencies when it is run for the first time.
 
-Alternatively, you can rely on the `pre-commit.ci`_ service enabled on GitHub. If you didn't run pre-commit before pushing changes to GitHub, it will automatically commit fixes to your pull request or show an error message.
+Alternatively, you can rely on the pre-commit.ci service enabled on GitHub. If you didn't run pre-commit before pushing changes to GitHub, it will automatically commit fixes to your pull request or show an error message.
 
 If pre-commit.ci added a commit on a branch you were still working on locally, simply use:
 
@@ -36,7 +38,7 @@ If pre-commit.ci added a commit on a branch you were still working on locally, s
 
     git pull --rebase
 
-to integrate the changes into your work. While `pre-commit.ci`_ is useful, we strongly encourage installing and running pre-commit locally first to understand its usage.
+to integrate the changes into your work. While pre-commit.ci is useful, we strongly encourage installing and running pre-commit locally first to understand its usage.
 
 Finally, most editors have an *autoformat on save* feature. Consider enabling this option for `Ruff`_ and `Prettier`_.
 
@@ -49,7 +51,7 @@ Writing Tests
 .. note::
     Remember to first install the package with `pip install -e '.[dev,test]'`.
 
-This package uses `pytest`_ for automated testing. Please `write tests`_ for every function added to the package.
+This package uses pytest for automated testing. Please write tests for every function added to the package.
 
 Most IDEs integrate with pytest and provide a GUI to run tests. Alternatively, you can run all tests from the command line by executing:
 
@@ -72,7 +74,7 @@ Publishing a Release
 Updating the Version Number
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Before making a release, you need to update the version number in the `pyproject.toml` file. Please adhere to `Semantic Versioning`_, in brief:
+Before making a release, you need to update the version number in the `pyproject.toml` file. Please adhere to Semantic Versioning, in brief:
 
     Given a version number MAJOR.MINOR.PATCH, increment the:
 
@@ -82,7 +84,7 @@ Before making a release, you need to update the version number in the `pyproject
 
     Additional labels for pre-release and build metadata are available as extensions to the MAJOR.MINOR.PATCH format.
 
-Once you are done, commit and push your changes and navigate to the "Releases" page of this project on GitHub. Specify `vX.X.X` as a tag name and create a release. For more information, see `managing GitHub releases`_. This will automatically create a git tag and trigger a GitHub workflow that creates a release on PyPI.
+Once you are done, commit and push your changes and navigate to the "Releases" page of this project on GitHub. Specify `vX.X.X` as a tag name and create a release. For more information, see `managing GitHub releases`. This will automatically create a git tag and trigger a GitHub workflow that creates a release on PyPI.
 
 Writing Documentation
 ----------------------
@@ -108,19 +110,3 @@ Building the Docs Locally
     cd docs
     make html
     open _build/html/index.html
-
-.. _developer documentation: https://scanpy.readthedocs.io/en/latest/dev/index.html
-.. _Scanpy developer guide: https://scanpy.readthedocs.io/en/latest/dev/index.html
-.. _pre-commit: https://pre-commit.com/
-.. _pre-commit.ci: https://pre-commit.ci/
-.. _pytest: https://docs.pytest.org/
-.. _write tests: https://scanpy.readthedocs.io/en/latest/dev/testing.html#writing-tests
-.. _Semantic Versioning: https://semver.org/
-.. _Sphinx: https://www.sphinx-doc.org/en/master/
-.. _MyST: https://myst-parser.readthedocs.io/en/latest/intro.html
-.. _Numpy-style docstrings: https://numpydoc.readthedocs.io/en/latest/format.html
-.. _Napoleon: https://www.sphinx-doc.org/en/master/usage/extensions/napoleon.html
-.. _Sphinx autodoc typehints: https://github.com/tox-dev/sphinx-autodoc-typehints
-.. _sphinxcontrib-bibtex: https://sphinxcontrib-bibtex.readthedocs.io/
-.. _this feature request: https://github.com/scverse/cookiecutter-scverse/issues/40
-.. _managing GitHub releases: https://docs.github.com/en/repositories/releasing-projects-on-github/managing-releases-in-a-repository

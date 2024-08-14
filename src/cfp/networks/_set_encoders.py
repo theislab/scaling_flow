@@ -19,7 +19,6 @@ __all__ = [
     "SeedAttentionPooling",
     "TokenAttentionPooling",
     "ConditionEncoder",
-    "MLPBlock",
     "SelfAttention",
     "SeedAttentionPooling",
     "TokenAttentionPooling",

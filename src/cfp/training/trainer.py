@@ -7,7 +7,7 @@ from numpy.typing import ArrayLike
 from tqdm import tqdm
 
 from cfp.data.dataloader import TrainSampler, ValidationSampler
-from cfp.solvers import genot, otfm
+from cfp.solvers import _genot, _otfm
 from cfp.training.callbacks import CallbackRunner
 
 
@@ -26,10 +26,10 @@ class CellFlowTrainer:
 
     def __init__(
         self,
-        model: otfm.OTFlowMatching | genot.GENOT,
+        model: _otfm.OTFlowMatching | _genot.GENOT,
         seed: int = 0,
     ):
-        if not isinstance(model, (otfm.OTFlowMatching | genot.GENOT)):
+        if not isinstance(model, (_otfm.OTFlowMatching | _genot.GENOT)):
             raise NotImplementedError(
                 f"Model must be an instance of OTFlowMatching or GENOT, got {type(model)}"
             )

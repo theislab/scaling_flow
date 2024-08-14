@@ -15,8 +15,8 @@ from ott.solvers import utils as solver_utils
 from cfp.data.data import BaseData, ValidationData
 from cfp.data.dataloader import PredictionSampler, TrainSampler, ValidationSampler
 from cfp.data.datamanager import DataManager
-from cfp.networks.velocity_field import ConditionalVelocityField
-from cfp.solvers import genot, otfm
+from cfp.networks._velocity_field import ConditionalVelocityField
+from cfp.solvers import _genot, _otfm
 from cfp.training.trainer import CellFlowTrainer
 
 __all__ = ["CellFlow"]
@@ -39,9 +39,9 @@ class CellFlow:
         self.solver = solver
         self.dataloader: TrainSampler | None = None
         self.trainer: CellFlowTrainer | None = None
-        self.model: otfm.OTFlowMatching | genot.GENOT | None = None
+        self.model: _otfm.OTFlowMatching | _genot.GENOT | None = None
         self._validation_data: dict[str, ValidationData] = {}
-        self._solver: otfm.OTFlowMatching | genot.GENOT | None = None
+        self._solver: _otfm.OTFlowMatching | _genot.GENOT | None = None
         self._condition_dim: int | None = None
 
     def prepare_data(
@@ -239,7 +239,7 @@ class CellFlow:
                 f"The key of `flow` must be `'constant_noise'` or `'bridge'` but found {flow.keys()[0]}."
             )
         if self.solver == "otfm":
-            self._solver = otfm.OTFlowMatching(
+            self._solver = _otfm.OTFlowMatching(
                 vf=vf,
                 match_fn=match_fn,
                 flow=flow,
@@ -249,7 +249,7 @@ class CellFlow:
                 **solver_kwargs,
             )
         elif self.solver == "genot":
-            self._solver = genot.GENOT(
+            self._solver = _genot.GENOT(
                 vf=vf,
                 data_match_fn=match_fn,
                 flow=flow,
