@@ -1,5 +1,5 @@
 import abc
-from typing import Any, Literal, Optional
+from typing import Any, Literal, NamedTuple
 
 import jax.tree as jt
 import jax.tree_util as jtu
@@ -184,35 +184,36 @@ class ComputeMetrics(ComputationCallback):
         return self.on_log_iteration(validation_data, predicted_data)
 
 
+class PCADecoder(NamedTuple):
+    pcs: np.ndarray
+    means: np.ndarray
+
 class ComputePCADecodedMetrics(ComputeMetrics):
     """Callback to compute metrics on decoded validation data during training
 
     Parameters
     ----------
-    PCs : ArrayLike
-        Principal components to use for decoding
+    pc_decoder: PCADecoder
+        Tuple containing the principal components and means to use for decoding
     metrics : list
         List of metrics to compute
     metric_aggregation : list
         List of aggregation functions to use for each metric
     means : ArrayLike
         Means to use for decoding
-
-    Returns
-    -------
-        None
     """
 
     def __init__(self,
-        PCs: ArrayLike,
+        pca_decoder: PCADecoder,
         metrics: list[Literal["r_squared", "mmd", "sinkhorn_div", "e_distance"]],
         metric_aggregations: list[Literal["mean", "median"]] = None,
-        means: Optional[ArrayLike] = None,
+        log_prefix: str = "pca_decoded_"
     ):
         super().__init__(metrics, metric_aggregations)
-        self.PCs = np.array(PCs)
-        self.means = np.array(means) if means is not None else np.zeros_like(self.PCs[0])
-        self.reconstruct_data = lambda x: x @ self.PCs.T + self.means.T
+        self.pcs = pca_decoder.pcs
+        self.means = pca_decoder.means
+        self.reconstruct_data = lambda x: x @ self.pcs.T + self.means.T
+        self.log_prefix = log_prefix
 
     def on_log_iteration(
         self,
@@ -230,7 +231,7 @@ class ComputePCADecodedMetrics(ComputeMetrics):
         predicted_data_decoded = jtu.tree_map(self.reconstruct_data, predicted_data)
 
         metrics = super().on_log_iteration(validation_data_decoded, predicted_data_decoded)
-        metrics = {f"decoded_{k}": v for k, v in metrics.items()}
+        metrics = {f"{self.log_prefix}{k}": v for k, v in metrics.items()}
         return metrics
         
 
