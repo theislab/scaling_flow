@@ -4,8 +4,8 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from cfp.data.data import TrainingData
-from cfp.data.dataloader import TrainSampler, ValidationSampler
+from cfp.data._data import TrainingData
+from cfp.data._dataloader import TrainSampler, ValidationSampler
 
 
 @pytest.fixture

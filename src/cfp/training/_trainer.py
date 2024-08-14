@@ -6,18 +6,22 @@ import numpy as np
 from numpy.typing import ArrayLike
 from tqdm import tqdm
 
-from cfp.data.dataloader import TrainSampler, ValidationSampler
+from cfp.data._dataloader import TrainSampler, ValidationSampler
 from cfp.solvers import _genot, _otfm
-from cfp.training.callbacks import CallbackRunner
+from cfp.training._callbacks import CallbackRunner
 
 
 class CellFlowTrainer:
     """Trainer for the OTFM/GENOT model with a conditional velocity field.
 
-    Args:
-        dataloader: Data sampler.
-        model: OTFM/GENOT model with a conditional velocity field.
-        seed: Random seed for subsampling validation data.
+    Parameters
+    ----------
+        dataloader
+            Data sampler.
+        model
+            OTFM/GENOT model with a conditional velocity field.
+        seed
+            Random seed for subsampling validation data.
 
     Returns
     -------
@@ -76,12 +80,18 @@ class CellFlowTrainer:
     ) -> None:
         """Trains the model.
 
-        Args:
-            num_iterations: Number of iterations to train the model.
-            batch_size: Batch size.
-            valid_freq: Frequency of validation.
-            callbacks: Callback functions.
-            monitor_metrics: Metrics to monitor.
+        Parameters
+        ----------
+            num_iterations
+                Number of iterations to train the model.
+            batch_size
+                Batch size.
+            valid_freq
+                Frequency of validation.
+            callbacks
+                Callback functions.
+            monitor_metrics
+                Metrics to monitor.
 
         Returns
         -------

@@ -12,12 +12,12 @@ from numpy.typing import ArrayLike
 from ott.neural.methods.flows import dynamics
 from ott.solvers import utils as solver_utils
 
-from cfp.data.data import BaseData, ValidationData
-from cfp.data.dataloader import PredictionSampler, TrainSampler, ValidationSampler
-from cfp.data.datamanager import DataManager
+from cfp.data._data import BaseData, ValidationData
+from cfp.data._dataloader import PredictionSampler, TrainSampler, ValidationSampler
+from cfp.data._datamanager import DataManager
 from cfp.networks._velocity_field import ConditionalVelocityField
 from cfp.solvers import _genot, _otfm
-from cfp.training.trainer import CellFlowTrainer
+from cfp.training._trainer import CellFlowTrainer
 
 __all__ = ["CellFlow"]
 

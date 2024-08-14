@@ -2,7 +2,7 @@ import anndata as ad
 import jax
 import pytest
 
-from cfp.data.datamanager import DataManager
+from cfp.data._datamanager import DataManager
 
 perturbation_covariates_args = [
     {"drug": ["drug1"]},
@@ -38,7 +38,7 @@ class TestDataManager:
         perturbation_covariate_reps,
         sample_covariates,
     ):
-        from cfp.data.datamanager import DataManager
+        from cfp.data._datamanager import DataManager
 
         dm = DataManager(
             adata_perturbation,
@@ -71,7 +71,7 @@ class TestDataManager:
         if el_to_delete == "cell_line_a":
             del adata_perturbation.uns["cell_type"]["cell_line_a"]
 
-        from cfp.data.datamanager import DataManager
+        from cfp.data._datamanager import DataManager
 
         with pytest.raises(KeyError, match=r"Representation.*not found.*"):
             _ = DataManager(
@@ -87,7 +87,7 @@ class TestDataManager:
 
     @pytest.mark.parametrize("el_to_delete", ["drug1", "dosage_a"])
     def raise_covar_mismatch(self, adata_perturbation: ad.AnnData, el_to_delete):
-        from cfp.data.datamanager import DataManager
+        from cfp.data._datamanager import DataManager
 
         sample_rep = "X"
         split_covariates = ["cell_type"]
@@ -128,8 +128,8 @@ class TestDataManager:
         perturbation_covariate_reps,
         sample_covariates,
     ):
-        from cfp.data.data import TrainingData
-        from cfp.data.datamanager import DataManager
+        from cfp.data._data import TrainingData
+        from cfp.data._datamanager import DataManager
 
         dm = DataManager(
             adata_perturbation,
@@ -190,7 +190,7 @@ class TestDataManager:
         perturbation_covariates,
         perturbation_covariate_reps,
     ):
-        from cfp.data.datamanager import DataManager
+        from cfp.data._datamanager import DataManager
 
         dm = DataManager(
             adata_perturbation,
@@ -305,7 +305,7 @@ class TestValidationData:
         perturbation_covariates,
         perturbation_covariate_reps,
     ):
-        from cfp.data.datamanager import DataManager
+        from cfp.data._datamanager import DataManager
 
         control_key = "control"
         sample_covariates = ["cell_type"]
@@ -344,7 +344,7 @@ class TestValidationData:
 
     @pytest.mark.skip(reason="To discuss: why should it raise an error?")
     def test_raises_wrong_max_combination_length(self, adata_perturbation):
-        from cfp.data.datamanager import DataManager
+        from cfp.data._datamanager import DataManager
 
         max_combination_length = 3
         adata = adata_perturbation
@@ -386,7 +386,7 @@ class TestPredictionData:
         perturbation_covariates,
         perturbation_covariate_reps,
     ):
-        from cfp.data.datamanager import DataManager
+        from cfp.data._datamanager import DataManager
 
         control_key = "control"
         sample_covariates = ["cell_type"]

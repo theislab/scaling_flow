@@ -13,9 +13,9 @@ from tqdm import tqdm
 
 from cfp._logging import logger
 from cfp._types import ArrayLike
-from cfp.data.data import ConditionData, PredictionData, ReturnData, TrainingData, ValidationData
+from cfp.data._data import ConditionData, PredictionData, ReturnData, TrainingData, ValidationData
 
-from .utils import _flatten_list, _to_list
+from ._utils import _flatten_list, _to_list
 
 
 class DataManager:
@@ -23,19 +23,32 @@ class DataManager:
 
     Parameters
     ----------
-    adata: An :class:`~anndata.AnnData` object.
-    covariate_encoder: Encoder for the primary covariate.
-    categorical: Whether the primary covariate is categorical.
-    max_combination_length: Maximum number of combinations of primary `perturbation_covariates`.
-    sample_rep: Key in `adata.obsm` where the sample representation is stored or "X" to use `adata.X`.
-    covariate_data: Dataframe with covariates. If `None`, `adata.obs` is used.
-    condition_id_key: Key in `adata.obs` that defines the condition id.
-    perturbation_covariates: A dictionary where the keys indicate the name of the covariate group and the values are keys in `adata.obs`. The corresponding columns should be either boolean (presence/abscence of the perturbation) or numeric (concentration or magnitude of the perturbation). If multiple groups are provided, the first is interpreted as the primary perturbation and the others as covariates corresponding to these perturbations, e.g. `{"drug":("drugA", "drugB"), "time":("drugA_time", "drugB_time")}`.
-    perturbation_covariate_reps: A dictionary where the keys indicate the name of the covariate group and the values are keys in `adata.uns` storing a dictionary with the representation of the covariates. E.g. `{"drug":"drug_embeddings"}` with `adata.uns["drug_embeddings"] = {"drugA": np.array, "drugB": np.array}`.
-    sample_covariates: Keys in `adata.obs` indicating sample covatiates to be taken into account for training and prediction, e.g. `["age", "cell_type"]`.
-    sample_covariate_reps: A dictionary where the keys indicate the name of the covariate group and the values are keys in `adata.uns` storing a dictionary with the representation of the covariates. E.g. `{"cell_type": "cell_type_embeddings"}` with `adata.uns["cell_type_embeddings"] = {"cell_typeA": np.array, "cell_typeB": np.array}`.
-    split_covariates: Covariates in adata.obs to split all control cells into different control populations. The perturbed cells are also split according to these columns, but if these covariates should also be encoded in the model, the corresponding column should also be used in `perturbation_covariates` or `sample_covariates`.
-    null_value: Value to use for padding to `max_combination_length`.
+    adata
+        An :class:`~anndata.AnnData` object.
+    covariate_encoder
+        Encoder for the primary covariate.
+    categorical
+        Whether the primary covariate is categorical.
+    max_combination_length
+        Maximum number of combinations of primary `perturbation_covariates`.
+    sample_rep
+        Key in :attr:`adata.obsm` where the sample representation is stored or "X" to use `adata.X`.
+    covariate_data
+        Dataframe with covariates. If :obj:`None`, :attr:`adata.obs` is used.
+    condition_id_key
+        Key in :attr:`adata.obs` that defines the condition id.
+    perturbation_covariates
+        A dictionary where the keys indicate the name of the covariate group and the values are keys in `adata.obs`. The corresponding columns should be either boolean (presence/abscence of the perturbation) or numeric (concentration or magnitude of the perturbation). If multiple groups are provided, the first is interpreted as the primary perturbation and the others as covariates corresponding to these perturbations, e.g. `{"drug":("drugA", "drugB"), "time":("drugA_time", "drugB_time")}`.
+    perturbation_covariate_reps
+        A dictionary where the keys indicate the name of the covariate group and the values are keys in `adata.uns` storing a dictionary with the representation of the covariates. E.g. `{"drug":"drug_embeddings"}` with `adata.uns["drug_embeddings"] = {"drugA": np.array, "drugB": np.array}`.
+    sample_covariates
+        Keys in :attr:`adata.obs` indicating sample covatiates to be taken into account for training and prediction, e.g. `["age", "cell_type"]`.
+    sample_covariate_reps
+        A dictionary where the keys indicate the name of the covariate group and the values are keys in `adata.uns` storing a dictionary with the representation of the covariates. E.g. `{"cell_type": "cell_type_embeddings"}` with `adata.uns["cell_type_embeddings"] = {"cell_typeA": np.array, "cell_typeB": np.array}`.
+    split_covariates
+        Covariates in adata.obs to split all control cells into different control populations. The perturbed cells are also split according to these columns, but if these covariates should also be encoded in the model, the corresponding column should also be used in `perturbation_covariates` or `sample_covariates`.
+    null_value
+        Value to use for padding to `max_combination_length`.
 
 
     """
@@ -102,11 +115,12 @@ class DataManager:
 
         Parameters
         ----------
-        adata: An :class:`~anndata.Anndata` object.
+        adata
+            An :class:`~anndata.Anndata` object.
 
         Returns
         -------
-        TrainingData: Training data for the model.
+        Training data for the model.
         """
         rd = self._get_data(adata, return_ground_truth_data=True)
         return TrainingData(
@@ -135,11 +149,12 @@ class DataManager:
 
         Parameters
         ----------
-        adata: An :class:`~anndata.Anndata` object.
+        adata
+            An :class:`~anndata.Anndata` object.
 
         Returns
         -------
-        TrainingData: Training data for the model.
+        Training data for the model.
         """
         self._verify_prediction_data(adata)
         adata_to_pass = adata if covariate_data is None else None
@@ -179,13 +194,16 @@ class DataManager:
 
         Parameters
         ----------
-        adata: An :class:`~anndata.Anndata` object.
-        n_conditions_on_log_iteration: Number of conditions to validate on during logging.
-        n_conditions_on_train_end: Number of conditions to validate on at the end of training.
+        adata
+            An :class:`~anndata.Anndata` object.
+        n_conditions_on_log_iteration
+            Number of conditions to validate on during logging.
+        n_conditions_on_train_end
+            Number of conditions to validate on at the end of training.
 
         Returns
         -------
-        ValidationData: Validation data for the model.
+        Validation data for the model.
         """
         rd = self._get_data(adata, return_ground_truth_data=True)
         return ValidationData(
@@ -214,12 +232,14 @@ class DataManager:
 
         Parameters
         ----------
-        covariate_data: Dataframe with covariates.
-        condition_id_key: Key in `covariate_data` that defines the condition id.
+        covariate_data
+            Dataframe with covariates.
+        condition_id_key
+            Key in `covariate_data` that defines the condition id.
 
         Returns
         -------
-        ConditionData: Condition data for the model.
+        Condition data for the model.
         """
         self._verify_covariate_data(covariate_data, self._perturb_covar_keys)
 
