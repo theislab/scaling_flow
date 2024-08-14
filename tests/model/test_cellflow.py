@@ -249,9 +249,7 @@ class TestCellFlow:
         assert cf.trainer is not None
 
         metric_to_compute = "r_squared"
-        metrics_callback = cfp.training.ComputeMetrics(
-            metrics=[metric_to_compute]
-        )
+        metrics_callback = cfp.training.ComputeMetrics(metrics=[metric_to_compute])
 
         cf.train(num_iterations=3, callbacks=[metrics_callback], valid_freq=1)
         assert cf.dataloader is not None
