@@ -13,13 +13,13 @@ CellFlow perturbation
         :link: installation
         :link-type: doc
 
-        Learn how to install :mod:`moscot`.
+        Learn how to install :mod:`cfp`.
 
     .. grid-item-card:: User API
         :link: user
         :link-type: doc
 
-        Find a detailed documentation of :mod:`moscot`.
+        Find a detailed documentation of :mod:`cfp`.
 
 
     .. grid-item-card:: Manuscript
@@ -31,10 +31,8 @@ CellFlow perturbation
     :hidden:
 
     installation
-    user_guide
     user
     developer
     contributing
-    notebooks/tutorials/index
-    notebooks/examples/index
     references
+    notebooks/index
