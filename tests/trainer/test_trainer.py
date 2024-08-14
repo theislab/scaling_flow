@@ -68,7 +68,7 @@ class TestTrainer:
         )
 
         metric_to_compute = "e_distance"
-        metrics_callback = cfp.training.callbacks.ComputeMetrics(
+        metrics_callback = cfp.training.ComputeMetrics(
             metrics=[metric_to_compute]
         )
 
