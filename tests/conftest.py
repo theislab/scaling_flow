@@ -184,3 +184,23 @@ def adata_perturbation_with_nulls(adata_perturbation: ad.AnnData) -> ad.AnnData:
 @pytest.fixture()
 def sampler(train_data: TrainingData):
     return TrainSampler(train_data, batch_size=32)
+
+@pytest.fixture()
+def adata_pca() -> ad.AnnData:
+    from scipy.sparse import csr_matrix
+    import scanpy as sc
+
+    n_obs=10
+    n_vars=50
+    n_pca=10
+
+    X_data = np.random.rand(n_obs, n_vars)
+    adata = ad.AnnData(X=X_data)
+
+    # Add the random data to .layers and .obsm
+    adata.varm["X_mean"] = adata.X.mean(axis=0).T
+    adata.layers["counts"] = adata.X
+    adata.X = csr_matrix(adata.X - adata.varm["X_mean"])
+    sc.pp.pca(adata, zero_center=False, n_comps=n_pca)
+
+    return adata
