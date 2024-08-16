@@ -32,7 +32,7 @@ class DataManager:
     max_combination_length
         Maximum number of combinations of primary `perturbation_covariates`.
     sample_rep
-        Key in :attr:`adata.obsm` where the sample representation is stored or "X" to use `adata.X`.
+        Key in :attr:`adata.obsm` where the sample representation is stored or `X` to use `adata.X`.
     covariate_data
         Dataframe with covariates. If :obj:`None`, :attr:`adata.obs` is used.
     condition_id_key
