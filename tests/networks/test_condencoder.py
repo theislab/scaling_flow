@@ -11,6 +11,7 @@ cond = {
     "pert3": jnp.ones((1, 3, 5)),
 }
 cond = {k: v.at[0, 2, :].set(0.0) for k, v in cond.items()}
+cond["pert4_skip_pool"] = jnp.ones((1, 3, 5))
 
 layers_before_pool = [
     {
@@ -20,6 +21,7 @@ layers_before_pool = [
         ),
         "pert2": (("mlp", {"dims": (32, 32)}),),
         "pert3": (),
+        "pert4_skip_pool": (),
     },
     (
         ("mlp", {"dims": (32, 32)}),
@@ -39,12 +41,16 @@ layers_after_pool = [
 
 class TestConditionEncoder:
     @pytest.mark.parametrize("pooling", ["mean", "attention_token", "attention_seed"])
+    @pytest.mark.parametrize("covariates_not_pooled", [[], ["pert4_skip_pool"]])
     @pytest.mark.parametrize("layers_before_pool", layers_before_pool)
     @pytest.mark.parametrize("layers_after_pool", layers_after_pool)
-    def test_velocity_field_init(self, pooling, layers_before_pool, layers_after_pool):
+    def test_velocity_field_init(
+        self, pooling, covariates_not_pooled, layers_before_pool, layers_after_pool
+    ):
         cond_encoder = cfp.networks.ConditionEncoder(
             output_dim=5,
             pooling=pooling,
+            covariates_not_pooled=covariates_not_pooled,
             layers_before_pool=layers_before_pool,
             layers_after_pool=layers_after_pool,
             output_dropout=0.1,

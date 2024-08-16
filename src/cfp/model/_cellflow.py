@@ -152,9 +152,10 @@ class CellFlow:
         decoder_dims: Sequence[int] = (1024, 1024, 1024),
         decoder_dropout: float = 0.0,
         condition_encoder_kwargs: dict[str, Any] | None = None,
+        pool_sample_covariates: bool = True,
         velocity_field_kwargs: dict[str, Any] | None = None,
         solver_kwargs: dict[str, Any] | None = None,
-        flow: dict[Literal["constant_noise", "schroedinger_bridge"], float] | None = {
+        flow: dict[Literal["constant_noise", "bridge"], float] | None = {
             "constant_noise": 0.0
         },
         match_fn: Callable[[ArrayLike, ArrayLike], ArrayLike] = partial(
@@ -185,6 +186,8 @@ class CellFlow:
                 Dimensions of the output layers.
             condition_encoder_kwargs
                 Keyword arguments for the condition encoder.
+            pool_sample_covariates
+                Whether to include sample covariates in the pooling.
             velocity_field_kwargs
                 Keyword arguments for the velocity field.
             solver_kwargs
@@ -192,7 +195,7 @@ class CellFlow:
             decoder_dropout
                 Dropout rate for the output layers.
             flow
-                Flow to use for training. Shoudl be a dict with the form {"constant_noise": noise_val} or {"schroedinger_bridge": noise_val}.
+                Flow to use for training. Should be a dict of the form {"constant_noise": noise_val} or {"bridge": noise_val}.
             match_fn
                 Matching function.
             optimizer
@@ -210,6 +213,9 @@ class CellFlow:
             )
 
         condition_encoder_kwargs = condition_encoder_kwargs or {}
+        covariates_not_pooled = (
+            [] if pool_sample_covariates else self.dm._sample_covariates
+        )
         velocity_field_kwargs = velocity_field_kwargs or {}
         solver_kwargs = solver_kwargs or {}
         flow = flow or {"constant_noise": 0.0}
@@ -219,6 +225,7 @@ class CellFlow:
             max_combination_length=self.train_data.max_combination_length,
             encode_conditions=encode_conditions,
             condition_embedding_dim=condition_embedding_dim,
+            covariates_not_pooled=covariates_not_pooled,
             condition_encoder_kwargs=condition_encoder_kwargs,
             time_encoder_dims=time_encoder_dims,
             time_encoder_dropout=time_encoder_dropout,

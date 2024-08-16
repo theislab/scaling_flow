@@ -400,6 +400,8 @@ class ConditionEncoder(BaseModule):
         Pooling method.
     pooling_kwargs
         Keyword arguments for the pooling method.
+    covariates_not_pooled
+        Covariates that will escape pooling (should be identical across all set elements).
     layers_before_pool
         Layers before pooling. Either a sequence of tuples with layer type and parameters or a dictionary with input-specific layers.
     layers_after_pool
@@ -419,6 +421,7 @@ class ConditionEncoder(BaseModule):
     output_dim: int
     pooling: Literal["mean", "attention_token", "attention_seed"] = "attention_token"
     pooling_kwargs: dict = field(default_factory=lambda: {})
+    covariates_not_pooled: Sequence[str] = field(default_factory=lambda: [])
     layers_before_pool: (
         Sequence[tuple[Literal["mlp", "self_attention"], dict]] | dict
     ) = field(default_factory=lambda: [])
@@ -502,25 +505,66 @@ class ConditionEncoder(BaseModule):
 
         # apply modules before pooling
         if self.separate_inputs:
-            processed_inputs = []
+            processed_inputs_pooling = []
+            processed_inputs_other = []
             for pert_cov, conditions_i in conditions.items():
+                # apply separate modules for all inputs
                 conditions_i = self._apply_modules(
                     self.before_pool_modules[pert_cov],
                     conditions_i,
                     attention_mask,
                     training,
                 )
-                processed_inputs.append(conditions_i)
-            conditions = jnp.concatenate(processed_inputs, axis=-1)
-        else:
-            conditions = jnp.concatenate(list(conditions.values()), axis=-1)
-            conditions = self._apply_modules(
-                self.before_pool_modules, conditions, attention_mask, training
+                if pert_cov in self.covariates_not_pooled:
+                    # only keep first set element for covariates that are not pooled
+                    processed_inputs_other.append(conditions_i[:, 0, :])
+                else:
+                    processed_inputs_pooling.append(conditions_i)
+
+            conditions_pooling = jnp.concatenate(processed_inputs_pooling, axis=-1)
+            conditions_not_pooled = (
+                jnp.concatenate(processed_inputs_other, axis=-1)
+                if self.covariates_not_pooled
+                else None
             )
+        else:
+            # by default, no modules before pooling for covariates that are not pooled
+            if self.covariates_not_pooled:
+                # divide conditions into pooled and not pooled
+                conditions_not_pooled = []
+                conditions_pooling = []
+                for pert_cov in conditions:
+                    if pert_cov in self.covariates_not_pooled:
+                        conditions_not_pooled.append(conditions[pert_cov][:, 0, :])
+                    else:
+                        conditions_pooling.append(conditions[pert_cov])
+                conditions_not_pooled = jnp.concatenate(
+                    conditions_not_pooled,
+                    axis=-1,
+                )
+                conditions_pooling = jnp.concatenate(
+                    conditions_pooling,
+                    axis=-1,
+                )
+
+                # apply modules to pooled covariates
+                conditions_pooling = self._apply_modules(
+                    self.before_pool_modules,
+                    conditions_pooling,
+                    attention_mask,
+                    training,
+                )
+            else:
+                conditions = jnp.concatenate(list(conditions.values()), axis=-1)
+                conditions_pooling = self._apply_modules(
+                    self.before_pool_modules, conditions, attention_mask, training
+                )
 
         # pooling
         pool_mask = mask if self.pooling == "mean" else attention_mask
-        conditions = self.pool_module(conditions, pool_mask, training=training)
+        conditions = self.pool_module(conditions_pooling, pool_mask, training=training)
+        if self.covariates_not_pooled:
+            conditions = jnp.concatenate([conditions, conditions_not_pooled], axis=-1)
 
         # apply modules after pooling
         conditions = self._apply_modules(
@@ -530,6 +574,7 @@ class ConditionEncoder(BaseModule):
         if return_conditions_only or self.genot_source_dim == 0:
             return conditions
 
+        # GENOT: apply cell data modules
         genot_cell_data = self._apply_modules(
             self.genot_source_modules, genot_cell_data, None, training
         )
@@ -573,10 +618,7 @@ class ConditionEncoder(BaseModule):
                 modules.append(nn.Dropout(dropout_rate))
         return modules
 
-    def _get_masks(
-        self,
-        conditions: dict,
-    ) -> tuple[jnp.ndarray, jnp.ndarray]:
+    def _get_masks(self, conditions: dict) -> tuple[jnp.ndarray, jnp.ndarray]:
         """Get mask for padded conditions tensor."""
         # mask of shape (batch_size, set_size)
         mask = 1 - jnp.all(
@@ -593,7 +635,13 @@ class ConditionEncoder(BaseModule):
 
         return mask, attention_mask
 
-    def _apply_modules(self, modules, conditions, attention_mask, training):
+    def _apply_modules(
+        self,
+        modules: list,
+        conditions: jnp.ndarray,
+        attention_mask: jnp.ndarray | None,
+        training: bool,
+    ) -> jnp.ndarray:
         """Apply modules to conditions."""
         for module in modules:
             if isinstance(module, SelfAttentionBlock):
