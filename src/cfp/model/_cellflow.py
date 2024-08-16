@@ -63,19 +63,19 @@ class CellFlow:
             adata
                 An :class:`~anndata.AnnData` object.
             sample_rep
-                Key in :attr:`adata.obsm` where the sample representation is stored or "X" to use `adata.X`.
+                Key in :attr:`~anndata.AnnData.obsm` where the sample representation is stored or `X` to use `adata.X`.
             control_key
-                Key of a boolean column in `adata.obs` that defines the control samples.
+                Key of a boolean column in `adata.o` that defines the control samples.
             perturbation_covariates
                 A dictionary where the keys indicate the name of the covariate group and the values are keys in `adata.obs`. The corresponding columns should be either boolean (presence/abscence of the perturbation) or numeric (concentration or magnitude of the perturbation). If multiple groups are provided, the first is interpreted as the primary perturbation and the others as covariates corresponding to these perturbations, e.g. `{"drug":("drugA", "drugB"), "time":("drugA_time", "drugB_time")}`.
             perturbation_covariate_reps
                 A dictionary where the keys indicate the name of the covariate group and the values are keys in `adata.uns` storing a dictionary with the representation of the covariates. E.g. `{"drug":"drug_embeddings"}` with `adata.uns["drug_embeddings"] = {"drugA": np.array, "drugB": np.array}`.
             sample_covariates
-                Keys in :attr:`adata.obs` indicating sample covatiates to be taken into account for training and prediction, e.g. `["age", "cell_type"]`.
+                Keys in :attr:`~anndata.AnnData.obs` indicating sample covatiates to be taken into account for training and prediction, e.g. `["age", "cell_type"]`.
             sample_covariate_reps
                 A dictionary where the keys indicate the name of the covariate group and the values are keys in `adata.uns` storing a dictionary with the representation of the covariates. E.g. `{"cell_type": "cell_type_embeddings"}` with `adata.uns["cell_type_embeddings"] = {"cell_typeA": np.array, "cell_typeB": np.array}`.
             split_covariates
-                Covariates in adata.obs to split all control cells into different control populations. The perturbed cells are also split according to these columns, but if these covariates should also be encoded in the model, the corresponding column should also be used in `perturbation_covariates` or `sample_covariates`.
+                Covariates in :attr:`~anndata.AnnData.obs` to split all control cells into different control populations. The perturbed cells are also split according to these columns, but if these covariates should also be encoded in the model, the corresponding column should also be used in `perturbation_covariates` or `sample_covariates`.
             max_combination_length
                 Maximum number of combinations of primary `perturbation_covariates`. If `None`, the value is inferred from the provided `perturbation_covariates`.
             null_value
@@ -120,7 +120,7 @@ class CellFlow:
             name
                 Name of the validation data.
             condition_id_key
-                Key in :attr:`adata.obs` or `covariate_data` indicating the condition name.
+                Key in :attr:`~anndata.AnnData.obs` or `covariate_data` indicating the condition name.
             n_conditions_on_log_iterations
                 Number of conditions to use for computation callbacks at each logged iteration. If :obj:`None`, use all conditions.
             n_conditions_on_train_end
@@ -326,11 +326,11 @@ class CellFlow:
             adata
                 An :class:`~anndata.AnnData` object with the source representation.
             sample_rep
-                Key in `adata.obsm` where the sample representation is stored or "X" to use `adata.X`.
+                Key in :attr:`~anndata.AnnData.obsm` where the sample representation is stored or `X` to use `adata.X`.
             covariate_data
-                Covariate data defining the condition to predict. If not provided, `adata.obs` is used.
+                Covariate data defining the condition to predict. If not provided, :attr:`~anndata.AnnData.obs` is used.
             condition_id_key
-                Key in `adata.obs` or `covariate_data` indicating the condition name.
+                Key in :attr:`~anndata.AnnData.obs` or `covariate_data` indicating the condition name.
 
         Returns
         -------
@@ -377,7 +377,7 @@ class CellFlow:
             covariate_data
                 Covariate data.
             condition_id_key
-                Key in :attr:`adata.obs` or `covariate_data` indicating the condition name.
+                Key in :attr:`anndata.AnnData.obs` or `covariate_data` indicating the condition name.
 
         Returns
         -------
