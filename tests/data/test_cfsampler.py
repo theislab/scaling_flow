@@ -120,7 +120,9 @@ class TestPredictionSampler:
 
         adata_pred = adata_perturbation[:10].copy()
         adata_pred.obs["control"] = True
-        pred_data = dm.get_prediction_data(adata_pred, sample_rep=sample_rep)
+        pred_data = dm.get_prediction_data(
+            adata_pred, covariate_data=adata_pred.obs, sample_rep=sample_rep
+        )
         s = PredictionSampler(pred_data)
         out = s.sample()
         assert "source" in out

@@ -108,63 +108,18 @@ class DataManager:
         -------
         TrainingData: Training data for the model.
         """
-        rd = self._get_data(adata, filter_by_split_covariates=True)
+        cond_data = self._get_condition_data(adata)
+        cell_data = self._get_cell_data(adata)
         return TrainingData(
-            cell_data=rd.cell_data,
-            split_covariates_mask=rd.split_covariates_mask,
-            split_idx_to_covariates=rd.split_idx_to_covariates,
-            perturbation_covariates_mask=rd.perturbation_covariates_mask,
-            perturbation_idx_to_covariates=rd.perturbation_idx_to_covariates,
-            perturbation_idx_to_id=rd.perturbation_idx_to_id,
-            condition_data=rd.condition_data,
-            control_to_perturbation=rd.control_to_perturbation,
-            max_combination_length=rd.max_combination_length,
-            null_value=self._null_value,
-            data_manager=self,
-        )
-
-    def get_prediction_data(
-        self,
-        adata: anndata.AnnData,
-        sample_rep: str,
-        covariate_data: pd.DataFrame | None = None,
-        rep_dict: dict[str, Any] | None = None,
-        condition_id_key: str | None = None,
-    ) -> Any:
-        """Get training data for the model.
-
-        Parameters
-        ----------
-        adata: An :class:`~anndata.Anndata` object.
-
-        Returns
-        -------
-        TrainingData: Training data for the model.
-        """
-        self._verify_prediction_data(adata)
-        adata_to_pass = adata if covariate_data is None else None
-        rd = self._get_data(
-            adata=adata_to_pass,
-            sample_rep=sample_rep,
-            covariate_data=covariate_data,
-            rep_dict=adata.uns if rep_dict is None else rep_dict,
-            condition_id_key=condition_id_key,
-            filter_by_split_covariates=False,
-        )
-        cell_data = self._get_cell_data(adata, sample_rep)
-        split_covariates_mask, split_idx_to_covariates = (
-            self._get_split_covariates_mask(adata)
-        )
-
-        return PredictionData(
             cell_data=cell_data,
-            split_covariates_mask=split_covariates_mask,
-            split_idx_to_covariates=split_idx_to_covariates,
-            condition_data=rd.condition_data,
-            control_to_perturbation=rd.control_to_perturbation,
-            perturbation_idx_to_covariates=rd.perturbation_idx_to_covariates,
-            perturbation_idx_to_id=rd.perturbation_idx_to_id,
-            max_combination_length=rd.max_combination_length,
+            split_covariates_mask=cond_data.split_covariates_mask,
+            split_idx_to_covariates=cond_data.split_idx_to_covariates,
+            perturbation_covariates_mask=cond_data.perturbation_covariates_mask,
+            perturbation_idx_to_covariates=cond_data.perturbation_idx_to_covariates,
+            perturbation_idx_to_id=cond_data.perturbation_idx_to_id,
+            condition_data=cond_data.condition_data,
+            control_to_perturbation=cond_data.control_to_perturbation,
+            max_combination_length=cond_data.max_combination_length,
             null_value=self._null_value,
             data_manager=self,
         )
@@ -187,21 +142,68 @@ class DataManager:
         -------
         ValidationData: Validation data for the model.
         """
-        rd = self._get_data(adata, filter_by_split_covariates=True)
+        cond_data = self._get_condition_data(adata)
+        cell_data = self._get_cell_data(adata)
         return ValidationData(
-            cell_data=rd.cell_data,
-            split_covariates_mask=rd.split_covariates_mask,
-            split_idx_to_covariates=rd.split_idx_to_covariates,
-            perturbation_covariates_mask=rd.perturbation_covariates_mask,
-            perturbation_idx_to_covariates=rd.perturbation_idx_to_covariates,
-            perturbation_idx_to_id=rd.perturbation_idx_to_id,
-            condition_data=rd.condition_data,
-            control_to_perturbation=rd.control_to_perturbation,
-            max_combination_length=rd.max_combination_length,
+            cell_data=cell_data,
+            split_covariates_mask=cond_data.split_covariates_mask,
+            split_idx_to_covariates=cond_data.split_idx_to_covariates,
+            perturbation_covariates_mask=cond_data.perturbation_covariates_mask,
+            perturbation_idx_to_covariates=cond_data.perturbation_idx_to_covariates,
+            perturbation_idx_to_id=cond_data.perturbation_idx_to_id,
+            condition_data=cond_data.condition_data,
+            control_to_perturbation=cond_data.control_to_perturbation,
+            max_combination_length=cond_data.max_combination_length,
             null_value=self._null_value,
             data_manager=self,
             n_conditions_on_log_iteration=n_conditions_on_log_iteration,
             n_conditions_on_train_end=n_conditions_on_train_end,
+        )
+
+    def get_prediction_data(
+        self,
+        adata: anndata.AnnData,
+        sample_rep: str,
+        covariate_data: pd.DataFrame,
+        rep_dict: dict[str, Any] | None = None,
+        condition_id_key: str | None = None,
+    ) -> Any:
+        """Get training data for the model.
+
+        Parameters
+        ----------
+        adata: An :class:`~anndata.Anndata` object.
+
+        Returns
+        -------
+        TrainingData: Training data for the model.
+        """
+        self._verify_prediction_data(adata)
+
+        # adata is None since we don't extract cell masks for predicted covariates
+        cond_data = self._get_condition_data(
+            adata=None,
+            covariate_data=covariate_data,
+            rep_dict=adata.uns if rep_dict is None else rep_dict,
+            condition_id_key=condition_id_key,
+        )
+
+        cell_data = self._get_cell_data(adata, sample_rep)
+        split_covariates_mask, split_idx_to_covariates = (
+            self._get_split_covariates_mask(adata)
+        )
+
+        return PredictionData(
+            cell_data=cell_data,
+            split_covariates_mask=split_covariates_mask,
+            split_idx_to_covariates=split_idx_to_covariates,
+            condition_data=cond_data.condition_data,
+            control_to_perturbation=cond_data.control_to_perturbation,
+            perturbation_idx_to_covariates=cond_data.perturbation_idx_to_covariates,
+            perturbation_idx_to_id=cond_data.perturbation_idx_to_id,
+            max_combination_length=cond_data.max_combination_length,
+            null_value=self._null_value,
+            data_manager=self,
         )
 
     def get_condition_data(
@@ -222,38 +224,32 @@ class DataManager:
         ConditionData: Condition data for the model.
         """
         self._verify_covariate_data(covariate_data, self._perturb_covar_keys)
-
-        rd = self._get_data(
+        cond_data = self._get_condition_data(
             adata=None,
             covariate_data=covariate_data,
             rep_dict=rep_dict,
             condition_id_key=condition_id_key,
-            filter_by_split_covariates=False,
         )
         return ConditionData(
-            condition_data=rd.condition_data,
-            max_combination_length=rd.max_combination_length,
-            perturbation_idx_to_covariates=rd.perturbation_idx_to_covariates,
-            perturbation_idx_to_id=rd.perturbation_idx_to_id,
+            condition_data=cond_data.condition_data,
+            max_combination_length=cond_data.max_combination_length,
+            perturbation_idx_to_covariates=cond_data.perturbation_idx_to_covariates,
+            perturbation_idx_to_id=cond_data.perturbation_idx_to_id,
             null_value=self._null_value,
             data_manager=self,
         )
 
-    def _get_data(
+    def _get_condition_data(
         self,
         adata: anndata.AnnData | None,
-        sample_rep: str | None = None,
         covariate_data: pd.DataFrame | None = None,
         rep_dict: dict[str, Any] | None = None,
         condition_id_key: str | None = None,
-        *,
-        filter_by_split_covariates: bool = True,
     ) -> TrainingData:
-        # if we only extract combinations of conditions, e.g. for PredictionData, adata is None
-        # for TrainingData and ValidationData adata is needed
+        # for prediction: adata is None, covariate_data is provided
+        # for training/validation: adata is provided and used to get cell masks, covariate_data is None
         if adata is None and covariate_data is None:
             raise ValueError("Either `adata` or `covariate_data` must be provided.")
-        # covariate data can be provided instead of adata.obs, e.g. for prediction
         covariate_data = covariate_data if covariate_data is not None else adata.obs
         if rep_dict is None:
             rep_dict = adata.uns if adata is not None else {}
@@ -292,7 +288,7 @@ class DataManager:
         )
 
         # intialize data containers
-        if filter_by_split_covariates:
+        if adata is not None:
             split_covariates_mask = np.full((len(adata),), -1, dtype=jnp.int32)
             perturbation_covariates_mask = np.full((len(adata),), -1, dtype=jnp.int32)
             control_mask = covariate_data[self._control_key]
@@ -323,8 +319,8 @@ class DataManager:
         # iterate over unique split covariate combinations
         for split_combination in split_cov_combs:
 
-            # get mask for split covariates
-            if filter_by_split_covariates:
+            # get masks for split covariates; for prediction, it's done outside this method
+            if adata is not None:
                 split_covariates_mask, split_idx_to_covariates, split_cov_mask = (
                     self._get_split_combination_mask(
                         covariate_data=adata.obs,
@@ -342,9 +338,8 @@ class DataManager:
             for i, tgt_cond in pbar:
                 tgt_cond = tgt_cond[self._perturb_covar_keys]
 
-                # for train/validation, only extract sample/split/perturbation
-                # covariate combinations that are present in the data
-                if filter_by_split_covariates:
+                # for train/validation, only extract covariate combinations that are present in adata
+                if adata is not None:
                     mask = covariate_data.index.isin(perturb_covar_to_cells[i])
                     mask *= (1 - control_mask) * split_cov_mask
                     mask = np.array(mask == 1)
@@ -392,11 +387,7 @@ class DataManager:
             if perturbation_covariates_mask is not None
             else None
         )
-        cell_data = (
-            self._get_cell_data(adata, sample_rep) if adata is not None else None
-        )
         return ReturnData(
-            cell_data=cell_data,
             split_covariates_mask=split_covariates_mask,
             split_idx_to_covariates=split_idx_to_covariates,
             perturbation_covariates_mask=perturbation_covariates_mask,
@@ -434,7 +425,7 @@ class DataManager:
     def _get_cell_data(
         self,
         adata: anndata.AnnData,
-        sample_rep: str | None,
+        sample_rep: str | None = None,
     ) -> jax.Array:
         sample_rep = self._sample_rep if sample_rep is None else sample_rep
         if sample_rep == "X":

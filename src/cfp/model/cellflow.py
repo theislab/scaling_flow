@@ -274,7 +274,7 @@ class CellFlow:
         self,
         adata: ad.AnnData,
         sample_rep: str,
-        covariate_data: pd.DataFrame | None = None,
+        covariate_data: pd.DataFrame,
         condition_id_key: str | None = None,
     ) -> dict[str, dict[str, ArrayLike]] | dict[str, ArrayLike]:
         """Predict perturbation.
@@ -282,7 +282,7 @@ class CellFlow:
         Args:
             adata: An :class:`~anndata.AnnData` object with the source representation.
             sample_rep: Key in `adata.obsm` where the sample representation is stored or "X" to use `adata.X`.
-            covariate_data: Covariate data defining the condition to predict. If not provided, `adata.obs` is used.
+            covariate_data: Covariate data defining the condition to predict.
             condition_id_key: Key in `adata.obs` or `covariate_data` indicating the condition name.
 
         Returns

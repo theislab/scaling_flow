@@ -405,7 +405,9 @@ class TestPredictionData:
 
         adata_pred = adata_perturbation[:50].copy()
         adata_pred.obs["control"] = True
-        pred_data = dm.get_prediction_data(adata_pred, sample_rep=sample_rep)
+        pred_data = dm.get_prediction_data(
+            adata_pred, covariate_data=adata_pred.obs, sample_rep=sample_rep
+        )
 
         assert isinstance(pred_data.cell_data, jax.Array)
         assert isinstance(pred_data.split_covariates_mask, jax.Array)
