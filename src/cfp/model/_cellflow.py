@@ -316,7 +316,7 @@ class CellFlow:
         self,
         adata: ad.AnnData,
         sample_rep: str,
-        covariate_data: pd.DataFrame | None = None,
+        covariate_data: pd.DataFrame,
         condition_id_key: str | None = None,
     ) -> dict[str, dict[str, ArrayLike]] | dict[str, ArrayLike]:
         """Predict perturbation.

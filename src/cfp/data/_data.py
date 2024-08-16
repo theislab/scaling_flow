@@ -16,7 +16,6 @@ __all__ = [
 
 @dataclass
 class ReturnData:  # TODO: this should rather be a NamedTuple
-    cell_data: jnp.ndarray | None
     split_covariates_mask: jnp.ndarray | None
     split_idx_to_covariates: dict[int, str] | None
     perturbation_covariates_mask: jnp.ndarray | None
