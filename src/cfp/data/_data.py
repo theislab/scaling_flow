@@ -5,11 +5,17 @@ from typing import Any
 import jax
 import jax.numpy as jnp
 
-__all__ = ["TrainingData", "ValidationData"]
+__all__ = [
+    "BaseData",
+    "ConditionData",
+    "PredictionData",
+    "TrainingData",
+    "ValidationData",
+]
 
 
 @dataclass
-class ReturnData:
+class ReturnData:  # TODO: this should rather be a NamedTuple
     cell_data: jnp.ndarray | None
     split_covariates_mask: jnp.ndarray | None
     split_idx_to_covariates: dict[int, str] | None

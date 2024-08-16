@@ -4,8 +4,8 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from cfp.data.data import TrainingData
-from cfp.data.dataloader import TrainSampler, ValidationSampler
+from cfp.data._data import TrainingData
+from cfp.data._dataloader import TrainSampler, ValidationSampler
 
 
 @pytest.fixture
@@ -185,14 +185,15 @@ def adata_perturbation_with_nulls(adata_perturbation: ad.AnnData) -> ad.AnnData:
 def sampler(train_data: TrainingData):
     return TrainSampler(train_data, batch_size=32)
 
+
 @pytest.fixture()
 def adata_pca() -> ad.AnnData:
-    from scipy.sparse import csr_matrix
     import scanpy as sc
+    from scipy.sparse import csr_matrix
 
-    n_obs=10
-    n_vars=50
-    n_pca=10
+    n_obs = 10
+    n_vars = 50
+    n_pca = 10
 
     X_data = np.random.rand(n_obs, n_vars)
     adata = ad.AnnData(X=X_data)

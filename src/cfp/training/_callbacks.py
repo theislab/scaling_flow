@@ -3,12 +3,20 @@ from typing import Any, Literal, NamedTuple
 
 import jax.tree as jt
 import jax.tree_util as jtu
-import jax.numpy as jnp
 import numpy as np
 from numpy.typing import ArrayLike
 
-from cfp.data.data import ValidationData
-from cfp.metrics.metrics import compute_e_distance, compute_r_squared, compute_scalar_mmd, compute_sinkhorn_div
+from cfp.data._data import ValidationData
+from cfp.metrics._metrics import compute_e_distance, compute_r_squared, compute_scalar_mmd, compute_sinkhorn_div
+
+__all__ = [
+    "BaseCallback",
+    "LoggingCallback",
+    "ComputationCallback",
+    "Metrics",
+    "WandbLogger",
+    "CallbackRunner",
+]
 
 
 class BaseCallback(abc.ABC):
@@ -109,7 +117,7 @@ agg_fn_to_func = {
 }
 
 
-class ComputeMetrics(ComputationCallback):
+class Metrics(ComputationCallback):
     """Callback to compute metrics on validation data during training
 
     Parameters
@@ -188,26 +196,28 @@ class PCADecoder(NamedTuple):
     pcs: np.ndarray
     means: np.ndarray
 
-class ComputePCADecodedMetrics(ComputeMetrics):
+
+class PCADecodedMetrics(Metrics):
     """Callback to compute metrics on decoded validation data during training
 
     Parameters
     ----------
-    pc_decoder: PCADecoder
-        Tuple containing the principal components and means to use for decoding
-    metrics : list
+    pc_decoder
+        Tuple of matrices containing the principal components and means to use for decoding
+    metrics
         List of metrics to compute
-    metric_aggregation : list
+    metric_aggregation
         List of aggregation functions to use for each metric
-    means : ArrayLike
+    means
         Means to use for decoding
     """
 
-    def __init__(self,
+    def __init__(
+        self,
         pca_decoder: PCADecoder,
         metrics: list[Literal["r_squared", "mmd", "sinkhorn_div", "e_distance"]],
         metric_aggregations: list[Literal["mean", "median"]] = None,
-        log_prefix: str = "pca_decoded_"
+        log_prefix: str = "pca_decoded_",
     ):
         super().__init__(metrics, metric_aggregations)
         self.pcs = pca_decoder.pcs
@@ -226,14 +236,15 @@ class ComputePCADecodedMetrics(ComputeMetrics):
             validation_data: Validation data
             predicted_data: Predicted data
         """
-
         validation_data_decoded = jtu.tree_map(self.reconstruct_data, validation_data)
         predicted_data_decoded = jtu.tree_map(self.reconstruct_data, predicted_data)
 
-        metrics = super().on_log_iteration(validation_data_decoded, predicted_data_decoded)
+        metrics = super().on_log_iteration(
+            validation_data_decoded, predicted_data_decoded
+        )
         metrics = {f"{self.log_prefix}{k}": v for k, v in metrics.items()}
         return metrics
-        
+
 
 class WandbLogger(LoggingCallback):
     """Callback to log data to Weights and Biases

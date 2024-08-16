@@ -1,8 +1,8 @@
 import jax
 import pytest
 
-from cfp.data.dataloader import PredictionSampler, TrainSampler
-from cfp.data.datamanager import DataManager
+from cfp.data._dataloader import PredictionSampler, TrainSampler
+from cfp.data._datamanager import DataManager
 
 
 class TestTrainSampler:
@@ -49,8 +49,8 @@ class TestTrainSampler:
 class TestValidationSampler:
     @pytest.mark.parametrize("n_conditions_on_log_iteration", [None, 1, 3])
     def test_valid_sampler(self, adata_perturbation, n_conditions_on_log_iteration):
-        from cfp.data.dataloader import ValidationSampler
-        from cfp.data.datamanager import DataManager
+        from cfp.data._dataloader import ValidationSampler
+        from cfp.data._datamanager import DataManager
 
         control_key = "control"
         sample_covariates = ["cell_type"]
@@ -99,7 +99,7 @@ class TestPredictionSampler:
         split_covariates,
         perturbation_covariate_reps,
     ):
-        from cfp.data.datamanager import DataManager
+        from cfp.data._datamanager import DataManager
 
         perturbation_covariates = {"drug": ["drug1", "drug2"]}
 
