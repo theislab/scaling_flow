@@ -1,2 +1,7 @@
 References
 ==========
+
+Bibliography
+------------
+.. bibliography::
+    :cited:

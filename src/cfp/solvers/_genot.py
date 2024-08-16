@@ -39,7 +39,7 @@ class GENOT:
             Flow between the latent and the target distributions.
         data_match_fn
             Function to match samples from the source and the target
-            distributions. Depending on the data passed in :meth:`__call__`, it has
+            distributions. Depending on the data passed :meth:`step_fn`, it has
             the following signature:
 
             - ``(src_lin, tgt_lin) -> matching`` - linear matching.
@@ -62,7 +62,8 @@ class GENOT:
             If :obj:`None`, multivariate normal distribution is used.
         n_samples_per_src: Number of samples drawn from the conditional distribution
             per one source sample.
-        kwargs: Keyword arguments for TODO
+        kwargs
+            Keyword arguments for TODO
     """
 
     def __init__(
