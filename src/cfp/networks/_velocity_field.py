@@ -11,8 +11,8 @@ from ott.neural.networks.layers import time_encoder
 
 from cfp._constants import GENOT_CELL_KEY
 from cfp._logging import logger
-from cfp.networks.modules import MLPBlock
-from cfp.networks.set_encoders import ConditionEncoder
+from cfp.networks._modules import MLPBlock
+from cfp.networks._set_encoders import ConditionEncoder
 
 __all__ = ["ConditionalVelocityField"]
 
