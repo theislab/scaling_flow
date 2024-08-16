@@ -13,11 +13,3 @@ CellFlow model
 
 Solvers
 =======
-
-.. module:: cfp.solvers
-.. currentmodule:: cfp.solvers
-.. autosummary::
-    :toctree: genapi
-
-    OTFlowMatching
-    GENOT

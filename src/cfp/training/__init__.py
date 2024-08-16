@@ -2,8 +2,8 @@ from cfp.training._callbacks import (
                                      BaseCallback,
                                      CallbackRunner,
                                      ComputationCallback,
-                                     ComputeMetrics,
                                      LoggingCallback,
+                                     Metrics,
                                      WandbLogger,
 )
 from cfp.training._trainer import CellFlowTrainer
@@ -13,7 +13,7 @@ __all__ = [
     "BaseCallback",
     "LoggingCallback",
     "ComputationCallback",
-    "ComputeMetrics",
+    "Metrics",
     "WandbLogger",
     "CallbackRunner",
 ]

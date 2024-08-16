@@ -68,7 +68,7 @@ class TestTrainer:
         )
 
         metric_to_compute = "e_distance"
-        metrics_callback = cfp.training.ComputeMetrics(metrics=[metric_to_compute])
+        metrics_callback = cfp.training.Metrics(metrics=[metric_to_compute])
 
         trainer = cfp.training.CellFlowTrainer(model=model)
         trainer.train(

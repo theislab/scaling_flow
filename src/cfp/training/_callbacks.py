@@ -1,5 +1,5 @@
 import abc
-from typing import Any, Literal
+from typing import Any, Literal, NamedTuple
 
 import jax.tree as jt
 import jax.tree_util as jtu
@@ -13,7 +13,7 @@ __all__ = [
     "BaseCallback",
     "LoggingCallback",
     "ComputationCallback",
-    "ComputeMetrics",
+    "Metrics",
     "WandbLogger",
     "CallbackRunner",
 ]
@@ -117,7 +117,7 @@ agg_fn_to_func = {
 }
 
 
-class ComputeMetrics(ComputationCallback):
+class Metrics(ComputationCallback):
     """Callback to compute metrics on validation data during training
 
     Parameters
@@ -190,6 +190,60 @@ class ComputeMetrics(ComputationCallback):
             training_data: Current batch and predicted data
         """
         return self.on_log_iteration(validation_data, predicted_data)
+
+
+class PCADecoder(NamedTuple):
+    pcs: np.ndarray
+    means: np.ndarray
+
+
+class PCADecodedMetrics(Metrics):
+    """Callback to compute metrics on decoded validation data during training
+
+    Parameters
+    ----------
+    pc_decoder
+        Tuple of matrices containing the principal components and means to use for decoding
+    metrics
+        List of metrics to compute
+    metric_aggregation
+        List of aggregation functions to use for each metric
+    means
+        Means to use for decoding
+    """
+
+    def __init__(
+        self,
+        pca_decoder: PCADecoder,
+        metrics: list[Literal["r_squared", "mmd", "sinkhorn_div", "e_distance"]],
+        metric_aggregations: list[Literal["mean", "median"]] = None,
+        log_prefix: str = "pca_decoded_",
+    ):
+        super().__init__(metrics, metric_aggregations)
+        self.pcs = pca_decoder.pcs
+        self.means = pca_decoder.means
+        self.reconstruct_data = lambda x: x @ self.pcs.T + self.means.T
+        self.log_prefix = log_prefix
+
+    def on_log_iteration(
+        self,
+        validation_data: dict[str, ValidationData],
+        predicted_data: dict[str, dict[str, ArrayLike]],
+    ) -> dict[str, float]:
+        """Called at each validation/log iteration to reconstruct the data and compute metrics on the reconstruction
+
+        Args:
+            validation_data: Validation data
+            predicted_data: Predicted data
+        """
+        validation_data_decoded = jtu.tree_map(self.reconstruct_data, validation_data)
+        predicted_data_decoded = jtu.tree_map(self.reconstruct_data, predicted_data)
+
+        metrics = super().on_log_iteration(
+            validation_data_decoded, predicted_data_decoded
+        )
+        metrics = {f"{self.log_prefix}{k}": v for k, v in metrics.items()}
+        return metrics
 
 
 class WandbLogger(LoggingCallback):
@@ -282,7 +336,7 @@ class CallbackRunner:
 
     def __init__(
         self,
-        callbacks: list[ComputationCallback],
+        callbacks: list[BaseCallback],
     ) -> None:
 
         self.computation_callbacks = [
