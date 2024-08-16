@@ -1,8 +1,8 @@
-User
-====
+User API
+########
 
 CellFlow model
-==============
+~~~~~~~~~~~~~~
 
 .. module:: cfp.model
 .. currentmodule:: cfp.model
@@ -12,4 +12,14 @@ CellFlow model
     CellFlow
 
 Solvers
-=======
+~~~~~~~
+
+.. module:: cfp.networks
+.. currentmodule:: cfp.networks
+.. autosummary::
+    :toctree: genapi
+
+    SelfAttention
+    SeedAttentionPooling
+    TokenAttentionPooling
+    ConditionEncoder
