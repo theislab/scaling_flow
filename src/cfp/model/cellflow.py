@@ -12,12 +12,12 @@ from numpy.typing import ArrayLike
 from ott.neural.methods.flows import dynamics
 from ott.solvers import utils as solver_utils
 
-from cfp.data._data import BaseData, ValidationData
-from cfp.data._dataloader import PredictionSampler, TrainSampler, ValidationSampler
-from cfp.data._datamanager import DataManager
-from cfp.networks._velocity_field import ConditionalVelocityField
-from cfp.solvers import _genot, _otfm
-from cfp.training._trainer import CellFlowTrainer
+from cfp.data.data import BaseData, ValidationData
+from cfp.data.dataloader import PredictionSampler, TrainSampler, ValidationSampler
+from cfp.data.datamanager import DataManager
+from cfp.networks.velocity_field import ConditionalVelocityField
+from cfp.solvers import genot, otfm
+from cfp.training.trainer import CellFlowTrainer
 
 __all__ = ["CellFlow"]
 
@@ -27,10 +27,8 @@ class CellFlow:
 
     Parameters
     ----------
-        adata
-            An :class:`~anndata.AnnData` object.
-        solver
-            Solver to use for training. Either "otfm" or "genot".
+        adata: An :class:`~anndata.AnnData` object.
+        solver: Solver to use for training. Either "otfm" or "genot".
     """
 
     def __init__(self, adata: ad.AnnData, solver: Literal["otfm", "genot"] = "otfm"):
@@ -39,9 +37,9 @@ class CellFlow:
         self.solver = solver
         self.dataloader: TrainSampler | None = None
         self.trainer: CellFlowTrainer | None = None
-        self.model: _otfm.OTFlowMatching | _genot.GENOT | None = None
+        self.model: otfm.OTFlowMatching | genot.GENOT | None = None
         self._validation_data: dict[str, ValidationData] = {}
-        self._solver: _otfm.OTFlowMatching | _genot.GENOT | None = None
+        self._solver: otfm.OTFlowMatching | genot.GENOT | None = None
         self._condition_dim: int | None = None
 
     def prepare_data(
@@ -58,28 +56,17 @@ class CellFlow:
     ) -> None:
         """Prepare dataloader for training from anndata object.
 
-        Parameters
-        ----------
-            adata
-                An :class:`~anndata.AnnData` object.
-            sample_rep
-                Key in :attr:`adata.obsm` where the sample representation is stored or "X" to use `adata.X`.
-            control_key
-                Key of a boolean column in `adata.obs` that defines the control samples.
-            perturbation_covariates
-                A dictionary where the keys indicate the name of the covariate group and the values are keys in `adata.obs`. The corresponding columns should be either boolean (presence/abscence of the perturbation) or numeric (concentration or magnitude of the perturbation). If multiple groups are provided, the first is interpreted as the primary perturbation and the others as covariates corresponding to these perturbations, e.g. `{"drug":("drugA", "drugB"), "time":("drugA_time", "drugB_time")}`.
-            perturbation_covariate_reps
-                A dictionary where the keys indicate the name of the covariate group and the values are keys in `adata.uns` storing a dictionary with the representation of the covariates. E.g. `{"drug":"drug_embeddings"}` with `adata.uns["drug_embeddings"] = {"drugA": np.array, "drugB": np.array}`.
-            sample_covariates
-                Keys in :attr:`adata.obs` indicating sample covatiates to be taken into account for training and prediction, e.g. `["age", "cell_type"]`.
-            sample_covariate_reps
-                A dictionary where the keys indicate the name of the covariate group and the values are keys in `adata.uns` storing a dictionary with the representation of the covariates. E.g. `{"cell_type": "cell_type_embeddings"}` with `adata.uns["cell_type_embeddings"] = {"cell_typeA": np.array, "cell_typeB": np.array}`.
-            split_covariates
-                Covariates in adata.obs to split all control cells into different control populations. The perturbed cells are also split according to these columns, but if these covariates should also be encoded in the model, the corresponding column should also be used in `perturbation_covariates` or `sample_covariates`.
-            max_combination_length
-                Maximum number of combinations of primary `perturbation_covariates`. If `None`, the value is inferred from the provided `perturbation_covariates`.
-            null_value
-                Value to use for padding to `max_combination_length`.
+        Args:
+            adata: An :class:`~anndata.AnnData` object.
+            sample_rep: Key in `adata.obsm` where the sample representation is stored or "X" to use `adata.X`.
+            control_key: Key of a boolean column in `adata.obs` that defines the control samples.
+            perturbation_covariates: A dictionary where the keys indicate the name of the covariate group and the values are keys in `adata.obs`. The corresponding columns should be either boolean (presence/abscence of the perturbation) or numeric (concentration or magnitude of the perturbation). If multiple groups are provided, the first is interpreted as the primary perturbation and the others as covariates corresponding to these perturbations, e.g. `{"drug":("drugA", "drugB"), "time":("drugA_time", "drugB_time")}`.
+            perturbation_covariate_reps: A dictionary where the keys indicate the name of the covariate group and the values are keys in `adata.uns` storing a dictionary with the representation of the covariates. E.g. `{"drug":"drug_embeddings"}` with `adata.uns["drug_embeddings"] = {"drugA": np.array, "drugB": np.array}`.
+            sample_covariates: Keys in `adata.obs` indicating sample covatiates to be taken into account for training and prediction, e.g. `["age", "cell_type"]`.
+            sample_covariate_reps: A dictionary where the keys indicate the name of the covariate group and the values are keys in `adata.uns` storing a dictionary with the representation of the covariates. E.g. `{"cell_type": "cell_type_embeddings"}` with `adata.uns["cell_type_embeddings"] = {"cell_typeA": np.array, "cell_typeB": np.array}`.
+            split_covariates: Covariates in adata.obs to split all control cells into different control populations. The perturbed cells are also split according to these columns, but if these covariates should also be encoded in the model, the corresponding column should also be used in `perturbation_covariates` or `sample_covariates`.
+            max_combination_length: Maximum number of combinations of primary `perturbation_covariates`. If `None`, the value is inferred from the provided `perturbation_covariates`.
+            null_value: Value to use for padding to `max_combination_length`.
 
         Returns
         -------
@@ -113,18 +100,12 @@ class CellFlow:
     ) -> None:
         """Prepare validation data.
 
-        Parameters
-        ----------
-            adata
-                An :class:`~anndata.AnnData` object.
-            name
-                Name of the validation data.
-            condition_id_key
-                Key in :attr:`adata.obs` or `covariate_data` indicating the condition name.
-            n_conditions_on_log_iterations
-                Number of conditions to use for computation callbacks at each logged iteration. If :obj:`None`, use all conditions.
-            n_conditions_on_train_end
-                Number of conditions to use for computation callbacks at the end of training. If :obj:`None`, use all conditions.
+        Args:
+            adata: An :class:`~anndata.AnnData` object.
+            name: Name of the validation data.
+            condition_id_key: Key in `adata.obs` or `covariate_data` indicating the condition name.
+            n_conditions_on_log_iterations: Number of conditions to use for computation callbacks at each logged iteration. If :obj:`None`, use all conditions.
+            n_conditions_on_train_end: Number of conditions to use for computation callbacks at the end of training. If :obj:`None`, use all conditions.
 
         Returns
         -------
@@ -165,40 +146,23 @@ class CellFlow:
     ) -> None:
         """Prepare model for training.
 
-        Parameters
-        ----------
-            encode_conditions
-                Whether to encode conditions.
-            condition_embedding_dim
-                Dimensions of the condition embedding.
-            condition_encoder_kwargs
-                Keyword arguments for the condition encoder.
-            time_encoder_dims
-                Dimensions of the time embedding.
-            time_encoder_dropout
-                Dropout rate for the time embedding.
-            hidden_dims
-                Dimensions of the hidden layers.
-            hidden_dropout
-                Dropout rate for the hidden layers.
-            decoder_dims
-                Dimensions of the output layers.
-            condition_encoder_kwargs
-                Keyword arguments for the condition encoder.
-            velocity_field_kwargs
-                Keyword arguments for the velocity field.
-            solver_kwargs
-                Keyword arguments for the solver.
-            decoder_dropout
-                Dropout rate for the output layers.
-            flow
-                Flow to use for training. Shoudl be a dict with the form {"constant_noise": noise_val} or {"schroedinger_bridge": noise_val}.
-            match_fn
-                Matching function.
-            optimizer
-                Optimizer for training.
-            seed
-                Random seed.
+        Args:
+            encode_conditions: Whether to encode conditions.
+            condition_embedding_dim: Dimensions of the condition embedding.
+            condition_encoder_kwargs: Keyword arguments for the condition encoder.
+            time_encoder_dims: Dimensions of the time embedding.
+            time_encoder_dropout: Dropout rate for the time embedding.
+            hidden_dims: Dimensions of the hidden layers.
+            hidden_dropout: Dropout rate for the hidden layers.
+            decoder_dims: Dimensions of the output layers.
+            condition_encoder_kwargs: Keyword arguments for the condition encoder.
+            velocity_field_kwargs: Keyword arguments for the velocity field.
+            solver_kwargs: Keyword arguments for the solver.
+            decoder_dropout: Dropout rate for the output layers.
+            flow: Flow to use for training. Shoudl be a dict with the form {"constant_noise": noise_val} or {"schroedinger_bridge": noise_val}.
+            match_fn: Matching function.
+            optimizer: Optimizer for training.
+            seed: Random seed.
 
         Returns
         -------
@@ -239,7 +203,7 @@ class CellFlow:
                 f"The key of `flow` must be `'constant_noise'` or `'bridge'` but found {flow.keys()[0]}."
             )
         if self.solver == "otfm":
-            self._solver = _otfm.OTFlowMatching(
+            self._solver = otfm.OTFlowMatching(
                 vf=vf,
                 match_fn=match_fn,
                 flow=flow,
@@ -249,7 +213,7 @@ class CellFlow:
                 **solver_kwargs,
             )
         elif self.solver == "genot":
-            self._solver = _genot.GENOT(
+            self._solver = genot.GENOT(
                 vf=vf,
                 data_match_fn=match_fn,
                 flow=flow,
@@ -272,18 +236,12 @@ class CellFlow:
     ) -> None:
         """Train the model.
 
-        Parameters
-        ----------
-            num_iterations
-                Number of iterations to train the model.
-            batch_size
-                Batch size.
-            valid_freq
-                Frequency of validation.
-            callbacks
-                Callback functions.
-            monitor_metrics
-                Metrics to monitor.
+        Args:
+            num_iterations: Number of iterations to train the model.
+            batch_size: Batch size.
+            valid_freq: Frequency of validation.
+            callbacks: Callback functions.
+            monitor_metrics: Metrics to monitor.
 
         Returns
         -------
@@ -316,25 +274,20 @@ class CellFlow:
         self,
         adata: ad.AnnData,
         sample_rep: str,
-        covariate_data: pd.DataFrame | None = None,
+        covariate_data: pd.DataFrame,
         condition_id_key: str | None = None,
     ) -> dict[str, dict[str, ArrayLike]] | dict[str, ArrayLike]:
         """Predict perturbation.
 
-        Parameters
-        ----------
-            adata
-                An :class:`~anndata.AnnData` object with the source representation.
-            sample_rep
-                Key in `adata.obsm` where the sample representation is stored or "X" to use `adata.X`.
-            covariate_data
-                Covariate data defining the condition to predict. If not provided, `adata.obs` is used.
-            condition_id_key
-                Key in `adata.obs` or `covariate_data` indicating the condition name.
+        Args:
+            adata: An :class:`~anndata.AnnData` object with the source representation.
+            sample_rep: Key in `adata.obsm` where the sample representation is stored or "X" to use `adata.X`.
+            covariate_data: Covariate data defining the condition to predict.
+            condition_id_key: Key in `adata.obs` or `covariate_data` indicating the condition name.
 
         Returns
         -------
-            A :class:`dict` with the predicted sample representation for each source distribution and condition.
+            A dict with the predicted sample representation for each source distribution and condition.
         """
         if self.model is None:
             raise ValueError("Model not trained. Please call `train` first.")
@@ -370,18 +323,14 @@ class CellFlow:
     ) -> dict[str, ArrayLike]:
         """Get condition embedding.
 
-        Parameters
-        ----------
-            adata
-                An :class:`~anndata.AnnData` object. If not provided, the training data is used.
-            covariate_data
-                Covariate data.
-            condition_id_key
-                Key in :attr:`adata.obs` or `covariate_data` indicating the condition name.
+        Args:
+            adata: An :class:`~anndata.AnnData` object. If not provided, the training data is used.
+            covariate_data: Covariate data.
+            condition_id_key: Key in `adata.obs` or `covariate_data` indicating the condition name.
 
         Returns
         -------
-            A class:`dict` with the condition embedding for each condition.
+            A dict with the condition embedding for each condition.
         """
         if self.model is None:
             raise ValueError("Model not trained. Please call `train` first.")
@@ -421,18 +370,14 @@ class CellFlow:
         """
         Save the model. Pickles the CellFlow class instance.
 
-        Parameters
-        ----------
-            dir_path
-                Path to a directory, defaults to current directory
-            file_prefix
-                Prefix to prepend to the file name.
-            overwrite
-                Overwrite existing data or not.
+        Args:
+        dir_path: Path to a directory, defaults to current directory
+        file_prefix: Prefix to prepend to the file name.
+        overwrite: Overwrite existing data or not.
 
         Returns
         -------
-            None
+        None
         """
         file_name = (
             f"{file_prefix}_{self.__class__.__name__}.pkl"
@@ -458,10 +403,8 @@ class CellFlow:
         """
         Instantiate a CellFlow model from a saved output.
 
-        Parameters
-        ----------
-            filename
-                Path to the saved file
+        Args:
+        filename: Path to the saved file
 
         Returns
         -------

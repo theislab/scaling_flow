@@ -14,10 +14,16 @@ from flax.typing import FrozenDict
 from cfp._constants import GENOT_CELL_KEY
 
 __all__ = [
-    "ConditionEncoder",
+    "MLPBlock",
     "SelfAttention",
     "SeedAttentionPooling",
     "TokenAttentionPooling",
+    "ConditionEncoder",
+    "MLPBlock",
+    "SelfAttention",
+    "SeedAttentionPooling",
+    "TokenAttentionPooling",
+    "ConditionEncoder",
 ]
 
 
@@ -36,13 +42,13 @@ class MLPBlock(BaseModule):
 
     Parameters
     ----------
-    dims
+    dims : Sequence[int]
         Dimensions of the MLP layers.
-    dropout_rate
+    dropout_rate : float
         Dropout rate.
-    act_last_layer
+    act_last_layer : bool
         Whether to apply the activation function to the last layer.
-    act_fn
+    act_fn : Callable[[jnp.ndarray], jnp.ndarray]
         Activation function.
     """
 
@@ -58,7 +64,7 @@ class MLPBlock(BaseModule):
 
         Parameters
         ----------
-        x
+        x : jnp.ndarray
             Input tensor of shape ``(batch_size, input_dim)``.
         training : bool
             Whether the model is in training mode.
@@ -83,15 +89,15 @@ class SelfAttention(BaseModule):
 
     Parameters
     ----------
-    num_heads
+    num_heads : int
         Number of heads.
-    qkv_dim
+    qkv_dim : int
         Dimensionality of the query, key, and value.
-    dropout_rate
+    dropout_rate : float
         Dropout rate.
-    transformer_block
+    transformer_block : bool
         Whether to make it a transformer block (adds FC layer with residual connection).
-    layer_norm
+    layer_norm : bool
         Whether to use layer normalization
     """
 
@@ -114,11 +120,11 @@ class SelfAttention(BaseModule):
 
         Parameters
         ----------
-        x
+        x : jnp.ndarray
             Input tensor of shape ``(batch_size, set_size, input_dim)`` or ``(batch_size, input_dim)``.
-        mask
+        mask : Optional[jnp.ndarray]
             Mask tensor of shape ``(batch_size, 1 | num_heads, set_size, set_size)``.
-        training
+        training : bool
             Whether the model is in training mode.
 
         Returns
@@ -155,15 +161,15 @@ class SelfAttentionBlock(BaseModule):
 
     Parameters
     ----------
-    num_heads
+    num_heads : Sequence[int] | int
         Number of heads for each layer.
-    qkv_dim
+    qkv_dim : Sequence[int] | int
         Dimensionality of the query, key, and value for each layer.
-    dropout_rate
+    dropout_rate : float
         Dropout rate.
-    transformer_block
+    transformer_block : bool
         Whether to make layers transformer blocks (adds FC layer with residual connection).
-    layer_norm
+    layer_norm : bool
         Whether to use layer normalization.
 
     Returns
@@ -176,7 +182,6 @@ class SelfAttentionBlock(BaseModule):
     dropout_rate: float = 0.0
     transformer_block: bool = False
     layer_norm: bool = False
-    act_fn: Callable[[jnp.ndarray], jnp.ndarray] = nn.silu
 
     def __post_init__(self) -> None:
         """Initialize the module."""
@@ -221,7 +226,6 @@ class SelfAttentionBlock(BaseModule):
                 dropout_rate=self.dropout_rate,
                 transformer_block=self.transformer_block,
                 layer_norm=self.layer_norm,
-                act_fn=self.act_fn,
             )(z, mask, training)
         return z
 
@@ -232,19 +236,19 @@ class SeedAttentionPooling(BaseModule):
 
     Parameters
     ----------
-    num_heads
+    num_heads : int
         Number of heads.
-    v_dim
+    v_dim : int
         Dimensionality of the value.
-    seed_dim
+    seed_dim : int
         Dimensionality of the seed.
-    dropout_rate
+    dropout_rate : float
         Dropout rate.
-    transformer_block
+    transformer_block : bool
         Whether to make it a transformer block (adds FC layer with residual connection).
-    layer_norm
+    layer_norm : bool
         Whether to use layer normalization.
-    act_fn
+    act_fn : Callable[[jnp.ndarray], jnp.ndarray]
         Activation function.
 
     References
@@ -272,11 +276,11 @@ class SeedAttentionPooling(BaseModule):
 
         Parameters
         ----------
-        x
+        x : jnp.ndarray
             Input tensor of shape ``(batch_size, set_size, input_dim)``.
-        mask
+        mask : Optional[jnp.ndarray]
             Mask tensor of shape ``(batch_size, 1, set_size, set_size)``.
-        training
+        training : bool
             Whether the model is in training mode.
 
         Returns
@@ -326,14 +330,10 @@ class TokenAttentionPooling(BaseModule):
 
     Parameters
     ----------
-    num_heads
-        Number of attention heads.
-    qkv_dim
-        Dimensionality of the query, key, and value.
-    dropout_rate
-        Dropout rate.
-    act_fn
-        Activation function.
+    num_heads: int = 8
+    qkv_dim: int = 64
+    dropout_rate: float = 0.0
+    act_fn: Callable[[jnp.ndarray], jnp.ndarray] = nn.silu
     """
 
     num_heads: int = 8
@@ -352,16 +352,16 @@ class TokenAttentionPooling(BaseModule):
 
         Parameters
         ----------
-        x
+        x : jnp.ndarray
             Input tensor of shape (batch_size, set_size, input_dim).
-        mask
+        mask : Optional[jnp.ndarray]
             Mask tensor of shape (batch_size, 1 | num_heads, set_size, set_size).
-        training
+        training : bool
             Whether the model is in training mode.
 
         Returns
         -------
-        Output tensor of shape ``(batch_size, input_dim)``.
+        Output tensor of shape (batch_size, input_dim).
         """
         # add token
         token_shape = (len(x), 1)
@@ -394,25 +394,25 @@ class ConditionEncoder(BaseModule):
 
     Parameters
     ----------
-    output_dim
+    output_dim : int
         Dimensionality of the output.
-    pooling
+    pooling : Literal["mean", "attention_token", "attention_seed"]
         Pooling method.
-    pooling_kwargs
+    pooling_kwargs : dict
         Keyword arguments for the pooling method.
-    layers_before_pool
+    layers_before_pool : Sequence[tuple[Literal["mlp", "self_attention"], dict]] | dict
         Layers before pooling. Either a sequence of tuples with layer type and parameters or a dictionary with input-specific layers.
-    layers_after_pool
+    layers_after_pool : Sequence[tuple[Literal["mlp", "self-attention"], dict]]
         Layers after pooling.
-    output_dropout
+    output_dropout : float
         Dropout rate for the output layer.
-    mask_value
+    mask_value : float
         Value for masked elements used in input conditions.
-    genot_source_layers
+    genot_source_layers: Sequence[tuple[Literal["mlp", "self-attention"], dict]] | None
         Only for GENOT: Layers for GENOT source.
-    genot_source_dim
+    genot_source_dim: int
         Only for GENOT: Dimensionality which the cell data should be processed to.
-    genot_source_dropout
+    genot_source_dropout: float
         Only for GENOT: Dropout rate for the GENOT source layers.
     """
 
@@ -557,7 +557,22 @@ class ConditionEncoder(BaseModule):
         output_dim: int | None = None,
         dropout_rate: float | None = None,
     ) -> list:
-        """Get modules from layer parameters."""
+        """
+        Get modules from layer parameters.
+
+        Parameters
+        ----------
+        layers : dict
+            Layer parameters.
+        output_dim : int
+            Dimensionality of the output (adds a dense layer at the end).
+        dropout_rate : float
+            Dropout rate for the output layer.
+
+        Returns
+        -------
+        List of modules.
+        """
         modules = []
         for layer_type, layer_params in layers:
             if layer_type == "mlp":

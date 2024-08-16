@@ -6,22 +6,18 @@ import numpy as np
 from numpy.typing import ArrayLike
 from tqdm import tqdm
 
-from cfp.data._dataloader import TrainSampler, ValidationSampler
-from cfp.solvers import _genot, _otfm
-from cfp.training._callbacks import CallbackRunner
+from cfp.data.dataloader import TrainSampler, ValidationSampler
+from cfp.solvers import genot, otfm
+from cfp.training.callbacks import CallbackRunner
 
 
 class CellFlowTrainer:
     """Trainer for the OTFM/GENOT model with a conditional velocity field.
 
-    Parameters
-    ----------
-        dataloader
-            Data sampler.
-        model
-            OTFM/GENOT model with a conditional velocity field.
-        seed
-            Random seed for subsampling validation data.
+    Args:
+        dataloader: Data sampler.
+        model: OTFM/GENOT model with a conditional velocity field.
+        seed: Random seed for subsampling validation data.
 
     Returns
     -------
@@ -30,10 +26,10 @@ class CellFlowTrainer:
 
     def __init__(
         self,
-        model: _otfm.OTFlowMatching | _genot.GENOT,
+        model: otfm.OTFlowMatching | genot.GENOT,
         seed: int = 0,
     ):
-        if not isinstance(model, (_otfm.OTFlowMatching | _genot.GENOT)):
+        if not isinstance(model, (otfm.OTFlowMatching | genot.GENOT)):
             raise NotImplementedError(
                 f"Model must be an instance of OTFlowMatching or GENOT, got {type(model)}"
             )
@@ -80,18 +76,12 @@ class CellFlowTrainer:
     ) -> None:
         """Trains the model.
 
-        Parameters
-        ----------
-            num_iterations
-                Number of iterations to train the model.
-            batch_size
-                Batch size.
-            valid_freq
-                Frequency of validation.
-            callbacks
-                Callback functions.
-            monitor_metrics
-                Metrics to monitor.
+        Args:
+            num_iterations: Number of iterations to train the model.
+            batch_size: Batch size.
+            valid_freq: Frequency of validation.
+            callbacks: Callback functions.
+            monitor_metrics: Metrics to monitor.
 
         Returns
         -------

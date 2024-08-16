@@ -5,21 +5,20 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 
-from cfp.data._data import PredictionData, TrainingData, ValidationData
+from cfp.data.data import PredictionData, TrainingData, ValidationData
 
-__all__ = ["TrainSampler", "ValidationSampler", "PredictionSampler"]
+__all__ = ["TrainSampler"]
 
 
 class TrainSampler:
-    """Data sampler for :class:`~cfp.data.TrainingData`.
+    """Data sampler for :class:`~cfp.data.data.TrainingData`.
 
     Parameters
     ----------
-    data
-        The training data.
-    batch_size
+    data : TrainingData
+        The data object to sample from.
+    batch_size : int
         The batch size.
-
     """
 
     def __init__(self, data: TrainingData, batch_size: int = 1024):
@@ -103,16 +102,6 @@ class BaseValidSampler(abc.ABC):
 
 
 class ValidationSampler(BaseValidSampler):
-    """Data sampler for :class:`~cfp.data.ValidationData`.
-
-    Parameters
-    ----------
-    val_data
-        The validation data.
-    seed
-        Random seed.
-    """
-
     def __init__(self, val_data: ValidationData, seed: int = 0) -> None:
         self.data = val_data
         self.perturbation_to_control = self._get_perturbation_to_control(val_data)
@@ -131,17 +120,6 @@ class ValidationSampler(BaseValidSampler):
             raise NotImplementedError("Validation data must have condition data.")
 
     def sample(self, mode: Literal["on_log_iteration", "on_train_end"]) -> Any:
-        """Sample data for validation.
-
-        Parameters
-        ----------
-        mode
-            Sampling mode. Either "on_log_iteration" or "on_train_end".
-
-        Returns
-        -------
-        Dictionary with source, condition, and target data from the validation data.
-        """
         size = (
             self.n_conditions_on_log_iteration
             if mode == "on_log_iteration"
@@ -177,15 +155,6 @@ class ValidationSampler(BaseValidSampler):
 
 
 class PredictionSampler(BaseValidSampler):
-    """Data sampler for :class:`~cfp.data.PredictionData`.
-
-    Parameters
-    ----------
-    pred_data
-        The prediction data.
-
-    """
-
     def __init__(self, pred_data: PredictionData) -> None:
         self.data = pred_data
         self.perturbation_to_control = self._get_perturbation_to_control(pred_data)
@@ -193,12 +162,6 @@ class PredictionSampler(BaseValidSampler):
             raise NotImplementedError("Validation data must have condition data.")
 
     def sample(self) -> Any:
-        """Sample data for prediction.
-
-        Returns
-        -------
-        Dictionary with source and condition data from the prediction data.
-        """
         condition_idcs = range(self.data.n_perturbations)
 
         source_idcs = [

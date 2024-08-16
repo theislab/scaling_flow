@@ -1,4 +1,2 @@
-from cfp.solvers._genot import GENOT
-from cfp.solvers._otfm import OTFlowMatching
-
-__all__ = ["GENOT", "OTFlowMatching"]
+from cfp.solvers.genot import GENOT
+from cfp.solvers.otfm import OTFlowMatching

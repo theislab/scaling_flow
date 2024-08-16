@@ -6,7 +6,7 @@ from ott.neural.methods.flows import dynamics
 from ott.solvers import utils as solver_utils
 
 import cfp
-from cfp.solvers import _otfm
+from cfp.solvers import otfm
 
 x_test = jnp.ones((10, 5)) * 10
 t_test = jnp.ones((10, 1))
@@ -25,7 +25,7 @@ class TestTrainer:
             hidden_dims=(32, 32),
             decoder_dims=(32, 32),
         )
-        model = _otfm.OTFlowMatching(
+        model = otfm.OTFlowMatching(
             vf=vf,
             match_fn=solver_utils.match_linear,
             flow=dynamics.ConstantNoiseFlow(0.0),
@@ -58,7 +58,7 @@ class TestTrainer:
             hidden_dims=(32, 32),
             decoder_dims=(32, 32),
         )
-        model = _otfm.OTFlowMatching(
+        model = otfm.OTFlowMatching(
             vf=vf,
             match_fn=solver_utils.match_linear,
             flow=dynamics.ConstantNoiseFlow(0.0),
@@ -68,7 +68,9 @@ class TestTrainer:
         )
 
         metric_to_compute = "e_distance"
-        metrics_callback = cfp.training.Metrics(metrics=[metric_to_compute])
+        metrics_callback = cfp.training.callbacks.ComputeMetrics(
+            metrics=[metric_to_compute]
+        )
 
         trainer = cfp.training.CellFlowTrainer(model=model)
         trainer.train(

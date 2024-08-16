@@ -31,38 +31,30 @@ class GENOT:
     (Fused) Gromov-Wasserstein couplings, in both the balanced and
     the unbalanced setting.
 
-    Parameters
-    ----------
-        vf
-            Vector field parameterized by a neural network.
-        flow
-            Flow between the latent and the target distributions.
-        data_match_fn
-            Function to match samples from the source and the target
-            distributions. Depending on the data passed in :meth:`__call__`, it has
-            the following signature:
+    Args:
+      vf: Vector field parameterized by a neural network.
+      flow: Flow between the latent and the target distributions.
+      data_match_fn: Function to match samples from the source and the target
+        distributions. Depending on the data passed in :meth:`__call__`, it has
+        the following signature:
 
-            - ``(src_lin, tgt_lin) -> matching`` - linear matching.
-            - ``(src_quad, tgt_quad, src_lin, tgt_lin) -> matching`` -
-            quadratic (fused) GW matching. In the pure GW setting, both ``src_lin``
-            and ``tgt_lin`` will be set to :obj:`None`.
+        - ``(src_lin, tgt_lin) -> matching`` - linear matching.
+        - ``(src_quad, tgt_quad, src_lin, tgt_lin) -> matching`` -
+          quadratic (fused) GW matching. In the pure GW setting, both ``src_lin``
+          and ``tgt_lin`` will be set to :obj:`None`.
 
-        source_dim
-            Dimensionality of the source distribution.
-        target_dim
-            Dimensionality of the target distribution.
-        condition_dim
-            Dimension of the conditions. If :obj:`None`, the underlying
-            velocity field has no conditions.
-        time_sampler
-            Time sampler with a ``(rng, n_samples) -> time`` signature.
-        latent_noise_fn
-            Function to sample from the latent distribution in the
-            target space with a ``(rng, shape) -> noise`` signature.
-            If :obj:`None`, multivariate normal distribution is used.
-        n_samples_per_src: Number of samples drawn from the conditional distribution
-            per one source sample.
-        kwargs: Keyword arguments for TODO
+      source_dim: Dimensionality of the source distribution.
+      target_dim: Dimensionality of the target distribution.
+      condition_dim: Dimension of the conditions. If :obj:`None`, the underlying
+        velocity field has no conditions.
+      time_sampler: Time sampler with a ``(rng, n_samples) -> time`` signature.
+      latent_noise_fn: Function to sample from the latent distribution in the
+        target space with a ``(rng, shape) -> noise`` signature.
+        If :obj:`None`, multivariate normal distribution is used.
+      n_samples_per_src: Number of samples drawn from the conditional distribution
+        per one source sample.
+      kwargs: Keyword arguments for
+        :meth:`~ott.neural.networks.velocity_field.VelocityField.create_train_state`.
     """
 
     def __init__(
@@ -206,10 +198,8 @@ class GENOT:
     def get_condition_embedding(self, condition: dict[str, ArrayLike]) -> ArrayLike:
         """Encode conditions
 
-        Parameters
-        ----------
-            condition
-                Conditions to encode
+        Args:
+            condition: Conditions to encode
 
         Returns
         -------
@@ -236,20 +226,17 @@ class GENOT:
         This function pushes forward the source distribution to its conditional
         distribution by solving the neural ODE.
 
-        Parameters
-        ----------
-            source
-                Data to transport.
-            condition
-                Condition of the input data.
-            rng
-                Random generate used to sample from the latent distribution.
-            kwargs
-                Keyword arguments for :func:`~diffrax.odesolve`.
+        Args:
+          source: Data to transport.
+          condition: Condition of the input data.
+          t0: Starting time of integration of neural ODE.
+          t1: End time of integration of neural ODE.
+          rng: Random generate used to sample from the latent distribution.
+          kwargs: Keyword arguments for :func:`~diffrax.odesolve`.
 
         Returns
         -------
-            The push-forward defined by the learned transport plan.
+          The push-forward defined by the learned transport plan.
         """
         kwargs.setdefault("dt0", None)
         kwargs.setdefault("solver", diffrax.Tsit5())

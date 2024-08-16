@@ -10,7 +10,7 @@ from ott.neural.methods.flows import dynamics
 from ott.solvers import utils as solver_utils
 
 from cfp._types import ArrayLike
-from cfp.networks._velocity_field import ConditionalVelocityField
+from cfp.networks.velocity_field import ConditionalVelocityField
 
 __all__ = ["OTFlowMatching"]
 
@@ -22,15 +22,11 @@ class OTFlowMatching:
 
     Parameters
     ----------
-        vf
-            Vector field parameterized by a neural network.
-        flow
-            Flow between the source and the target distributions.
-        match_fn
-            Function to match samples from the source and the target
-            distributions. It has a ``(src, tgt) -> matching`` signature.
-        time_sampler
-            Time sampler with a ``(rng, n_samples) -> time`` signature.
+      vf: Vector field parameterized by a neural network.
+      flow: Flow between the source and the target distributions.
+      match_fn: Function to match samples from the source and the target
+        distributions. It has a ``(src, tgt) -> matching`` signature.
+      time_sampler: Time sampler with a ``(rng, n_samples) -> time`` signature.
     """
 
     def __init__(
@@ -122,10 +118,8 @@ class OTFlowMatching:
     def get_condition_embedding(self, condition: dict[str, ArrayLike]) -> ArrayLike:
         """Encode conditions
 
-        Parameters
-        ----------
-            condition
-                Conditions to encode
+        Args:
+            condition: Conditions to encode
 
         Returns
         -------
@@ -147,11 +141,11 @@ class OTFlowMatching:
 
         Parameters
         ----------
-        x
+        x : ArrayLike
             Input data of shape [batch_size, ...].
-        condition
+        condition : ArrayLike
             Condition of the input data of shape [batch_size, ...].
-        kwargs
+        kwargs : Any
             Keyword arguments for the ODE solver.
 
         Returns

@@ -5,7 +5,6 @@ import jax.numpy as jnp
 from flax import linen as nn
 
 
-# TODO: this is also defined in _set_encoders
 class MLPBlock(nn.Module):
     """An MLP block."""
 
