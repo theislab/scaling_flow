@@ -4,6 +4,8 @@ from cfp.training._callbacks import (
                                      ComputationCallback,
                                      LoggingCallback,
                                      Metrics,
+                                     PCADecodedMetrics,
+                                     PCADecoder,
                                      WandbLogger,
 )
 from cfp.training._trainer import CellFlowTrainer
@@ -16,4 +18,6 @@ __all__ = [
     "Metrics",
     "WandbLogger",
     "CallbackRunner",
+    "PCADecodedMetrics",
+    "PCADecoder",
 ]
