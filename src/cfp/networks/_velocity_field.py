@@ -21,19 +21,32 @@ class ConditionalVelocityField(nn.Module):
     """Parameterized neural vector field with conditions.
 
     Args:
-        output_dim: Dimensionality of the output.
-        max_combination_length: Maximum number of covariates in a combination.
-        encode_conditions: whether to encode the conditions.
-        condition_embedding_dim: Dimensions of the condition embedding..
-        condition_encoder_kwargs: Keyword arguments for the condition encoder.
-        act_fn: Activation function.
-        time_freqs: Frequency of the cyclical time encoding.
-        time_encoder_dims: Dimensions of the time embedding.
-        time_encoder_dropout: Dropout rate for the time embedding.
-        hidden_dims: Dimensions of the hidden layers.
-        hidden_dropout: Dropout rate for the hidden layers.
-        decoder_dims: Dimensions of the output layers.
-        decoder_dropout: Dropout rate for the output layers.
+        output_dim
+            Dimensionality of the output.
+        max_combination_length
+            Maximum number of covariates in a combination.
+        encode_conditions
+            Whether to encode the conditions.
+        condition_embedding_dim
+            Dimensions of the condition embedding..
+        condition_encoder_kwargs
+            Keyword arguments for the condition encoder.
+        act_fn
+            Activation function.
+        time_freqs
+            Frequency of the cyclical time encoding.
+        time_encoder_dims
+            Dimensions of the time embedding.
+        time_encoder_dropout
+            Dropout rate for the time embedding.
+        hidden_dims
+            Dimensions of the hidden layers.
+        hidden_dropout
+            Dropout rate for the hidden layers.
+        decoder_dims
+            Dimensions of the output layers.
+        decoder_dropout
+            Dropout rate for the output layers.
 
     Returns
     -------
@@ -91,10 +104,14 @@ class ConditionalVelocityField(nn.Module):
         """Forward pass through the neural vector field.
 
         Args:
-            t: Time of shape ``[batch, 1]``.
-            x: Data of shape ``[batch, ...]``.
-            condition: Condition dictionary, with condition names as keys and condition representations of shape ``[batch, max_combination_length, condition_dim]`` as values.
-            train: If `True`, enables dropout for training.
+            t
+                Time of shape ``[batch, 1]``.
+            x
+                Data of shape ``[batch, ...]``.
+            condition
+                Condition dictionary, with condition names as keys and condition representations of shape ``[batch, max_combination_length, condition_dim]`` as values.
+            train
+                `True`, enables dropout for training.
 
         Returns
         -------
@@ -120,7 +137,8 @@ class ConditionalVelocityField(nn.Module):
         """Get the embedding of the condition.
 
         Args:
-            condition: Conditioning vector of shape ``[batch, ...]``.
+            condition
+                Conditioning vector of shape ``[batch, ...]``.
 
         Returns
         -------
@@ -148,9 +166,12 @@ class ConditionalVelocityField(nn.Module):
         """Create the training state.
 
         Args:
-            rng: Random number generator.
-            optimizer: Optimizer.
-            input_dim: Dimensionality of the velocity field.
+            rng
+                Random number generator.
+            optimizer
+                Optimizer.
+            input_dim
+                Dimensionality of the velocity field.
 
         Returns
         -------

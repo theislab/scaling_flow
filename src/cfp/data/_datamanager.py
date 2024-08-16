@@ -17,6 +17,8 @@ from cfp.data._data import ConditionData, PredictionData, ReturnData, TrainingDa
 
 from ._utils import _flatten_list, _to_list
 
+__all__ = ["DataManager"]
+
 
 class DataManager:
     """Data manager for handling perturbation data.
@@ -32,25 +34,40 @@ class DataManager:
     max_combination_length
         Maximum number of combinations of primary `perturbation_covariates`.
     sample_rep
-        Key in :attr:`adata.obsm` where the sample representation is stored or `X` to use `adata.X`.
+        Key in :attr:`~anndata.AnnData.obsm` where the sample representation is stored or `X`
+        to use :attr:`~anndata.AnnData.X`.
     covariate_data
-        Dataframe with covariates. If :obj:`None`, :attr:`adata.obs` is used.
+        Dataframe with covariates. If :obj:`None`, :attr:`~anndata.AnnData.obs` is used.
     condition_id_key
-        Key in :attr:`adata.obs` that defines the condition id.
+        Key in :attr:`~anndata.AnnData.obs` that defines the condition id.
     perturbation_covariates
-        A dictionary where the keys indicate the name of the covariate group and the values are keys in `adata.obs`. The corresponding columns should be either boolean (presence/abscence of the perturbation) or numeric (concentration or magnitude of the perturbation). If multiple groups are provided, the first is interpreted as the primary perturbation and the others as covariates corresponding to these perturbations, e.g. `{"drug":("drugA", "drugB"), "time":("drugA_time", "drugB_time")}`.
+        A dictionary where the keys indicate the name of the covariate group
+        and the values are keys in :attr:`~anndata.AnnData.uns`. The corresponding
+        columns should be either boolean (presence/abscence of the perturbation) or
+        numeric (concentration or magnitude of the perturbation). If multiple groups
+        are provided, the first is interpreted as the primary perturbation and the
+        others as covariates corresponding to these perturbations, e.g.
+        `{"drug":("drugA", "drugB"), "time":("drugA_time", "drugB_time")}`.
     perturbation_covariate_reps
-        A dictionary where the keys indicate the name of the covariate group and the values are keys in `adata.uns` storing a dictionary with the representation of the covariates. E.g. `{"drug":"drug_embeddings"}` with `adata.uns["drug_embeddings"] = {"drugA": np.array, "drugB": np.array}`.
+        A dictionary where the keys indicate the name of the covariate group and the
+        values are keys in :attr:`~anndata.AnnData.uns` storing a dictionary with
+        the representation of the covariates. E.g. `{"drug":"drug_embeddings"}`
+        with `adata.uns["drug_embeddings"] = {"drugA": np.array, "drugB": np.array}`.
     sample_covariates
-        Keys in :attr:`adata.obs` indicating sample covatiates to be taken into account for training and prediction, e.g. `["age", "cell_type"]`.
+        Keys in :attr:`~anndata.AnnData.obs` indicating sample covatiates to be taken
+        into account for training and prediction, e.g. `["age", "cell_type"]`.
     sample_covariate_reps
-        A dictionary where the keys indicate the name of the covariate group and the values are keys in `adata.uns` storing a dictionary with the representation of the covariates. E.g. `{"cell_type": "cell_type_embeddings"}` with `adata.uns["cell_type_embeddings"] = {"cell_typeA": np.array, "cell_typeB": np.array}`.
+        A dictionary where the keys indicate the name of the covariate group and the
+        values are keys in :attr:`~anndata.AnnData.uns` storing a dictionary with the
+        representation of the covariates. E.g. `{"cell_type": "cell_type_embeddings"}`
+        with `adata.uns["cell_type_embeddings"] = {"cell_typeA": np.array, "cell_typeB": np.array}`.
     split_covariates
-        Covariates in adata.obs to split all control cells into different control populations. The perturbed cells are also split according to these columns, but if these covariates should also be encoded in the model, the corresponding column should also be used in `perturbation_covariates` or `sample_covariates`.
+        Covariates in :attr:`~anndata.AnnData.obs` to split all control cells into
+        different control populations. The perturbed cells are also split according to these
+        columns, but if these covariates should also be encoded in the model, the corresponding
+        column should also be used in `perturbation_covariates` or `sample_covariates`.
     null_value
         Value to use for padding to `max_combination_length`.
-
-
     """
 
     def __init__(
@@ -909,22 +926,33 @@ class DataManager:
 
     @property
     def perturbation_covariates(self) -> dict[str, list[str]]:
-        """Dictionary with keys indicating the name of the covariate group and values are keys in :attr:`~anndata.AnnData.obs` which together define the covariates."""
+        """Dictionary with keys indicating the name of the covariate group
+        and values are keys in :attr:`~anndata.AnnData.obs` which together
+        define the covariates.
+        """
         return self._perturbation_covariates
 
     @property
     def perturbation_covariate_reps(self) -> dict[str, list[str]]:
-        """Dictionary with keys indicating the name of the covariate group and values are keys in :attr:`~anndata.AnnData.uns` storing a dictionary with the representation of the covariates."""
+        """Dictionary with keys indicating the name of the covariate group and
+        values are keys in :attr:`~anndata.AnnData.uns` storing a dictionary
+        with the representation of the covariates.
+        """
         return self._perturbation_covariate_reps
 
     @property
     def sample_covariates(self) -> Sequence[str]:
-        """Keys in :attr:`~anndata.AnnData.obs` indicating which sample the cell belongs to (e.g. cell line)."""
+        """Keys in :attr:`~anndata.AnnData.obs` indicating which
+        sample the cell belongs to (e.g. cell line).
+        """
         return self._sample_covariates
 
     @property
     def sample_covariate_reps(self) -> dict[str, str]:
-        """Dictionary with keys indicating the name of the sample covariate group and values are keys in :attr:`~anndata.AnnData.uns` storing a dictionary with the representation of the sample covariates."""
+        """Dictionary with keys indicating the name of the sample covariate
+        group and values are keys in :attr:`~anndata.AnnData.uns` storing
+        a dictionary with the representation of the sample covariates.
+        """
         return self._sample_covariate_reps
 
     @property
@@ -949,12 +977,17 @@ class DataManager:
 
     @property
     def linked_perturb_covars(self) -> dict[str, dict[Any, Any]]:
-        """Dictionary with keys indicating the name of the primary covariate and values are dictionaries with keys indicating the name of the linked covariate group and values are the linked covariates."""
+        """Dictionary with keys indicating the name of the primary covariate
+        and values are dictionaries with keys indicating the name of the linked
+        covariate group and values are the linked covariates.
+        """
         return self._linked_perturb_covars
 
     @property
     def covariate_reps(self) -> dict[str, str]:
-        """Dictionary which stores representation of covariates, i.e. the union of `sample_covariate_reps` and `perturbation_covariate_reps`."""
+        """Dictionary which stores representation of covariates, i.e. the
+        union of `sample_covariate_reps` and `perturbation_covariate_reps`.
+        """
         return self._covariate_reps
 
     @property

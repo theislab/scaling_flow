@@ -53,6 +53,8 @@ intersphinx_mapping = {
     "matplotlib": ("https://matplotlib.org/stable/", None),
     "anndata": ("https://anndata.readthedocs.io/en/latest/", None),
     "scanpy": ("https://scanpy.readthedocs.io/en/latest/", None),
+    "flax": ("https://flax.readthedocs.io/en/latest/", None),
+    "optax": ("https://optax.readthedocs.io/en/latest/", None),
 }
 master_doc = "index"
 pygments_style = "tango"
