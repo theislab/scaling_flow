@@ -16,6 +16,7 @@ __all__ = [
     "Metrics",
     "WandbLogger",
     "CallbackRunner",
+    "PCADecodedMetrics",
 ]
 
 
