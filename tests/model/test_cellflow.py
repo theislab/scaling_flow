@@ -25,7 +25,7 @@ class TestCellFlow:
         perturbation_covariate_reps = {"drug": "drug"}
         condition_embedding_dim = 32
 
-        cf = cfp.model.cellflow.CellFlow(adata_perturbation, solver=solver)
+        cf = cfp.model.CellFlow(adata_perturbation, solver=solver)
         cf.prepare_data(
             sample_rep=sample_rep,
             control_key=control_key,
@@ -56,11 +56,7 @@ class TestCellFlow:
         # we assume these are all source cells now in adata_perturbation
         adata_perturbation_pred = adata_perturbation.copy()
         adata_perturbation_pred.obs["control"] = True
-        pred = cf.predict(
-            adata_perturbation_pred,
-            covariate_data=adata_perturbation_pred.obs,
-            sample_rep=sample_rep,
-        )
+        pred = cf.predict(adata_perturbation_pred, sample_rep=sample_rep)
         assert isinstance(pred, dict)
         out = next(iter(pred.values()))
         assert out.shape[0] == adata_perturbation.n_obs
@@ -88,7 +84,7 @@ class TestCellFlow:
         perturbation_covariate_reps = {"drug": "drug"}
         condition_embedding_dim = 32
 
-        cf = cfp.model.cellflow.CellFlow(adata_perturbation, solver=solver)
+        cf = cfp.model.CellFlow(adata_perturbation, solver=solver)
         cf.prepare_data(
             sample_rep=sample_rep,
             control_key=control_key,
@@ -119,11 +115,7 @@ class TestCellFlow:
         # we assume these are all source cells now in adata_perturbation
         adata_perturbation_pred = adata_perturbation.copy()
         adata_perturbation_pred.obs["control"] = True
-        pred = cf.predict(
-            adata_perturbation_pred,
-            covariate_data=adata_perturbation_pred.obs,
-            sample_rep=sample_rep,
-        )
+        pred = cf.predict(adata_perturbation_pred, sample_rep=sample_rep)
         assert isinstance(pred, dict)
         out = next(iter(pred.values()))
         assert out.shape[0] == adata_perturbation.n_obs
@@ -153,7 +145,7 @@ class TestCellFlow:
         n_conditions_on_log_iteration,
         n_conditions_on_train_end,
     ):
-        cf = cfp.model.cellflow.CellFlow(adata_perturbation, solver=solver)
+        cf = cfp.model.CellFlow(adata_perturbation, solver=solver)
         cf.prepare_data(
             sample_rep="X",
             control_key="control",
@@ -212,7 +204,7 @@ class TestCellFlow:
         n_conditions_on_train_end,
     ):
         # TODO(@MUCDK) after PR #33 check for larger n_conditions_on...
-        cf = cfp.model.cellflow.CellFlow(adata_perturbation, solver=solver)
+        cf = cfp.model.CellFlow(adata_perturbation, solver=solver)
         cf.prepare_data(
             sample_rep="X",
             control_key="control",
@@ -257,9 +249,7 @@ class TestCellFlow:
         assert cf.trainer is not None
 
         metric_to_compute = "r_squared"
-        metrics_callback = cfp.training.callbacks.ComputeMetrics(
-            metrics=[metric_to_compute]
-        )
+        metrics_callback = cfp.training.Metrics(metrics=[metric_to_compute])
 
         cf.train(num_iterations=3, callbacks=[metrics_callback], valid_freq=1)
         assert cf.dataloader is not None
@@ -271,7 +261,7 @@ class TestCellFlow:
         adata_perturbation,
         solver,
     ):
-        cf = cfp.model.cellflow.CellFlow(adata_perturbation, solver=solver)
+        cf = cfp.model.CellFlow(adata_perturbation, solver=solver)
         cf.prepare_data(
             sample_rep="X",
             control_key="control",
