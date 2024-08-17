@@ -214,7 +214,7 @@ class CellFlow:
 
         condition_encoder_kwargs = condition_encoder_kwargs or {}
         covariates_not_pooled = (
-            [] if pool_sample_covariates else self.dm._sample_covariates
+            [] if pool_sample_covariates else self.dm.sample_covariates
         )
         velocity_field_kwargs = velocity_field_kwargs or {}
         solver_kwargs = solver_kwargs or {}
