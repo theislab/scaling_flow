@@ -36,8 +36,8 @@ class CellFlow:
 
     def __init__(self, adata: ad.AnnData, solver: Literal["otfm", "genot"] = "otfm"):
 
-        self.adata = adata
-        self.solver = solver
+        self._adata = adata
+        self._solver_class = _otfm.OTFlowMatching if solver == "otfm" else _genot.GENOT
         self.dataloader: TrainSampler | None = None
         self.trainer: CellFlowTrainer | None = None
         self.model: _otfm.OTFlowMatching | _genot.GENOT | None = None
@@ -245,8 +245,10 @@ class CellFlow:
             raise NotImplementedError(
                 f"The key of `flow` must be `'constant_noise'` or `'bridge'` but found {flow.keys()[0]}."
             )
-        if self.solver == "otfm":
-            self._solver = _otfm.OTFlowMatching(
+        print("self._solver_class", self._solver_class)
+
+        if self._solver_class == _otfm.OTFlowMatching:
+            self._solver = self._solver_class(
                 vf=vf,
                 match_fn=match_fn,
                 flow=flow,
@@ -255,8 +257,8 @@ class CellFlow:
                 rng=jax.random.PRNGKey(seed),
                 **solver_kwargs,
             )
-        elif self.solver == "genot":
-            self._solver = _genot.GENOT(
+        elif self._solver_class == _genot.GENOT:
+            self._solver = self._solver_class(
                 vf=vf,
                 data_match_fn=match_fn,
                 flow=flow,
@@ -267,7 +269,11 @@ class CellFlow:
                 rng=jax.random.PRNGKey(seed),
                 **solver_kwargs,
             )
-        self.trainer = CellFlowTrainer(model=self._solver)
+        else:
+            raise NotImplementedError(
+                f"Solver must be an instance of OTFlowMatching or GENOT, got {type(self._solver)}"
+            )
+        self.trainer = CellFlowTrainer(model=self._solver)  # type: ignore[arg-type]
 
     def train(
         self,
@@ -393,6 +399,11 @@ class CellFlow:
         if self.model is None:
             raise ValueError("Model not trained. Please call `train` first.")
 
+        if not self.dm.is_conditional:
+            raise ValueError(
+                "Model is not conditional. Condition embeddings are not available."
+            )
+
         if hasattr(covariate_data, "condition_data"):
             cond_data = covariate_data
         elif isinstance(covariate_data, pd.DataFrame):
@@ -406,8 +417,8 @@ class CellFlow:
                 "Covariate data must be a `pandas.DataFrame` or an instance of `BaseData`."
             )
 
-        condition_embeddings = {}
-        n_conditions = len(next(iter(cond_data.condition_data.values())))
+        condition_embeddings: dict[str, ArrayLike] = {}
+        n_conditions = len(next(iter(cond_data.condition_data.values())))  # type: ignore[union-attr]
         for i in range(n_conditions):
             condition = {k: v[[i], :] for k, v in cond_data.condition_data.items()}  # type: ignore[union-attr]
             if len(cond_data.perturbation_idx_to_id):  # type: ignore[union-attr]
@@ -489,3 +500,13 @@ class CellFlow:
                 f"Expected the model to be type of `{cls}`, found `{type(model)}`."
             )
         return model
+
+    @property
+    def adata(self) -> ad.AnnData:
+        """The AnnData object used for training."""
+        return self._adata
+
+    @property
+    def solver(self) -> _otfm.OTFlowMatching | _genot.GENOT | None:
+        """The solver to use for training."""
+        return self._solver

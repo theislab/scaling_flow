@@ -5,6 +5,8 @@ from typing import Any
 import jax
 import jax.numpy as jnp
 
+from cfp._types import ArrayLike
+
 __all__ = [
     "BaseDataMixin",
     "ConditionData",
@@ -17,12 +19,12 @@ __all__ = [
 @dataclass
 class ReturnData:  # TODO: this should rather be a NamedTuple
     split_covariates_mask: jnp.ndarray | None
-    split_idx_to_covariates: dict[int, str] | None
+    split_idx_to_covariates: dict[int, str]
     perturbation_covariates_mask: jnp.ndarray | None
-    perturbation_idx_to_covariates: dict[int, tuple[str, ...]] | None
+    perturbation_idx_to_covariates: dict[int, tuple[Any, ...]] | None
     perturbation_idx_to_id: dict[int, Any]
-    condition_data: dict[str | int, jnp.ndarray] | None
-    control_to_perturbation: dict[int, jnp.ndarray] | None
+    condition_data: dict[int, ArrayLike]
+    control_to_perturbation: dict[int, ArrayLike]
     max_combination_length: int | None
 
 
@@ -71,7 +73,7 @@ class ConditionData(BaseDataMixin):
         Data manager used to generate the data.
     """
 
-    condition_data: dict[int | str, jnp.ndarray] | None
+    condition_data: dict[int, ArrayLike]
     max_combination_length: int
     perturbation_idx_to_covariates: dict[int, tuple[str, ...]]
     perturbation_idx_to_id: dict[int, Any]
@@ -119,11 +121,9 @@ class TrainingData(BaseDataMixin):
         int, tuple[str, ...]
     ]  # (n_targets,), dictionary explaining perturbation_covariates_mask
     perturbation_idx_to_id: dict[int, Any]
-    condition_data: dict[
-        str | int, jnp.ndarray
-    ]  # (n_targets,) all embeddings for conditions
+    condition_data: dict[int, ArrayLike]  # (n_targets,) all embeddings for conditions
     control_to_perturbation: dict[
-        int, jax.Array
+        int, ArrayLike
     ]  # mapping from control idx to target distribution idcs
     max_combination_length: int
     null_value: Any
@@ -176,9 +176,7 @@ class ValidationData(BaseDataMixin):
         int, tuple[str, ...]
     ]  # (n_targets,), dictionary explaining perturbation_covariates_mask
     perturbation_idx_to_id: dict[int, Any]
-    condition_data: dict[
-        str | int, jnp.ndarray
-    ]  # (n_targets,) all embeddings for conditions
+    condition_data: dict[int, ArrayLike]  # (n_targets,) all embeddings for conditions
     control_to_perturbation: dict[
         int, jax.Array
     ]  # mapping from control idx to target distribution idcs
@@ -220,10 +218,8 @@ class PredictionData(BaseDataMixin):
         int, tuple[str, ...]
     ]  # (n_targets,), dictionary explaining perturbation_covariates_mask
     perturbation_idx_to_id: dict[int, Any]
-    condition_data: dict[
-        str | int, jnp.ndarray
-    ]  # (n_targets,) all embeddings for conditions
-    control_to_perturbation: dict[int, jnp.ndarray] | None
+    condition_data: dict[int, ArrayLike]  # (n_targets,) all embeddings for conditions
+    control_to_perturbation: dict[int, ArrayLike]
     max_combination_length: int
     null_value: Any
     data_manager: Any

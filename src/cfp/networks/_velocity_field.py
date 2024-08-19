@@ -102,7 +102,7 @@ class ConditionalVelocityField(nn.Module):
         self,
         t: jnp.ndarray,
         x: jnp.ndarray,
-        condition: dict[str, jnp.ndarray],
+        cond: dict[str, jnp.ndarray],
         train: bool = True,
     ) -> jnp.ndarray:
         """Forward pass through the neural vector field.
@@ -123,17 +123,17 @@ class ConditionalVelocityField(nn.Module):
         """
         squeeze = x.ndim == 1
         if self.encode_conditions:
-            condition = self.condition_encoder(condition, training=train)
+            cond = self.condition_encoder(cond, training=train)
         else:
-            condition = jnp.concatenate(list(condition.values()), axis=-1)
+            cond = jnp.concatenate(list(cond.values()), axis=-1)
         t = time_encoder.cyclical_time_encoder(t, n_freqs=self.time_freqs)
         t = self.time_encoder(t, training=train)
         x = self.x_encoder(x, training=train)
         if squeeze:
-            condition = jnp.squeeze(condition)  # , 0)
-        elif condition.shape[0] != x.shape[0]:
-            condition = jnp.tile(condition, (x.shape[0], 1))
-        concatenated = jnp.concatenate((t, x, condition), axis=-1)
+            cond = jnp.squeeze(cond)  # , 0)
+        elif cond.shape[0] != x.shape[0]:
+            cond = jnp.tile(cond, (x.shape[0], 1))
+        concatenated = jnp.concatenate((t, x, cond), axis=-1)
         out = self.decoder(concatenated, training=train)
         return self.output_layer(out)
 

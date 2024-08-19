@@ -1,5 +1,5 @@
 import abc
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from typing import Any, Literal, NamedTuple
 
 import jax.tree as jt
@@ -106,16 +106,16 @@ class ComputationCallback(BaseCallback, abc.ABC):
         pass
 
 
-metric_to_func = {
+metric_to_func: dict[str, Callable[[ArrayLike, ArrayLike], float | ArrayLike]] = {
     "r_squared": compute_r_squared,
     "mmd": compute_scalar_mmd,
     "sinkhorn_div": compute_sinkhorn_div,
     "e_distance": compute_e_distance,
 }
 
-agg_fn_to_func = {
-    "mean": np.mean,
-    "median": np.median,
+agg_fn_to_func: dict[str, Callable[[ArrayLike], float | ArrayLike]] = {
+    "mean": lambda x: np.mean(x, axis=0),  # type: ignore[arg-type]
+    "median": lambda x: np.median(x, axis=0),  # type: ignore[arg-type]
 }
 
 
@@ -177,7 +177,7 @@ class Metrics(ComputationCallback):
                         out_flattened
                     )
 
-        return metrics
+        return metrics  # type: ignore[return-value]
 
     def on_train_end(
         self,
@@ -224,7 +224,9 @@ class PCADecodedMetrics(Metrics):
         super().__init__(metrics, metric_aggregations)
         self.pcs = pca_decoder.pcs
         self.means = pca_decoder.means
-        self.reconstruct_data = lambda x: x @ self.pcs.T + self.means.T
+        self.reconstruct_data = lambda x: x @ np.transpose(self.pcs) + np.transpose(
+            self.means
+        )
         self.log_prefix = log_prefix
 
     def on_log_iteration(
@@ -382,7 +384,7 @@ class CallbackRunner:
             dict_to_log.update(results)
 
         for callback in self.logging_callbacks:
-            callback.on_log_iteration(dict_to_log)
+            callback.on_log_iteration(dict_to_log)  # type: ignore[call-arg]
 
         return dict_to_log
 
@@ -404,6 +406,6 @@ class CallbackRunner:
             dict_to_log.update(results)
 
         for callback in self.logging_callbacks:
-            callback.on_log_iteration(dict_to_log)
+            callback.on_log_iteration(dict_to_log)  # type: ignore[call-arg]
 
         return dict_to_log

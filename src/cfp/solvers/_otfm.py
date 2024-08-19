@@ -53,7 +53,7 @@ class OTFlowMatching:
         )
         self.vf_step_fn = self._get_vf_step_fn()
 
-    def _get_vf_step_fn(self) -> Callable:
+    def _get_vf_step_fn(self) -> Callable:  # type: ignore[type-arg]
 
         @jax.jit
         def vf_step_fn(
