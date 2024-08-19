@@ -131,7 +131,7 @@ class ConditionalVelocityField(nn.Module):
         x = self.x_encoder(x, training=train)
         if squeeze:
             cond = jnp.squeeze(cond)  # , 0)
-        elif cond.shape[0] != x.shape[0]:
+        elif cond.shape[0] != x.shape[0]:  # type: ignore[attr-defined]
             cond = jnp.tile(cond, (x.shape[0], 1))
         concatenated = jnp.concatenate((t, x, cond), axis=-1)
         out = self.decoder(concatenated, training=train)

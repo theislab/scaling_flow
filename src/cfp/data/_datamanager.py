@@ -121,7 +121,7 @@ class DataManager:
             self._sample_covariate_reps or {}
         )
 
-        self._covar_to_idx = self._get_covar_to_idx(covariate_groups)
+        self._covar_to_idx = self._get_covar_to_idx(covariate_groups)  # type: ignore[arg-type]
         perturb_covar_keys = _flatten_list(
             self._perturbation_covariates.values()
         ) + list(self._sample_covariates)
@@ -334,7 +334,7 @@ class DataManager:
             perturbation_covariates_mask = None
             control_mask = jnp.ones((len(covariate_data),))
 
-        condition_data: dict[int, list[jnp.ndarray]] = (
+        condition_data: dict[str, list[jnp.ndarray]] = (
             {i: [] for i in self._covar_to_idx.keys()} if self.is_conditional else {}
         )
 
@@ -383,7 +383,7 @@ class DataManager:
                     if mask.sum() == 0:
                         continue
                     # map unique condition id to target id
-                    perturbation_covariates_mask[mask] = tgt_counter
+                    perturbation_covariates_mask[mask] = tgt_counter  # type: ignore[index]
 
                 # map target id to unique conditions and their ids
                 conditional_distributions.append(tgt_counter)
@@ -430,7 +430,7 @@ class DataManager:
             perturbation_covariates_mask=perturbation_covariates_mask,
             perturbation_idx_to_covariates=perturbation_idx_to_covariates,
             perturbation_idx_to_id=perturbation_idx_to_id,
-            condition_data=condition_data,
+            condition_data=condition_data,  # type: ignore[arg-type]
             control_to_perturbation=control_to_perturbation,
             max_combination_length=self._max_combination_length,
         )
@@ -978,7 +978,7 @@ class DataManager:
         return self._linked_perturb_covars
 
     @property
-    def covariate_reps(self) -> dict[str, list[str] | str]:
+    def covariate_reps(self) -> dict[str, str]:
         """Dictionary which stores representation of covariates, i.e. the union of `sample_covariate_reps` and `perturbation_covariate_reps`."""
         return self._covariate_reps
 

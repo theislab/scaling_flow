@@ -243,7 +243,7 @@ class CellFlow:
             flow = dynamics.BrownianBridge(noise)
         else:
             raise NotImplementedError(
-                f"The key of `flow` must be `'constant_noise'` or `'bridge'` but found {flow.keys()[0]}."
+                f"The key of `flow` must be `'constant_noise'` or `'bridge'` but found {flow}."
             )
 
         if self._solver_class == _otfm.OTFlowMatching:

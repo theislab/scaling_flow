@@ -23,7 +23,7 @@ class ReturnData:  # TODO: this should rather be a NamedTuple
     perturbation_covariates_mask: jnp.ndarray | None
     perturbation_idx_to_covariates: dict[int, tuple[Any, ...]]
     perturbation_idx_to_id: dict[int, Any]
-    condition_data: dict[int, ArrayLike]
+    condition_data: dict[str, ArrayLike]
     control_to_perturbation: dict[int, ArrayLike]
     max_combination_length: int
 
@@ -73,7 +73,7 @@ class ConditionData(BaseDataMixin):
         Data manager used to generate the data.
     """
 
-    condition_data: dict[int, ArrayLike]
+    condition_data: dict[str, ArrayLike]
     max_combination_length: int
     perturbation_idx_to_covariates: dict[int, tuple[str, ...]]
     perturbation_idx_to_id: dict[int, Any]
@@ -121,7 +121,7 @@ class TrainingData(BaseDataMixin):
         int, tuple[str, ...]
     ]  # (n_targets,), dictionary explaining perturbation_covariates_mask
     perturbation_idx_to_id: dict[int, Any]
-    condition_data: dict[int, ArrayLike]  # (n_targets,) all embeddings for conditions
+    condition_data: dict[str, ArrayLike]  # (n_targets,) all embeddings for conditions
     control_to_perturbation: dict[
         int, ArrayLike
     ]  # mapping from control idx to target distribution idcs
@@ -176,7 +176,7 @@ class ValidationData(BaseDataMixin):
         int, tuple[str, ...]
     ]  # (n_targets,), dictionary explaining perturbation_covariates_mask
     perturbation_idx_to_id: dict[int, Any]
-    condition_data: dict[int, ArrayLike]  # (n_targets,) all embeddings for conditions
+    condition_data: dict[str, ArrayLike]  # (n_targets,) all embeddings for conditions
     control_to_perturbation: dict[
         int, jax.Array
     ]  # mapping from control idx to target distribution idcs
@@ -218,7 +218,7 @@ class PredictionData(BaseDataMixin):
         int, tuple[str, ...]
     ]  # (n_targets,), dictionary explaining perturbation_covariates_mask
     perturbation_idx_to_id: dict[int, Any]
-    condition_data: dict[int, ArrayLike]  # (n_targets,) all embeddings for conditions
+    condition_data: dict[str, ArrayLike]  # (n_targets,) all embeddings for conditions
     control_to_perturbation: dict[int, ArrayLike]
     max_combination_length: int
     null_value: Any

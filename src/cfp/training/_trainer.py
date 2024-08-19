@@ -44,9 +44,12 @@ class CellFlowTrainer:
 
     def _validation_step(
         self,
-        val_data: dict[str, dict[str, dict[str, ArrayLike]]],
+        val_data: dict[str, ValidationSampler],
         mode: Literal["on_log_iteration", "on_train_end"] = "on_log_iteration",
-    ) -> dict[str, dict[str, dict[str, ArrayLike]]]:
+    ) -> tuple[
+        dict[str, dict[str, ArrayLike]],
+        dict[str, dict[str, ArrayLike]],
+    ]:
         """Compute predictions for validation data."""
         # TODO: Sample fixed number of conditions to validate on
 

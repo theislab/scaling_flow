@@ -78,15 +78,21 @@ class ComputationCallback(BaseCallback, abc.ABC):
     @abc.abstractmethod
     def on_log_iteration(
         self,
-        validation_data: dict[str, ValidationData],
+        validation_data: dict[str, dict[str, ArrayLike]],
         predicted_data: dict[str, dict[str, ArrayLike]],
     ) -> dict[str, float]:
         """Called at each validation/log iteration to compute metrics
 
-        Args:
-            validation_data: Validation data
-            predicted_data: Predicted data
-            training_data: Current batch and predicted data
+        Parameters
+        ----------
+            validation_data
+                Validation data in nested dictionary format with same keys as `predicted_data`
+            predicted_data
+                Predicted data in nested dictionary format with same keys as `validation_data`
+
+        Returns
+        -------
+            Statistics of the validation data and predicted data
         """
         pass
 
@@ -364,7 +370,9 @@ class CallbackRunner:
             callback.on_train_begin()
 
     def on_log_iteration(
-        self, valid_data: dict[str, ValidationData], pred_data
+        self,
+        valid_data: dict[str, dict[str, ArrayLike]],
+        pred_data: dict[str, dict[str, ArrayLike]],
     ) -> dict[str, Any]:
         """Called at each validation/log iteration to run callbacks. First computes metrics with computation callbacks and then logs data with logging callbacks.
 
