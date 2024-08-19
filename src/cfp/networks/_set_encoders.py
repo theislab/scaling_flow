@@ -12,6 +12,7 @@ from flax.training import train_state
 from flax.typing import FrozenDict
 
 from cfp._constants import GENOT_CELL_KEY
+from cfp._types import ArrayLike
 
 __all__ = [
     "ConditionEncoder",
@@ -451,10 +452,10 @@ class ConditionEncoder(BaseModule):
             # different layers for different inputs
             self.before_pool_modules = {
                 key: self._get_layers(layers)
-                for key, layers in self.layers_before_pool.items()
+                for key, layers in self.layers_before_pool.items()  # type: ignore[union-attr]
             }
         else:
-            self.before_pool_modules = self._get_layers(self.layers_before_pool)
+            self.before_pool_modules = self._get_layers(self.layers_before_pool)  # type: ignore[arg-type]
 
         # pooling
         if self.pooling == "mean":
@@ -466,7 +467,7 @@ class ConditionEncoder(BaseModule):
 
         # modules after pooling
         self.after_pool_modules = self._get_layers(
-            self.layers_after_pool, self.output_dim, self.output_dropout
+            self.layers_after_pool, self.output_dim, self.output_dropout  # type: ignore[arg-type]
         )
 
         # separate input layers for GENOT
@@ -599,19 +600,19 @@ class ConditionEncoder(BaseModule):
 
     def _get_layers(
         self,
-        layers: dict,
+        layers: dict[str, Any],
         output_dim: int | None = None,
         dropout_rate: float | None = None,
-    ) -> list:
+    ) -> list[nn.Module]:
         """Get modules from layer parameters."""
         modules = []
         for layer_type, layer_params in layers:
-            if layer_type == "mlp":
-                layer = MLPBlock(**layer_params)
-            elif layer_type == "self_attention":
-                layer = SelfAttentionBlock(**layer_params)
+            if layer_type == "mlp":  # type: ignore[has-type]
+                layer = MLPBlock(**layer_params)  # type: ignore[has-type]
+            elif layer_type == "self_attention":  # type: ignore[has-type]
+                layer = SelfAttentionBlock(**layer_params)  # type: ignore[has-type]
             else:
-                raise ValueError(f"Unknown layer type: {layer_type}")
+                raise ValueError(f"Unknown layer type: {layer_type}")  # type: ignore[has-type]
             modules.append(layer)
         if output_dim is not None:
             modules.append(nn.Dense(output_dim))
@@ -619,7 +620,9 @@ class ConditionEncoder(BaseModule):
                 modules.append(nn.Dropout(dropout_rate))
         return modules
 
-    def _get_masks(self, conditions: dict) -> tuple[jnp.ndarray, jnp.ndarray]:
+    def _get_masks(
+        self, conditions: dict[str, ArrayLike]
+    ) -> tuple[jnp.ndarray, jnp.ndarray]:
         """Get mask for padded conditions tensor."""
         # mask of shape (batch_size, set_size)
         mask = 1 - jnp.all(
@@ -638,7 +641,7 @@ class ConditionEncoder(BaseModule):
 
     def _apply_modules(
         self,
-        modules: list,
+        modules: list[nn.Module],
         conditions: jnp.ndarray,
         attention_mask: jnp.ndarray | None,
         training: bool,

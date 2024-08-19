@@ -398,7 +398,7 @@ class DataManager:
                         rep_dict=rep_dict,
                         perturb_covariates={
                             k: _to_list(v)
-                            for k, v in self._perturbation_covariates.items()
+                            for k, v in self._perturbation_covariates.items()  # type: ignore[union-attr]
                         },
                     )
                     for pert_cov, emb in embedding.items():
@@ -412,7 +412,7 @@ class DataManager:
 
         # convert outputs to jax arrays
         if self.is_conditional:
-            for pert_cov, emb in condition_data.items():
+            for pert_cov, emb in condition_data.items():  # type: ignore[union-attr]
                 condition_data[pert_cov] = jnp.array(emb)
         split_covariates_mask = (
             jnp.asarray(split_covariates_mask)
@@ -477,7 +477,7 @@ class DataManager:
                     f"Sample representation '{self._sample_rep}' not found in `adata.obsm`."
                 )
             return jnp.asarray(adata.obsm[self._sample_rep])
-        attr, key = next(iter(sample_rep.items()))
+        attr, key = next(iter(sample_rep.items()))  # type: ignore[union-attr]
         return jnp.asarray(getattr(adata, attr)[key])
 
     def _verify_control_data(self, adata: anndata.AnnData | None) -> None:
@@ -527,14 +527,13 @@ class DataManager:
         control_mask: ArrayLike,
         src_counter: int,
     ):
-        # split_combination = tuple(list(split_combination))
         filter_dict = dict(zip(self.split_covariates, split_combination, strict=False))
         split_cov_mask = (
             covariate_data[list(filter_dict.keys())] == list(filter_dict.values())
         ).all(axis=1)
         mask = jnp.array(control_mask * split_cov_mask).astype(bool)
         split_covariates_mask[mask] = src_counter
-        split_idx_to_covariates[src_counter] = tuple(list(split_combination))
+        split_idx_to_covariates[src_counter] = tuple(split_combination)
         return split_covariates_mask, split_idx_to_covariates, split_cov_mask
 
     def _get_split_covariates_mask(self, adata: anndata.AnnData) -> Any:
@@ -987,7 +986,7 @@ class DataManager:
         return self._linked_perturb_covars
 
     @property
-    def covariate_reps(self) -> dict[str, str]:
+    def covariate_reps(self) -> dict[str, list[str]]:
         """Dictionary which stores representation of covariates, i.e. the union of `sample_covariate_reps` and `perturbation_covariate_reps`."""
         return self._covariate_reps
 

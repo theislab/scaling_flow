@@ -17,6 +17,7 @@ from cfp.data._dataloader import PredictionSampler, TrainSampler, ValidationSamp
 from cfp.data._datamanager import DataManager
 from cfp.networks._velocity_field import ConditionalVelocityField
 from cfp.solvers import _genot, _otfm
+from cfp.training._callbacks import BaseCallback
 from cfp.training._trainer import CellFlowTrainer
 
 __all__ = ["CellFlow"]
@@ -273,7 +274,7 @@ class CellFlow:
         num_iterations: int,
         batch_size: int = 64,
         valid_freq: int = 1000,
-        callbacks: Sequence[Callable] = [],
+        callbacks: Sequence[BaseCallback] = [],
         monitor_metrics: Sequence[str] = [],
     ) -> None:
         """Train the model.
@@ -408,11 +409,11 @@ class CellFlow:
         condition_embeddings = {}
         n_conditions = len(next(iter(cond_data.condition_data.values())))
         for i in range(n_conditions):
-            condition = {k: v[[i], :] for k, v in cond_data.condition_data.items()}
-            if len(cond_data.perturbation_idx_to_id):
-                c_key = cond_data.perturbation_idx_to_id[i]
+            condition = {k: v[[i], :] for k, v in cond_data.condition_data.items()}  # type: ignore[union-attr]
+            if len(cond_data.perturbation_idx_to_id):  # type: ignore[union-attr]
+                c_key = cond_data.perturbation_idx_to_id[i]  # type: ignore[union-attr]
             else:
-                cov_combination = cond_data.perturbation_idx_to_covariates[i]
+                cov_combination = cond_data.perturbation_idx_to_covariates[i]  # type: ignore[union-attr]
                 c_key = tuple(cov_combination[i] for i in range(len(cov_combination)))
             condition_embeddings[c_key] = self.model.get_condition_embedding(condition)
 

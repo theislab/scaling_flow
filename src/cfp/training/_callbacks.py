@@ -1,4 +1,5 @@
 import abc
+from collections.abc import Sequence
 from typing import Any, Literal, NamedTuple
 
 import jax.tree as jt
@@ -194,8 +195,8 @@ class Metrics(ComputationCallback):
 
 
 class PCADecoder(NamedTuple):
-    pcs: np.ndarray
-    means: np.ndarray
+    pcs: ArrayLike
+    means: ArrayLike
 
 
 class PCADecodedMetrics(Metrics):
@@ -337,13 +338,13 @@ class CallbackRunner:
 
     def __init__(
         self,
-        callbacks: list[BaseCallback],
+        callbacks: Sequence[BaseCallback],
     ) -> None:
 
-        self.computation_callbacks = [
+        self.computation_callbacks: list[ComputationCallback] = [
             c for c in callbacks if isinstance(c, ComputationCallback)
         ]
-        self.logging_callbacks = [
+        self.logging_callbacks: list[LoggingCallback] = [
             c for c in callbacks if isinstance(c, LoggingCallback)
         ]
 

@@ -23,50 +23,50 @@ class TrainSampler:
     """
 
     def __init__(self, data: TrainingData, batch_size: int = 1024):
-        self.data = data
-        self.data_idcs = jnp.arange(data.cell_data.shape[0])
+        self._data = data
+        self._data_idcs = jnp.arange(data.cell_data.shape[0])
         self.batch_size = batch_size
         self.n_source_dists = data.n_controls
         self.n_target_dists = data.n_perturbations
         self.conditional_samplings = [
             lambda key: jax.random.choice(
-                key, self.data.control_to_perturbation[i]  # noqa: B023
+                key, self._data.control_to_perturbation[i]  # noqa: B023
             )
             for i in range(self.n_source_dists)
         ]
         self.get_embeddings = lambda idx: {
             pert_cov: jnp.expand_dims(arr[idx], 0)
-            for pert_cov, arr in self.data.condition_data.items()
+            for pert_cov, arr in self._data.condition_data.items()
         }
 
         @jax.jit
         def _sample(rng: jax.Array) -> Any:
             rng_1, rng_2, rng_3, rng_4 = jax.random.split(rng, 4)
             source_dist_idx = jax.random.choice(rng_1, self.n_source_dists)
-            source_cells_mask = self.data.split_covariates_mask == source_dist_idx
+            source_cells_mask = self._data.split_covariates_mask == source_dist_idx
             src_cond_p = source_cells_mask / jnp.count_nonzero(source_cells_mask)
             source_batch_idcs = jax.random.choice(
-                rng_2, self.data_idcs, [self.batch_size], replace=True, p=src_cond_p
+                rng_2, self._data_idcs, [self.batch_size], replace=True, p=src_cond_p
             )
 
-            source_batch = self.data.cell_data[source_batch_idcs]
+            source_batch = self._data.cell_data[source_batch_idcs]
 
             target_dist_idx = jax.lax.switch(
                 source_dist_idx, self.conditional_samplings, rng_3
             )
             target_cells_mask = (
-                self.data.perturbation_covariates_mask == target_dist_idx
+                self._data.perturbation_covariates_mask == target_dist_idx
             )
             tgt_cond_p = target_cells_mask / jnp.count_nonzero(target_cells_mask)
             target_batch_idcs = jax.random.choice(
                 rng_4,
-                self.data_idcs,
+                self._data_idcs,
                 [self.batch_size],
                 replace=True,
                 p=tgt_cond_p,
             )
-            target_batch = self.data.cell_data[target_batch_idcs]
-            if self.data.condition_data is None:
+            target_batch = self._data.cell_data[target_batch_idcs]
+            if self._data.condition_data is None:
                 return {"src_cell_data": source_batch, "tgt_cell_data": target_batch}
 
             condition_batch = self.get_embeddings(target_dist_idx)
@@ -78,6 +78,11 @@ class TrainSampler:
 
         self.sample = _sample
 
+    @property
+    def data(self) -> TrainingData:
+        """The training data."""
+        return self._data
+
 
 class BaseValidSampler(abc.ABC):
 
@@ -85,21 +90,23 @@ class BaseValidSampler(abc.ABC):
     def sample(*args, **kwargs):
         pass
 
-    def _get_key(self, cond_idx: int) -> tuple:
-        if len(self.data.perturbation_idx_to_id):
-            return self.data.perturbation_idx_to_id[cond_idx]
-        cov_combination = self.data.perturbation_idx_to_covariates[cond_idx]
+    def _get_key(self, cond_idx: int) -> tuple[str, ...]:
+        if len(self._data.perturbation_idx_to_id):  # type: ignore[attr-defined]
+            return self._data.perturbation_idx_to_id[cond_idx]  # type: ignore[attr-defined]
+        cov_combination = self._data.perturbation_idx_to_covariates[cond_idx]  # type: ignore[attr-defined]
         return tuple(cov_combination[i] for i in range(len(cov_combination)))
 
-    def _get_perturbation_to_control(self, val_data: ValidationData) -> dict[int, int]:
+    def _get_perturbation_to_control(
+        self, data: ValidationData | PredictionData
+    ) -> dict[int, int]:
         d = {}
-        for k, v in val_data.control_to_perturbation.items():
+        for k, v in data.control_to_perturbation.items():
             for el in v:
                 d[el] = k
         return d
 
     def _get_condition_data(self, cond_idx: int) -> jnp.ndarray:
-        return {k: v[[cond_idx], ...] for k, v in self.data.condition_data.items()}
+        return {k: v[[cond_idx], ...] for k, v in self._data.condition_data.items()}  # type: ignore[attr-defined]
 
 
 class ValidationSampler(BaseValidSampler):
@@ -114,7 +121,7 @@ class ValidationSampler(BaseValidSampler):
     """
 
     def __init__(self, val_data: ValidationData, seed: int = 0) -> None:
-        self.data = val_data
+        self._data = val_data
         self.perturbation_to_control = self._get_perturbation_to_control(val_data)
         self.n_conditions_on_log_iteration = (
             val_data.n_conditions_on_log_iteration
@@ -127,7 +134,7 @@ class ValidationSampler(BaseValidSampler):
             else val_data.n_perturbations
         )
         self.rng = np.random.default_rng(seed)
-        if self.data.condition_data is None:
+        if self._data.condition_data is None:
             raise NotImplementedError("Validation data must have condition data.")
 
     def sample(self, mode: Literal["on_log_iteration", "on_train_end"]) -> Any:
@@ -148,21 +155,21 @@ class ValidationSampler(BaseValidSampler):
             else self.n_conditions_on_train_end
         )
         condition_idcs = self.rng.choice(
-            self.data.n_perturbations, size=(size,), replace=False
+            self._data.n_perturbations, size=(size,), replace=False
         )
 
         source_idcs = [
             self.perturbation_to_control[cond_idx] for cond_idx in condition_idcs
         ]
         source_cells_mask = [
-            self.data.split_covariates_mask == source_idx for source_idx in source_idcs
+            self._data.split_covariates_mask == source_idx for source_idx in source_idcs
         ]
-        source_cells = [self.data.cell_data[mask] for mask in source_cells_mask]
+        source_cells = [self._data.cell_data[mask] for mask in source_cells_mask]
         target_cells_mask = [
-            cond_idx == self.data.perturbation_covariates_mask
+            cond_idx == self._data.perturbation_covariates_mask
             for cond_idx in condition_idcs
         ]
-        target_cells = [self.data.cell_data[mask] for mask in target_cells_mask]
+        target_cells = [self._data.cell_data[mask] for mask in target_cells_mask]
         conditions = [self._get_condition_data(cond_idx) for cond_idx in condition_idcs]
         cell_rep_dict = {}
         cond_dict = {}
@@ -174,6 +181,11 @@ class ValidationSampler(BaseValidSampler):
             true_dict[k] = target_cells[i]
 
         return {"source": cell_rep_dict, "condition": cond_dict, "target": true_dict}
+
+    @property
+    def data(self) -> ValidationData:
+        """The validation data."""
+        return self._data
 
 
 class PredictionSampler(BaseValidSampler):
@@ -187,9 +199,9 @@ class PredictionSampler(BaseValidSampler):
     """
 
     def __init__(self, pred_data: PredictionData) -> None:
-        self.data = pred_data
+        self._data = pred_data
         self.perturbation_to_control = self._get_perturbation_to_control(pred_data)
-        if self.data.condition_data is None:
+        if self._data.condition_data is None:
             raise NotImplementedError("Validation data must have condition data.")
 
     def sample(self) -> Any:
@@ -199,15 +211,15 @@ class PredictionSampler(BaseValidSampler):
         -------
         Dictionary with source and condition data from the prediction data.
         """
-        condition_idcs = range(self.data.n_perturbations)
+        condition_idcs = range(self._data.n_perturbations)
 
         source_idcs = [
             self.perturbation_to_control[cond_idx] for cond_idx in condition_idcs
         ]
         source_cells_mask = [
-            self.data.split_covariates_mask == source_idx for source_idx in source_idcs
+            self._data.split_covariates_mask == source_idx for source_idx in source_idcs
         ]
-        source_cells = [self.data.cell_data[mask] for mask in source_cells_mask]
+        source_cells = [self._data.cell_data[mask] for mask in source_cells_mask]
         conditions = [self._get_condition_data(cond_idx) for cond_idx in condition_idcs]
         cell_rep_dict = {}
         cond_dict = {}
@@ -218,3 +230,8 @@ class PredictionSampler(BaseValidSampler):
             cond_dict[k] = conditions[i]
 
         return {"source": cell_rep_dict, "condition": cond_dict}
+
+    @property
+    def data(self) -> PredictionData:
+        """The training data."""
+        return self._data
