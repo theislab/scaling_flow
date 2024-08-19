@@ -42,6 +42,14 @@ dependencies = [
 dev = [
     "pre-commit",
     "twine>=4.0.2",
+    "sphinx",
+    "sphinxcontrib-bibtex",
+    "sphinx_copybutton",
+    "sphinx_autodoc_typehints",
+    "myst-nb",
+    "sphinx_design",
+    "sphinx_tippy",
+    "furo",
 ]
 doc = [
     "docutils>=0.8,!=0.18.*,!=0.19.*",

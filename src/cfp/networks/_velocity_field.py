@@ -28,7 +28,9 @@ class ConditionalVelocityField(nn.Module):
         encode_conditions
             Whether to encode the conditions.
         condition_embedding_dim
-            Dimensions of the condition embedding..
+            Dimensions of the condition embedding.
+        covariates_not_pooled
+            Covariates that will escape pooling (should be identical across all set elements).
         condition_encoder_kwargs
             Keyword arguments for the condition encoder.
         act_fn
@@ -57,6 +59,7 @@ class ConditionalVelocityField(nn.Module):
     max_combination_length: int
     encode_conditions: bool = True
     condition_embedding_dim: int = 32
+    covariates_not_pooled: Sequence[str] = dc_field(default_factory=list)
     condition_encoder_kwargs: dict[str, Any] = dc_field(default_factory=dict)
     act_fn: Callable[[jnp.ndarray], jnp.ndarray] = nn.silu
     time_freqs: int = 1024
@@ -72,6 +75,7 @@ class ConditionalVelocityField(nn.Module):
         if self.encode_conditions:
             self.condition_encoder = ConditionEncoder(
                 output_dim=self.condition_embedding_dim,
+                covariates_not_pooled=self.covariates_not_pooled,
                 **self.condition_encoder_kwargs,
             )
         self.time_encoder = MLPBlock(
