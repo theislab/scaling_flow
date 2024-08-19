@@ -334,11 +334,11 @@ class DataManager:
             perturbation_covariates_mask = None
             control_mask = jnp.ones((len(covariate_data),))
 
-        condition_data: dict[int | str, list[jnp.ndarray]] = (
+        condition_data: dict[int, list[jnp.ndarray]] = (
             {i: [] for i in self._covar_to_idx.keys()} if self.is_conditional else {}
         )
 
-        control_to_perturbation: dict[int, int] = {}
+        control_to_perturbation: dict[int, ArrayLike] = {}
         split_idx_to_covariates: dict[int, tuple[Any]] = {}
         perturbation_idx_to_covariates: dict[int, tuple[Any]] = {}
         perturbation_idx_to_id: dict[int, Any] = {}
@@ -526,7 +526,7 @@ class DataManager:
         split_idx_to_covariates: dict[int, tuple[Any]],
         control_mask: ArrayLike,
         src_counter: int,
-    ):
+    ) -> tuple[ArrayLike, dict[int, tuple[Any]], ArrayLike]:
         filter_dict = dict(zip(self.split_covariates, split_combination, strict=False))
         split_cov_mask = (
             covariate_data[list(filter_dict.keys())] == list(filter_dict.values())
@@ -536,7 +536,9 @@ class DataManager:
         split_idx_to_covariates[src_counter] = tuple(split_combination)
         return split_covariates_mask, split_idx_to_covariates, split_cov_mask
 
-    def _get_split_covariates_mask(self, adata: anndata.AnnData) -> Any:
+    def _get_split_covariates_mask(
+        self, adata: anndata.AnnData
+    ) -> tuple[ArrayLike, dict[int, tuple[Any]]]:
         # here we assume that adata only contains source cells
         if len(self.split_covariates) == 0:
             return jnp.full((len(adata),), 0, dtype=jnp.int32), {}
@@ -649,7 +651,7 @@ class DataManager:
         adata: anndata.AnnData,
         perturbation_covariate_reps: dict[str, str] | None,
         perturbation_covariates: dict[str, list[str]],
-    ) -> dict[str, list[str]]:
+    ) -> dict[str, str]:
         if perturbation_covariate_reps is None:
             return {}
         for key, value in perturbation_covariate_reps.items():
@@ -709,7 +711,7 @@ class DataManager:
         self,
         adata: anndata.AnnData,
         perturbation_covariates: dict[str, list[str]],
-        perturbation_covariate_reps: dict[str, list[str]] | None,
+        perturbation_covariate_reps: dict[str, str],
     ) -> tuple[preprocessing.OneHotEncoder | None, bool]:
         primary_group, primary_covars = next(iter(perturbation_covariates.items()))
         is_categorical = self._check_covariate_type(adata, primary_covars)
@@ -803,7 +805,7 @@ class DataManager:
         )
 
     @staticmethod
-    def _get_covar_to_idx(covariate_groups: dict[str, Sequence[str]]) -> dict[int, str]:
+    def _get_covar_to_idx(covariate_groups: dict[str, Sequence[str]]) -> dict[str, int]:
         idx_to_covar = {}
         for idx, cov_group in enumerate(covariate_groups):
             idx_to_covar[idx] = cov_group
@@ -936,7 +938,7 @@ class DataManager:
         return self._perturbation_covariates
 
     @property
-    def perturbation_covariate_reps(self) -> dict[str, list[str]]:
+    def perturbation_covariate_reps(self) -> dict[str, str]:
         """Dictionary with keys indicating the name of the covariate group and values are keys in :attr:`~anndata.AnnData.uns` storing a dictionary with the representation of the covariates."""
         return self._perturbation_covariate_reps
 
@@ -983,6 +985,7 @@ class DataManager:
     @property
     def covar_to_idx(self) -> dict[str, int]:
         """TODO: add description"""
+        return self._covar_to_idx
 
     @property
     def perturb_covar_keys(self) -> list[str]:

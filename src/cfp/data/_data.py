@@ -19,13 +19,13 @@ __all__ = [
 @dataclass
 class ReturnData:  # TODO: this should rather be a NamedTuple
     split_covariates_mask: jnp.ndarray | None
-    split_idx_to_covariates: dict[int, str]
+    split_idx_to_covariates: dict[int, tuple[Any, ...]]
     perturbation_covariates_mask: jnp.ndarray | None
-    perturbation_idx_to_covariates: dict[int, tuple[Any, ...]] | None
+    perturbation_idx_to_covariates: dict[int, tuple[Any, ...]]
     perturbation_idx_to_id: dict[int, Any]
     condition_data: dict[int, ArrayLike]
     control_to_perturbation: dict[int, ArrayLike]
-    max_combination_length: int | None
+    max_combination_length: int
 
 
 class BaseDataMixin:
@@ -112,7 +112,7 @@ class TrainingData(BaseDataMixin):
         jax.Array
     )  # (n_cells,), which cell assigned to which source distribution
     split_idx_to_covariates: dict[
-        int, str
+        int, tuple[Any, ...]
     ]  # (n_sources,) dictionary explaining split_covariates_mask
     perturbation_covariates_mask: (
         jax.Array
@@ -167,7 +167,7 @@ class ValidationData(BaseDataMixin):
         jax.Array
     )  # (n_cells,), which cell assigned to which source distribution
     split_idx_to_covariates: dict[
-        int, str
+        int, tuple[Any, ...]
     ]  # (n_sources,) dictionary explaining split_covariates_mask
     perturbation_covariates_mask: (
         jax.Array
@@ -212,7 +212,7 @@ class PredictionData(BaseDataMixin):
         jax.Array
     )  # (n_cells,), which cell assigned to which source distribution
     split_idx_to_covariates: dict[
-        int, str
+        int, tuple[Any, ...]
     ]  # (n_sources,) dictionary explaining split_covariates_mask
     perturbation_idx_to_covariates: dict[
         int, tuple[str, ...]

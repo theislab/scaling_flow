@@ -245,7 +245,6 @@ class CellFlow:
             raise NotImplementedError(
                 f"The key of `flow` must be `'constant_noise'` or `'bridge'` but found {flow.keys()[0]}."
             )
-        print("self._solver_class", self._solver_class)
 
         if self._solver_class == _otfm.OTFlowMatching:
             self._solver = self._solver_class(
