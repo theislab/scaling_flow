@@ -21,6 +21,19 @@ __all__ = [
 ]
 
 
+metric_to_func: dict[str, Callable[[ArrayLike, ArrayLike], float | ArrayLike]] = {
+    "r_squared": compute_r_squared,
+    "mmd": compute_scalar_mmd,
+    "sinkhorn_div": compute_sinkhorn_div,
+    "e_distance": compute_e_distance,
+}
+
+agg_fn_to_func: dict[str, Callable[[ArrayLike], float | ArrayLike]] = {
+    "mean": lambda x: np.mean(x, axis=0),  # type: ignore[arg-type]
+    "median": lambda x: np.median(x, axis=0),  # type: ignore[arg-type]
+}
+
+
 class BaseCallback(abc.ABC):
     """Base class for callbacks in the CellFlowTrainer"""
 
@@ -104,25 +117,18 @@ class ComputationCallback(BaseCallback, abc.ABC):
     ) -> dict[str, float]:
         """Called at the end of training to compute metrics
 
-        Args:
-            validation_data: Validation data
-            predicted_data: Predicted data
-            training_data: Current batch and predicted data
+        Parameters
+        ----------
+            validation_data
+                Validation data in nested dictionary format with same keys as `predicted_data`
+            predicted_data
+                Predicted data in nested dictionary format with same keys as `validation_data`
+
+        Returns
+        -------
+            Statistics of the validation data and predicted data
         """
         pass
-
-
-metric_to_func: dict[str, Callable[[ArrayLike, ArrayLike], float | ArrayLike]] = {
-    "r_squared": compute_r_squared,
-    "mmd": compute_scalar_mmd,
-    "sinkhorn_div": compute_sinkhorn_div,
-    "e_distance": compute_e_distance,
-}
-
-agg_fn_to_func: dict[str, Callable[[ArrayLike], float | ArrayLike]] = {
-    "mean": lambda x: np.mean(x, axis=0),  # type: ignore[arg-type]
-    "median": lambda x: np.median(x, axis=0),  # type: ignore[arg-type]
-}
 
 
 class Metrics(ComputationCallback):
