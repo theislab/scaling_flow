@@ -6,7 +6,7 @@ import jax
 import jax.numpy as jnp
 
 __all__ = [
-    "BaseData",
+    "BaseDataMixin",
     "ConditionData",
     "PredictionData",
     "TrainingData",
@@ -26,23 +26,23 @@ class ReturnData:  # TODO: this should rather be a NamedTuple
     max_combination_length: int | None
 
 
-class BaseData:
+class BaseDataMixin:
     """Base class for data containers."""
 
     @property
     def n_controls(self) -> int:
         """Returns the number of control covariate values."""
-        return len(self.split_idx_to_covariates)
+        return len(self.split_idx_to_covariates)  # type: ignore[attr-defined]
 
     @property
     def n_perturbations(self) -> int:
         """Returns the number of perturbation covariate combinations."""
-        return len(self.perturbation_idx_to_covariates)
+        return len(self.perturbation_idx_to_covariates)  # type: ignore[attr-defined]
 
     @property
     def n_perturbation_covariates(self) -> int:
         """Returns the number of perturbation covariates."""
-        return len(self.condition_data)
+        return len(self.condition_data)  # type: ignore[attr-defined]
 
     def _format_params(self, fmt: Callable[[Any], str]) -> str:
         params = {
@@ -56,7 +56,7 @@ class BaseData:
 
 
 @dataclass
-class ConditionData(BaseData):
+class ConditionData(BaseDataMixin):
     """Data container containing condition embeddings.
 
     Parameters
@@ -80,7 +80,7 @@ class ConditionData(BaseData):
 
 
 @dataclass
-class TrainingData(BaseData):
+class TrainingData(BaseDataMixin):
     """Training data.
 
     Parameters
@@ -131,7 +131,7 @@ class TrainingData(BaseData):
 
 
 @dataclass
-class ValidationData(BaseData):
+class ValidationData(BaseDataMixin):
     """Data container for the validation data.
 
     Parameters
@@ -188,24 +188,9 @@ class ValidationData(BaseData):
     n_conditions_on_log_iteration: int | None = None
     n_conditions_on_train_end: int | None = None
 
-    @property
-    def n_controls(self) -> int:
-        """Returns the number of control covariate values."""
-        return len(self.split_idx_to_covariates)
-
-    @property
-    def n_perturbations(self) -> int:
-        """Returns the number of perturbation covariate combinations."""
-        return len(self.perturbation_idx_to_covariates)
-
-    @property
-    def n_perturbation_covariates(self) -> int:
-        """Returns the number of perturbation covariates."""
-        return len(self.condition_data)
-
 
 @dataclass
-class PredictionData(BaseData):
+class PredictionData(BaseDataMixin):
     """Data container to perform prediction.
 
     Parameters

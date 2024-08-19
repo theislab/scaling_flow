@@ -12,7 +12,7 @@ from numpy.typing import ArrayLike
 from ott.neural.methods.flows import dynamics
 from ott.solvers import utils as solver_utils
 
-from cfp.data._data import BaseData, ValidationData
+from cfp.data._data import BaseDataMixin, ValidationData
 from cfp.data._dataloader import PredictionSampler, TrainSampler, ValidationSampler
 from cfp.data._datamanager import DataManager
 from cfp.networks._velocity_field import ConditionalVelocityField
@@ -155,9 +155,7 @@ class CellFlow:
         pool_sample_covariates: bool = True,
         velocity_field_kwargs: dict[str, Any] | None = None,
         solver_kwargs: dict[str, Any] | None = None,
-        flow: dict[Literal["constant_noise", "bridge"], float] | None = {
-            "constant_noise": 0.0
-        },
+        flow: dict[Literal["constant_noise", "bridge"], float] | None = None,
         match_fn: Callable[[ArrayLike, ArrayLike], ArrayLike] = partial(
             solver_utils.match_linear, epsilon=0.1, scale_cost="mean"
         ),
@@ -195,7 +193,7 @@ class CellFlow:
             decoder_dropout
                 Dropout rate for the output layers.
             flow
-                Flow to use for training. Should be a dict of the form {"constant_noise": noise_val} or {"bridge": noise_val}.
+                Flow to use for training. Should be a dict of the form `{"constant_noise": noise_val}` or `{"bridge": noise_val}`. If :obj:`None`, defaults to `{"constant_noise": 0.0}`.
             match_fn
                 Matching function.
             optimizer
@@ -207,6 +205,7 @@ class CellFlow:
         -------
             None
         """
+        flow = flow or {"constant_noise": 0.0}
         if self.train_data is None:
             raise ValueError(
                 "Dataloader not initialized. Please call `prepare_data` first."
@@ -371,7 +370,7 @@ class CellFlow:
 
     def get_condition_embedding(
         self,
-        covariate_data: pd.DataFrame | BaseData | None = None,
+        covariate_data: pd.DataFrame | BaseDataMixin | None = None,
         rep_dict: dict[str, str] | None = None,
         condition_id_key: str | None = None,
     ) -> dict[str, ArrayLike]:

@@ -943,33 +943,22 @@ class DataManager:
 
     @property
     def perturbation_covariates(self) -> dict[str, list[str]]:
-        """Dictionary with keys indicating the name of the covariate group
-        and values are keys in :attr:`~anndata.AnnData.obs` which together
-        define the covariates.
-        """
+        """Dictionary with keys indicating the name of the covariate group and values are keys in :attr:`~anndata.AnnData.obs` which together define the covariates."""
         return self._perturbation_covariates
 
     @property
     def perturbation_covariate_reps(self) -> dict[str, list[str]]:
-        """Dictionary with keys indicating the name of the covariate group and
-        values are keys in :attr:`~anndata.AnnData.uns` storing a dictionary
-        with the representation of the covariates.
-        """
+        """Dictionary with keys indicating the name of the covariate group and values are keys in :attr:`~anndata.AnnData.uns` storing a dictionary with the representation of the covariates."""
         return self._perturbation_covariate_reps
 
     @property
     def sample_covariates(self) -> Sequence[str]:
-        """Keys in :attr:`~anndata.AnnData.obs` indicating which
-        sample the cell belongs to (e.g. cell line).
-        """
+        """Keys in :attr:`~anndata.AnnData.obs` indicating which sample the cell belongs to (e.g. cell line)."""
         return self._sample_covariates
 
     @property
     def sample_covariate_reps(self) -> dict[str, str]:
-        """Dictionary with keys indicating the name of the sample covariate
-        group and values are keys in :attr:`~anndata.AnnData.uns` storing
-        a dictionary with the representation of the sample covariates.
-        """
+        """Dictionary with keys indicating the name of the sample covariate group and values are keys in :attr:`~anndata.AnnData.uns` storing a dictionary with the representation of the sample covariates."""
         return self._sample_covariate_reps
 
     @property
@@ -994,17 +983,12 @@ class DataManager:
 
     @property
     def linked_perturb_covars(self) -> dict[str, dict[Any, Any]]:
-        """Dictionary with keys indicating the name of the primary covariate
-        and values are dictionaries with keys indicating the name of the linked
-        covariate group and values are the linked covariates.
-        """
+        """Dictionary with keys indicating the name of the primary covariate and values are dictionaries with keys indicating the name of the linked covariate group and values are the linked covariates."""
         return self._linked_perturb_covars
 
     @property
     def covariate_reps(self) -> dict[str, str]:
-        """Dictionary which stores representation of covariates, i.e. the
-        union of `sample_covariate_reps` and `perturbation_covariate_reps`.
-        """
+        """Dictionary which stores representation of covariates, i.e. the union of `sample_covariate_reps` and `perturbation_covariate_reps`."""
         return self._covariate_reps
 
     @property

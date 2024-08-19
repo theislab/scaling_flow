@@ -214,7 +214,7 @@ class SelfAttentionBlock(BaseModule):
         Output tensor of shape (batch_size, set_size, input_dim).
         """
         z = x
-        for num_heads, qkv_dim in zip(self.num_heads, self.qkv_dim, strict=False):
+        for num_heads, qkv_dim in zip(self.num_heads, self.qkv_dim, strict=False):  # type: ignore[arg-type]
             z = SelfAttention(
                 num_heads=num_heads,
                 qkv_dim=qkv_dim,
@@ -420,18 +420,19 @@ class ConditionEncoder(BaseModule):
 
     output_dim: int
     pooling: Literal["mean", "attention_token", "attention_seed"] = "attention_token"
-    pooling_kwargs: dict = field(default_factory=lambda: {})
+    pooling_kwargs: dict[str, Any] = field(default_factory=lambda: {})
     covariates_not_pooled: Sequence[str] = field(default_factory=lambda: [])
     layers_before_pool: (
-        Sequence[tuple[Literal["mlp", "self_attention"], dict]] | dict
+        Sequence[tuple[Literal["mlp", "self_attention"], dict[str, Any]]]
+        | dict[str, Any]
     ) = field(default_factory=lambda: [])
-    layers_after_pool: Sequence[tuple[Literal["mlp", "self-attention"], dict]] = field(
-        default_factory=lambda: []
-    )
+    layers_after_pool: Sequence[
+        tuple[Literal["mlp", "self-attention"], dict[str, Any]]
+    ] = field(default_factory=lambda: [])
     output_dropout: float = 0.0
     mask_value: float = 0.0
     genot_source_layers: (
-        Sequence[tuple[Literal["mlp", "self-attention"], dict]] | None
+        Sequence[tuple[Literal["mlp", "self-attention"], dict[str, Any]]] | None
     ) = None
     genot_source_dim: int = 0
     genot_source_dropout: float = 0.0
