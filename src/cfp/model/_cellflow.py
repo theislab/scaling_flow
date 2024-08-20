@@ -1,4 +1,5 @@
 import os
+import types
 from collections.abc import Callable, Sequence
 from dataclasses import field as dc_field
 from functools import partial
@@ -159,7 +160,7 @@ class CellFlow:
         pooling: Literal[
             "mean", "attention_token", "attention_seed"
         ] = "attention_token",
-        pooling_kwargs: dict[str, Any] = dc_field(default_factory=dict),
+        pooling_kwargs: dict[str, Any] = types.MappingProxyType({}),
         layers_before_pool: Layers_separate_input_t | Layers_t = dc_field(
             default_factory=lambda: []
         ),

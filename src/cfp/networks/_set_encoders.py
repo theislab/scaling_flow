@@ -421,12 +421,12 @@ class ConditionEncoder(BaseModule):
 
     output_dim: int
     pooling: Literal["mean", "attention_token", "attention_seed"] = "attention_token"
-    pooling_kwargs: dict[str, Any] = dc_field(default_factory=dict)
+    pooling_kwargs: dict[str, Any] = (dc_field(default_factory=lambda: {}),)
     covariates_not_pooled: Sequence[str] = dc_field(default_factory=list)
     layers_before_pool: Layers_t | Layers_separate_input_t = dc_field(
-        default_factory=list
+        default_factory=lambda: []
     )
-    layers_after_pool: Layers_t = dc_field(default_factory=list)
+    layers_after_pool: Layers_t = dc_field(default_factory=lambda: [])
     output_dropout: float = 0.0
     mask_value: float = 0.0
     genot_source_layers: Layers_t | None = None
@@ -603,6 +603,8 @@ class ConditionEncoder(BaseModule):
     ) -> list[nn.Module]:
         """Get modules from layer parameters."""
         modules = []
+        if not isinstance(layers, Sequence):
+            return modules
         for layer in layers:
             layer = dict(layer)
             layer_type = layer.pop("layer_type", "mlp")
