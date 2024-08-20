@@ -421,7 +421,7 @@ class ConditionEncoder(BaseModule):
 
     output_dim: int
     pooling: Literal["mean", "attention_token", "attention_seed"] = "attention_token"
-    pooling_kwargs: dict[str, Any] = (dc_field(default_factory=lambda: {}),)
+    pooling_kwargs: dict[str, Any] = dc_field(default_factory=lambda: {})
     covariates_not_pooled: Sequence[str] = dc_field(default_factory=list)
     layers_before_pool: Layers_t | Layers_separate_input_t = dc_field(
         default_factory=lambda: []
