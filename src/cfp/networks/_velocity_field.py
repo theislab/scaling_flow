@@ -1,3 +1,4 @@
+import types
 from collections.abc import Callable, Sequence
 from dataclasses import field as dc_field
 from typing import Any, Literal
@@ -11,6 +12,7 @@ from ott.neural.networks.layers import time_encoder
 
 from cfp._constants import GENOT_CELL_KEY
 from cfp._logging import logger
+from cfp._types import Layers_separate_input_t, Layers_t
 from cfp.networks._modules import MLPBlock
 from cfp.networks._set_encoders import ConditionEncoder
 
@@ -69,13 +71,11 @@ class ConditionalVelocityField(nn.Module):
     condition_embedding_dim: int = 32
     covariates_not_pooled: Sequence[str] = dc_field(default_factory=list)
     pooling: Literal["mean", "attention_token", "attention_seed"] = "attention_token"
-    pooling_kwargs: dict = dc_field(default_factory=lambda: {})
-    layers_before_pool: (
-        Sequence[tuple[Literal["mlp", "self_attention"], dict]] | dict
-    ) = dc_field(default_factory=lambda: [])
-    layers_after_pool: Sequence[tuple[Literal["mlp", "self-attention"], dict]] = field(
+    pooling_kwargs: dict[str, Any] = types.MappingProxyType({})
+    layers_before_pool: Layers_separate_input_t | Layers_t = dc_field(
         default_factory=lambda: []
     )
+    layers_after_pool: Layers_t = dc_field(default_factory=lambda: [])
     mask_value: float = 0.0
     condition_encoder_kwargs: dict[str, Any] = dc_field(default_factory=dict)
     act_fn: Callable[[jnp.ndarray], jnp.ndarray] = nn.silu
