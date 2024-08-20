@@ -9,8 +9,10 @@ import jax
 import optax
 import pandas as pd
 from numpy.typing import ArrayLike
+import jax.numpy as jnp
 from ott.neural.methods.flows import dynamics
 from ott.solvers import utils as solver_utils
+import flax.linen as nn
 
 from cfp.data._data import BaseData, ValidationData
 from cfp.data._dataloader import PredictionSampler, TrainSampler, ValidationSampler
