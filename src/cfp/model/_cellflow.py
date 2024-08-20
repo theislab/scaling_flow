@@ -1,5 +1,6 @@
 import os
 from collections.abc import Callable, Sequence
+from dataclasses import field as dc_field
 from functools import partial
 from typing import Any, Literal
 
@@ -14,6 +15,7 @@ from numpy.typing import ArrayLike
 from ott.neural.methods.flows import dynamics
 from ott.solvers import utils as solver_utils
 
+from cfp._types import Layers_separate_input_t, Layers_t
 from cfp.data._data import BaseDataMixin, ValidationData
 from cfp.data._dataloader import PredictionSampler, TrainSampler, ValidationSampler
 from cfp.data._datamanager import DataManager
@@ -154,6 +156,14 @@ class CellFlow:
         hidden_dropout: float = 0.0,
         decoder_dims: Sequence[int] = (1024, 1024, 1024),
         decoder_dropout: float = 0.0,
+        pooling: Literal[
+            "mean", "attention_token", "attention_seed"
+        ] = "attention_token",
+        pooling_kwargs: dict[str, Any] = dc_field(default_factory=dict),
+        layers_before_pool: Layers_separate_input_t | Layers_t = dc_field(
+            default_factory=lambda: []
+        ),
+        layers_after_pool: Layers_t = dc_field(default_factory=lambda: []),
         condition_encoder_kwargs: dict[str, Any] | None = None,
         pool_sample_covariates: bool = True,
         vf_act_fn: Callable[[jnp.ndarray], jnp.ndarray] = nn.silu,
@@ -186,6 +196,14 @@ class CellFlow:
                 Dropout rate for the hidden layers.
             decoder_dims
                 Dimensions of the output layers.
+            pooling
+                Pooling method.
+            pooling_kwargs
+                Keyword arguments for the pooling method.
+            layers_before_pool
+                Layers before pooling. Either a sequence of tuples with layer type and parameters or a dictionary with input-specific layers.
+            layers_after_pool
+                Layers after pooling.
             condition_encoder_kwargs
                 Keyword arguments for the condition encoder.
             pool_sample_covariates
@@ -230,6 +248,10 @@ class CellFlow:
             encode_conditions=encode_conditions,
             condition_embedding_dim=condition_embedding_dim,
             covariates_not_pooled=covariates_not_pooled,
+            pooling=pooling,
+            pooling_kwargs=pooling_kwargs,
+            layers_before_pool=layers_before_pool,
+            layers_after_pool=layers_after_pool,
             condition_encoder_kwargs=condition_encoder_kwargs,
             act_fn=vf_act_fn,
             time_freqs=time_freqs,
