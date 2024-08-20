@@ -1,4 +1,4 @@
-from collections.abc import Callable, Sequence
+from collections.abc import Sequence
 from typing import Any, Literal
 
 import jax
@@ -8,7 +8,7 @@ from tqdm import tqdm
 
 from cfp.data._dataloader import TrainSampler, ValidationSampler
 from cfp.solvers import _genot, _otfm
-from cfp.training._callbacks import CallbackRunner
+from cfp.training._callbacks import BaseCallback, CallbackRunner
 
 
 class CellFlowTrainer:
@@ -44,9 +44,12 @@ class CellFlowTrainer:
 
     def _validation_step(
         self,
-        val_data: dict[str, dict[str, dict[str, ArrayLike]]],
+        val_data: dict[str, ValidationSampler],
         mode: Literal["on_log_iteration", "on_train_end"] = "on_log_iteration",
-    ) -> dict[str, dict[str, dict[str, ArrayLike]]]:
+    ) -> tuple[
+        dict[str, dict[str, ArrayLike]],
+        dict[str, dict[str, ArrayLike]],
+    ]:
         """Compute predictions for validation data."""
         # TODO: Sample fixed number of conditions to validate on
 
@@ -76,7 +79,7 @@ class CellFlowTrainer:
         valid_freq: int,
         valid_loaders: dict[str, ValidationSampler] | None = None,
         monitor_metrics: Sequence[str] = [],
-        callbacks: Sequence[Callable] = [],
+        callbacks: Sequence[BaseCallback] = [],
     ) -> None:
         """Trains the model.
 

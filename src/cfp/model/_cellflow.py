@@ -12,11 +12,12 @@ from numpy.typing import ArrayLike
 from ott.neural.methods.flows import dynamics
 from ott.solvers import utils as solver_utils
 
-from cfp.data._data import BaseData, ValidationData
+from cfp.data._data import BaseDataMixin, ValidationData
 from cfp.data._dataloader import PredictionSampler, TrainSampler, ValidationSampler
 from cfp.data._datamanager import DataManager
 from cfp.networks._velocity_field import ConditionalVelocityField
 from cfp.solvers import _genot, _otfm
+from cfp.training._callbacks import BaseCallback
 from cfp.training._trainer import CellFlowTrainer
 
 __all__ = ["CellFlow"]
@@ -35,8 +36,8 @@ class CellFlow:
 
     def __init__(self, adata: ad.AnnData, solver: Literal["otfm", "genot"] = "otfm"):
 
-        self.adata = adata
-        self.solver = solver
+        self._adata = adata
+        self._solver_class = _otfm.OTFlowMatching if solver == "otfm" else _genot.GENOT
         self.dataloader: TrainSampler | None = None
         self.trainer: CellFlowTrainer | None = None
         self.model: _otfm.OTFlowMatching | _genot.GENOT | None = None
@@ -155,9 +156,7 @@ class CellFlow:
         pool_sample_covariates: bool = True,
         velocity_field_kwargs: dict[str, Any] | None = None,
         solver_kwargs: dict[str, Any] | None = None,
-        flow: dict[Literal["constant_noise", "bridge"], float] | None = {
-            "constant_noise": 0.0
-        },
+        flow: dict[Literal["constant_noise", "bridge"], float] | None = None,
         match_fn: Callable[[ArrayLike, ArrayLike], ArrayLike] = partial(
             solver_utils.match_linear, epsilon=0.1, scale_cost="mean"
         ),
@@ -195,7 +194,7 @@ class CellFlow:
             decoder_dropout
                 Dropout rate for the output layers.
             flow
-                Flow to use for training. Should be a dict of the form {"constant_noise": noise_val} or {"bridge": noise_val}.
+                Flow to use for training. Should be a dict of the form `{"constant_noise": noise_val}` or `{"bridge": noise_val}`. If :obj:`None`, defaults to `{"constant_noise": 0.0}`.
             match_fn
                 Matching function.
             optimizer
@@ -207,6 +206,7 @@ class CellFlow:
         -------
             None
         """
+        flow = flow or {"constant_noise": 0.0}
         if self.train_data is None:
             raise ValueError(
                 "Dataloader not initialized. Please call `prepare_data` first."
@@ -243,10 +243,11 @@ class CellFlow:
             flow = dynamics.BrownianBridge(noise)
         else:
             raise NotImplementedError(
-                f"The key of `flow` must be `'constant_noise'` or `'bridge'` but found {flow.keys()[0]}."
+                f"The key of `flow` must be `'constant_noise'` or `'bridge'` but found {flow}."
             )
-        if self.solver == "otfm":
-            self._solver = _otfm.OTFlowMatching(
+
+        if self._solver_class == _otfm.OTFlowMatching:
+            self._solver = self._solver_class(
                 vf=vf,
                 match_fn=match_fn,
                 flow=flow,
@@ -255,8 +256,8 @@ class CellFlow:
                 rng=jax.random.PRNGKey(seed),
                 **solver_kwargs,
             )
-        elif self.solver == "genot":
-            self._solver = _genot.GENOT(
+        elif self._solver_class == _genot.GENOT:
+            self._solver = self._solver_class(
                 vf=vf,
                 data_match_fn=match_fn,
                 flow=flow,
@@ -267,14 +268,18 @@ class CellFlow:
                 rng=jax.random.PRNGKey(seed),
                 **solver_kwargs,
             )
-        self.trainer = CellFlowTrainer(model=self._solver)
+        else:
+            raise NotImplementedError(
+                f"Solver must be an instance of OTFlowMatching or GENOT, got {type(self._solver)}"
+            )
+        self.trainer = CellFlowTrainer(model=self._solver)  # type: ignore[arg-type]
 
     def train(
         self,
         num_iterations: int,
         batch_size: int = 64,
         valid_freq: int = 1000,
-        callbacks: Sequence[Callable] = [],
+        callbacks: Sequence[BaseCallback] = [],
         monitor_metrics: Sequence[str] = [],
     ) -> None:
         """Train the model.
@@ -371,7 +376,7 @@ class CellFlow:
 
     def get_condition_embedding(
         self,
-        covariate_data: pd.DataFrame | BaseData | None = None,
+        covariate_data: pd.DataFrame | BaseDataMixin | None = None,
         rep_dict: dict[str, str] | None = None,
         condition_id_key: str | None = None,
     ) -> dict[str, ArrayLike]:
@@ -393,6 +398,11 @@ class CellFlow:
         if self.model is None:
             raise ValueError("Model not trained. Please call `train` first.")
 
+        if not self.dm.is_conditional:
+            raise ValueError(
+                "Model is not conditional. Condition embeddings are not available."
+            )
+
         if hasattr(covariate_data, "condition_data"):
             cond_data = covariate_data
         elif isinstance(covariate_data, pd.DataFrame):
@@ -406,14 +416,14 @@ class CellFlow:
                 "Covariate data must be a `pandas.DataFrame` or an instance of `BaseData`."
             )
 
-        condition_embeddings = {}
-        n_conditions = len(next(iter(cond_data.condition_data.values())))
+        condition_embeddings: dict[str, ArrayLike] = {}
+        n_conditions = len(next(iter(cond_data.condition_data.values())))  # type: ignore[union-attr]
         for i in range(n_conditions):
-            condition = {k: v[[i], :] for k, v in cond_data.condition_data.items()}
-            if len(cond_data.perturbation_idx_to_id):
-                c_key = cond_data.perturbation_idx_to_id[i]
+            condition = {k: v[[i], :] for k, v in cond_data.condition_data.items()}  # type: ignore[union-attr]
+            if len(cond_data.perturbation_idx_to_id):  # type: ignore[union-attr]
+                c_key = cond_data.perturbation_idx_to_id[i]  # type: ignore[union-attr]
             else:
-                cov_combination = cond_data.perturbation_idx_to_covariates[i]
+                cov_combination = cond_data.perturbation_idx_to_covariates[i]  # type: ignore[union-attr]
                 c_key = tuple(cov_combination[i] for i in range(len(cov_combination)))
             condition_embeddings[c_key] = self.model.get_condition_embedding(condition)
 
@@ -489,3 +499,13 @@ class CellFlow:
                 f"Expected the model to be type of `{cls}`, found `{type(model)}`."
             )
         return model
+
+    @property
+    def adata(self) -> ad.AnnData:
+        """The AnnData object used for training."""
+        return self._adata
+
+    @property
+    def solver(self) -> _otfm.OTFlowMatching | _genot.GENOT | None:
+        """The solver to use for training."""
+        return self._solver
