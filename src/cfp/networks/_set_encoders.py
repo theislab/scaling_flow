@@ -423,7 +423,9 @@ class ConditionEncoder(BaseModule):
     pooling: Literal["mean", "attention_token", "attention_seed"] = "attention_token"
     pooling_kwargs: dict[str, Any] = dc_field(default_factory=dict)
     covariates_not_pooled: Sequence[str] = dc_field(default_factory=list)
-    layers_before_pool: Layers_t | Layers_separate_input_t = dc_field(default_factory=list)
+    layers_before_pool: Layers_t | Layers_separate_input_t = dc_field(
+        default_factory=list
+    )
     layers_after_pool: Layers_t = dc_field(default_factory=list)
     output_dropout: float = 0.0
     mask_value: float = 0.0
@@ -516,7 +518,7 @@ class ConditionEncoder(BaseModule):
                 else:
                     processed_inputs_pooling.append(conditions_i)
 
-            conditions_pooling = jnp.concatenate(processed_inputs_pooling, axis=-1)
+            conditions_pooling_arr = jnp.concatenate(processed_inputs_pooling, axis=-1)
             conditions_not_pooled = (
                 jnp.concatenate(processed_inputs_other, axis=-1)
                 if self.covariates_not_pooled
@@ -601,14 +603,16 @@ class ConditionEncoder(BaseModule):
     ) -> list[nn.Module]:
         """Get modules from layer parameters."""
         modules = []
-        for layer_type, layer_params in layers:
+        for layer in layers:
+            layer = dict(layer)
+            layer_type = layer.pop("layer_type", "mlp")
             if layer_type == "mlp":
-                layer = MLPBlock(**layer_params)
+                lay = MLPBlock(**layer)
             elif layer_type == "self_attention":
-                layer = SelfAttentionBlock(**layer_params)
+                lay = SelfAttentionBlock(**layer)
             else:
                 raise ValueError(f"Unknown layer type: {layer_type}")
-            modules.append(layer)
+            modules.append(lay)
         if output_dim is not None:
             modules.append(nn.Dense(output_dim))
             if dropout_rate is not None:
