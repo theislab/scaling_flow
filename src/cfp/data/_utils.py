@@ -22,7 +22,7 @@ def _flatten_list(x: Iterable[Iterable[Any]]) -> list[Any]:
 
 def encode_onehot(
     adata: ad.AnnData,
-    covariate_keys: Sequence[str],
+    covariate_keys: str | Sequence[str],
     uns_key: Sequence[str] = "onehot",
     copy: bool = False,
 ) -> None | ad.AnnData:
@@ -40,6 +40,7 @@ def encode_onehot(
     """
     adata = adata.copy() if copy else adata
 
+    covariate_keys = _to_list(covariate_keys)
     all_values = np.unique(adata.obs[covariate_keys].values.flatten()).reshape(-1, 1)
     encoder = preprocessing.OneHotEncoder(sparse_output=False)
     encodings = encoder.fit_transform(all_values)
