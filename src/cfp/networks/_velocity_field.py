@@ -68,15 +68,15 @@ class ConditionalVelocityField(nn.Module):
     max_combination_length: int
     encode_conditions: bool = True
     condition_embedding_dim: int = 32
-    covariates_not_pooled: Sequence[str] = dc_field(default_factory=list)
+    covariates_not_pooled: Sequence[str] = dc_field(default_factory=lambda: [])
     pooling: Literal["mean", "attention_token", "attention_seed"] = "attention_token"
-    pooling_kwargs: dict[str, Any] = (dc_field(default_factory=lambda: {}),)
+    pooling_kwargs: dict[str, Any] = dc_field(default_factory=lambda: {})
     layers_before_pool: Layers_separate_input_t | Layers_t = dc_field(
         default_factory=lambda: []
     )
     layers_after_pool: Layers_t = dc_field(default_factory=lambda: [])
     mask_value: float = 0.0
-    condition_encoder_kwargs: dict[str, Any] = dc_field(default_factory=dict)
+    condition_encoder_kwargs: dict[str, Any] = dc_field(default_factory=lambda: {})
     act_fn: Callable[[jnp.ndarray], jnp.ndarray] = nn.silu
     time_freqs: int = 1024
     time_encoder_dims: Sequence[int] = (1024, 1024, 1024)
