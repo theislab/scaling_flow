@@ -1,6 +1,6 @@
 import abc
-import types
 from collections.abc import Callable, Sequence
+from dataclasses import field as dc_field
 from typing import Any, Literal
 
 import jax
@@ -421,10 +421,10 @@ class ConditionEncoder(BaseModule):
 
     output_dim: int
     pooling: Literal["mean", "attention_token", "attention_seed"] = "attention_token"
-    pooling_kwargs: dict[str, Any] = types.MappingProxyType({})
-    covariates_not_pooled: Sequence[str] = []
-    layers_before_pool: Layers_t | Layers_separate_input_t = []
-    layers_after_pool: Layers_t = []
+    pooling_kwargs: dict[str, Any] = dc_field(default_factory=dict)
+    covariates_not_pooled: Sequence[str] = dc_field(default_factory=list)
+    layers_before_pool: Layers_t | Layers_separate_input_t = dc_field(default_factory=list)
+    layers_after_pool: Layers_t = dc_field(default_factory=list)
     output_dropout: float = 0.0
     mask_value: float = 0.0
     genot_source_layers: Layers_t | None = None
