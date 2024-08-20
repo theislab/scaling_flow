@@ -21,7 +21,8 @@ __all__ = ["ConditionalVelocityField"]
 class ConditionalVelocityField(nn.Module):
     """Parameterized neural vector field with conditions.
 
-    Args:
+    Parameters
+    ----------
         output_dim
             Dimensionality of the output.
         max_combination_length

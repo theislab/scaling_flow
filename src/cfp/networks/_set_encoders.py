@@ -603,18 +603,17 @@ class ConditionEncoder(BaseModule):
     ) -> list[nn.Module]:
         """Get modules from layer parameters."""
         modules = []
-        if not isinstance(layers, Sequence):
-            return modules
-        for layer in layers:
-            layer = dict(layer)
-            layer_type = layer.pop("layer_type", "mlp")
-            if layer_type == "mlp":
-                lay = MLPBlock(**layer)
-            elif layer_type == "self_attention":
-                lay = SelfAttentionBlock(**layer)
-            else:
-                raise ValueError(f"Unknown layer type: {layer_type}")
-            modules.append(lay)
+        if isinstance(layers, Sequence):
+            for layer in layers:
+                layer = dict(layer)
+                layer_type = layer.pop("layer_type", "mlp")
+                if layer_type == "mlp":
+                    lay = MLPBlock(**layer)
+                elif layer_type == "self_attention":
+                    lay = SelfAttentionBlock(**layer)
+                else:
+                    raise ValueError(f"Unknown layer type: {layer_type}")
+                modules.append(lay)
         if output_dim is not None:
             modules.append(nn.Dense(output_dim))
             if dropout_rate is not None:
