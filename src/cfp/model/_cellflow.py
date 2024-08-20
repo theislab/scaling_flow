@@ -153,7 +153,8 @@ class CellFlow:
         decoder_dropout: float = 0.0,
         condition_encoder_kwargs: dict[str, Any] | None = None,
         pool_sample_covariates: bool = True,
-        velocity_field_kwargs: dict[str, Any] | None = None,
+        vf_act_fn: Callable[[jnp.ndarray], jnp.ndarray] = nn.silu,
+        time_freqs: int = 1024,
         solver_kwargs: dict[str, Any] | None = None,
         flow: dict[Literal["constant_noise", "bridge"], float] | None = {
             "constant_noise": 0.0
@@ -188,8 +189,10 @@ class CellFlow:
                 Keyword arguments for the condition encoder.
             pool_sample_covariates
                 Whether to include sample covariates in the pooling.
-            velocity_field_kwargs
-                Keyword arguments for the velocity field.
+            vf_act_fn
+                Activation function of the velocity field.
+            time_freqs
+                Frequency of the cyclical time encoding.
             solver_kwargs
                 Keyword arguments for the solver.
             decoder_dropout
@@ -216,7 +219,6 @@ class CellFlow:
         covariates_not_pooled = (
             [] if pool_sample_covariates else self.dm.sample_covariates
         )
-        velocity_field_kwargs = velocity_field_kwargs or {}
         solver_kwargs = solver_kwargs or {}
         flow = flow or {"constant_noise": 0.0}
 
@@ -227,13 +229,14 @@ class CellFlow:
             condition_embedding_dim=condition_embedding_dim,
             covariates_not_pooled=covariates_not_pooled,
             condition_encoder_kwargs=condition_encoder_kwargs,
+            act_fn=vf_act_fn,
+            time_freqs=time_freqs,
             time_encoder_dims=time_encoder_dims,
             time_encoder_dropout=time_encoder_dropout,
             hidden_dims=hidden_dims,
             hidden_dropout=hidden_dropout,
             decoder_dims=decoder_dims,
             decoder_dropout=decoder_dropout,
-            **velocity_field_kwargs,
         )
 
         flow, noise = next(iter(flow.items()))
