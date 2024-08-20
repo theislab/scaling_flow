@@ -556,7 +556,7 @@ class DataManager:
                     src_counter=src_counter,
                 )
             )
-            src_counter +=1
+            src_counter += 1
         return jnp.asarray(split_covariates_mask), split_idx_to_covariates
 
     @staticmethod

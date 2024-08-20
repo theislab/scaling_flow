@@ -76,7 +76,7 @@ class ConditionalVelocityField(nn.Module):
     layers_after_pool: Sequence[tuple[Literal["mlp", "self-attention"], dict]] = field(
         default_factory=lambda: []
     )
-    mask_value: float=0.0
+    mask_value: float = 0.0
     condition_encoder_kwargs: dict[str, Any] = dc_field(default_factory=dict)
     act_fn: Callable[[jnp.ndarray], jnp.ndarray] = nn.silu
     time_freqs: int = 1024
