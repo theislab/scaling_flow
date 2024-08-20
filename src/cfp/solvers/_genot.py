@@ -99,7 +99,7 @@ class GENOT:
         )
         self.vf_step_fn = self._get_vf_step_fn()
 
-    def _get_vf_step_fn(self) -> Callable:
+    def _get_vf_step_fn(self) -> Callable:  #  type: ignore[type-arg]
 
         @jax.jit
         def vf_step_fn(
@@ -150,8 +150,8 @@ class GENOT:
 
     @staticmethod
     def _prepare_data(batch: dict[str, jnp.ndarray]) -> tuple[
-        tuple[jnp.ndarray, jnp.ndarray | None, jnp.ndarray],
-        tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray | None, jnp.ndarray | None],
+        tuple[ArrayLike, ArrayLike],
+        tuple[ArrayLike | None, ...],
     ]:
         src_lin, src_quad = batch.get("src_cell_data"), batch.get("src_cell_data_quad")
         tgt_lin, tgt_quad = batch.get("tgt_cell_data"), batch.get("tgt_cell_data_quad")
@@ -171,7 +171,7 @@ class GENOT:
         else:
             raise RuntimeError("Cannot infer OT problem type from data.")
 
-        return (src, tgt), arrs
+        return (src, tgt), arrs  # type: ignore[return-value]
 
     def step_fn(
         self,
@@ -265,7 +265,7 @@ class GENOT:
             return self.vf_state.apply_fn({"params": params}, t, x, cond, train=False)
 
         def solve_ode(
-            x: jnp.ndarray, condition: jnp.ndarray | None, cell_data: jnp.ndarray
+            x: jnp.ndarray, condition: dict[str, jnp.ndarray], cell_data: jnp.ndarray
         ) -> jnp.ndarray:
             ode_term = diffrax.ODETerm(vf)
             condition[GENOT_CELL_KEY] = cell_data

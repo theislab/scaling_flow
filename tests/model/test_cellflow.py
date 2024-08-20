@@ -58,8 +58,8 @@ class TestCellFlow:
         adata_perturbation_pred.obs["control"] = True
         pred = cf.predict(
             adata_perturbation_pred,
-            covariate_data=adata_perturbation_pred.obs,
             sample_rep=sample_rep,
+            covariate_data=adata_perturbation_pred.obs,
         )
         assert isinstance(pred, dict)
         out = next(iter(pred.values()))
@@ -121,8 +121,8 @@ class TestCellFlow:
         adata_perturbation_pred.obs["control"] = True
         pred = cf.predict(
             adata_perturbation_pred,
-            covariate_data=adata_perturbation_pred.obs,
             sample_rep=sample_rep,
+            covariate_data=adata_perturbation_pred.obs,
         )
         assert isinstance(pred, dict)
         out = next(iter(pred.values()))

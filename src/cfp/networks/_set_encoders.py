@@ -12,6 +12,7 @@ from flax.training import train_state
 from flax.typing import FrozenDict
 
 from cfp._constants import GENOT_CELL_KEY
+from cfp._types import ArrayLike, Layers_separate_input_t, Layers_t
 
 __all__ = [
     "ConditionEncoder",
@@ -214,7 +215,7 @@ class SelfAttentionBlock(BaseModule):
         Output tensor of shape (batch_size, set_size, input_dim).
         """
         z = x
-        for num_heads, qkv_dim in zip(self.num_heads, self.qkv_dim, strict=False):
+        for num_heads, qkv_dim in zip(self.num_heads, self.qkv_dim, strict=False):  # type: ignore[arg-type]
             z = SelfAttention(
                 num_heads=num_heads,
                 qkv_dim=qkv_dim,
@@ -420,19 +421,13 @@ class ConditionEncoder(BaseModule):
 
     output_dim: int
     pooling: Literal["mean", "attention_token", "attention_seed"] = "attention_token"
-    pooling_kwargs: dict = field(default_factory=lambda: {})
-    covariates_not_pooled: Sequence[str] = field(default_factory=lambda: [])
-    layers_before_pool: (
-        Sequence[tuple[Literal["mlp", "self_attention"], dict]] | dict
-    ) = field(default_factory=lambda: [])
-    layers_after_pool: Sequence[tuple[Literal["mlp", "self-attention"], dict]] = field(
-        default_factory=lambda: []
-    )
+    pooling_kwargs: dict[str, Any] = field(default_factory=lambda: {})
+    covariates_not_pooled: Sequence[str] = []
+    layers_before_pool: Layers_t | Layers_separate_input_t = []
+    layers_after_pool: Layers_t = []
     output_dropout: float = 0.0
     mask_value: float = 0.0
-    genot_source_layers: (
-        Sequence[tuple[Literal["mlp", "self-attention"], dict]] | None
-    ) = None
+    genot_source_layers: Layers_t | None = None
     genot_source_dim: int = 0
     genot_source_dropout: float = 0.0
 
@@ -447,13 +442,13 @@ class ConditionEncoder(BaseModule):
         # modules before pooling
         self.separate_inputs = isinstance(self.layers_before_pool, (dict | FrozenDict))
         if self.separate_inputs:
-            # different layers for different inputs
-            self.before_pool_modules = {
+            # different layers for different inputs, before_pool_modules is of type Layers_separate_input_t
+            self.before_pool_modules: dict[str, list[nn.Module]] | list[nn.Module] = {
                 key: self._get_layers(layers)
-                for key, layers in self.layers_before_pool.items()
+                for key, layers in self.layers_before_pool.items()  # type: ignore[union-attr]
             }
         else:
-            self.before_pool_modules = self._get_layers(self.layers_before_pool)
+            self.before_pool_modules = self._get_layers(self.layers_before_pool)  # type: ignore[arg-type]
 
         # pooling
         if self.pooling == "mean":
@@ -471,7 +466,7 @@ class ConditionEncoder(BaseModule):
         # separate input layers for GENOT
         if self.genot_source_dim:
             self.genot_source_modules = self._get_layers(
-                self.genot_source_layers,
+                self.genot_source_layers,  # type: ignore[arg-type]
                 self.genot_source_dim,
                 self.genot_source_dropout,
             )
@@ -510,7 +505,7 @@ class ConditionEncoder(BaseModule):
             for pert_cov, conditions_i in conditions.items():
                 # apply separate modules for all inputs
                 conditions_i = self._apply_modules(
-                    self.before_pool_modules[pert_cov],
+                    self.before_pool_modules[pert_cov],  # type: ignore[call-overload]
                     conditions_i,
                     attention_mask,
                     training,
@@ -542,27 +537,29 @@ class ConditionEncoder(BaseModule):
                     conditions_not_pooled,
                     axis=-1,
                 )
-                conditions_pooling = jnp.concatenate(
+                conditions_pooling_arr = jnp.concatenate(
                     conditions_pooling,
                     axis=-1,
                 )
 
                 # apply modules to pooled covariates
-                conditions_pooling = self._apply_modules(
-                    self.before_pool_modules,
-                    conditions_pooling,
+                conditions_pooling_arr = self._apply_modules(
+                    self.before_pool_modules,  # type: ignore[arg-type]
+                    conditions_pooling_arr,
                     attention_mask,
                     training,
                 )
             else:
                 conditions = jnp.concatenate(list(conditions.values()), axis=-1)
-                conditions_pooling = self._apply_modules(
-                    self.before_pool_modules, conditions, attention_mask, training
+                conditions_pooling_arr = self._apply_modules(
+                    self.before_pool_modules, conditions, attention_mask, training  # type: ignore[arg-type]
                 )
 
         # pooling
         pool_mask = mask if self.pooling == "mean" else attention_mask
-        conditions = self.pool_module(conditions_pooling, pool_mask, training=training)
+        conditions = self.pool_module(
+            conditions_pooling_arr, pool_mask, training=training
+        )
         if self.covariates_not_pooled:
             conditions = jnp.concatenate([conditions, conditions_not_pooled], axis=-1)
 
@@ -598,10 +595,10 @@ class ConditionEncoder(BaseModule):
 
     def _get_layers(
         self,
-        layers: dict,
+        layers: Layers_t,
         output_dim: int | None = None,
         dropout_rate: float | None = None,
-    ) -> list:
+    ) -> list[nn.Module]:
         """Get modules from layer parameters."""
         modules = []
         for layer_type, layer_params in layers:
@@ -618,7 +615,9 @@ class ConditionEncoder(BaseModule):
                 modules.append(nn.Dropout(dropout_rate))
         return modules
 
-    def _get_masks(self, conditions: dict) -> tuple[jnp.ndarray, jnp.ndarray]:
+    def _get_masks(
+        self, conditions: dict[str, ArrayLike]
+    ) -> tuple[jnp.ndarray, jnp.ndarray]:
         """Get mask for padded conditions tensor."""
         # mask of shape (batch_size, set_size)
         mask = 1 - jnp.all(
@@ -637,8 +636,8 @@ class ConditionEncoder(BaseModule):
 
     def _apply_modules(
         self,
-        modules: list,
-        conditions: jnp.ndarray,
+        modules: list[nn.Module],
+        conditions: jax.Array,
         attention_mask: jnp.ndarray | None,
         training: bool,
     ) -> jnp.ndarray:

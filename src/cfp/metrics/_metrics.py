@@ -52,7 +52,9 @@ def compute_metrics(x: ArrayLike, y: ArrayLike) -> dict[str, float]:
 def compute_mean_metrics(metrics: dict[str, dict[str, float]], prefix: str = ""):
     """Compute the mean value of different metrics."""
     metric_names = list(list(metrics.values())[0].keys())
-    metric_dict = {prefix + met_name: [] for met_name in metric_names}
+    metric_dict: dict[str, list[float]] = {
+        prefix + met_name: [] for met_name in metric_names
+    }
     for met in metric_names:
         stat = 0.0
         for vals in metrics.values():
@@ -97,7 +99,7 @@ def compute_scalar_mmd(
     """Compute MMD across different length scales"""
     if gammas is None:
         gammas = [2, 1, 0.5, 0.1, 0.01, 0.005]
-    mmds = [maximum_mean_discrepancy(x, y, gamma=gamma) for gamma in gammas]
+    mmds = [maximum_mean_discrepancy(x, y, gamma=gamma) for gamma in gammas]  # type: ignore[union-attr]
     return np.nanmean(np.array(mmds))
 
 

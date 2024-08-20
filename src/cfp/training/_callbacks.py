@@ -1,4 +1,5 @@
 import abc
+from collections.abc import Callable, Sequence
 from typing import Any, Literal, NamedTuple
 
 import jax.tree as jt
@@ -18,6 +19,19 @@ __all__ = [
     "CallbackRunner",
     "PCADecodedMetrics",
 ]
+
+
+metric_to_func: dict[str, Callable[[ArrayLike, ArrayLike], float | ArrayLike]] = {
+    "r_squared": compute_r_squared,
+    "mmd": compute_scalar_mmd,
+    "sinkhorn_div": compute_sinkhorn_div,
+    "e_distance": compute_e_distance,
+}
+
+agg_fn_to_func: dict[str, Callable[[ArrayLike], float | ArrayLike]] = {
+    "mean": lambda x: np.mean(x, axis=0),  # type: ignore[arg-type]
+    "median": lambda x: np.median(x, axis=0),  # type: ignore[arg-type]
+}
 
 
 class BaseCallback(abc.ABC):
@@ -77,15 +91,21 @@ class ComputationCallback(BaseCallback, abc.ABC):
     @abc.abstractmethod
     def on_log_iteration(
         self,
-        validation_data: dict[str, ValidationData],
+        validation_data: dict[str, dict[str, ArrayLike]],
         predicted_data: dict[str, dict[str, ArrayLike]],
     ) -> dict[str, float]:
         """Called at each validation/log iteration to compute metrics
 
-        Args:
-            validation_data: Validation data
-            predicted_data: Predicted data
-            training_data: Current batch and predicted data
+        Parameters
+        ----------
+            validation_data
+                Validation data in nested dictionary format with same keys as `predicted_data`
+            predicted_data
+                Predicted data in nested dictionary format with same keys as `validation_data`
+
+        Returns
+        -------
+            Statistics of the validation data and predicted data
         """
         pass
 
@@ -97,25 +117,18 @@ class ComputationCallback(BaseCallback, abc.ABC):
     ) -> dict[str, float]:
         """Called at the end of training to compute metrics
 
-        Args:
-            validation_data: Validation data
-            predicted_data: Predicted data
-            training_data: Current batch and predicted data
+        Parameters
+        ----------
+            validation_data
+                Validation data in nested dictionary format with same keys as `predicted_data`
+            predicted_data
+                Predicted data in nested dictionary format with same keys as `validation_data`
+
+        Returns
+        -------
+            Statistics of the validation data and predicted data
         """
         pass
-
-
-metric_to_func = {
-    "r_squared": compute_r_squared,
-    "mmd": compute_scalar_mmd,
-    "sinkhorn_div": compute_sinkhorn_div,
-    "e_distance": compute_e_distance,
-}
-
-agg_fn_to_func = {
-    "mean": np.mean,
-    "median": np.median,
-}
 
 
 class Metrics(ComputationCallback):
@@ -176,7 +189,7 @@ class Metrics(ComputationCallback):
                         out_flattened
                     )
 
-        return metrics
+        return metrics  # type: ignore[return-value]
 
     def on_train_end(
         self,
@@ -194,8 +207,8 @@ class Metrics(ComputationCallback):
 
 
 class PCADecoder(NamedTuple):
-    pcs: np.ndarray
-    means: np.ndarray
+    pcs: ArrayLike
+    means: ArrayLike
 
 
 class PCADecodedMetrics(Metrics):
@@ -223,7 +236,9 @@ class PCADecodedMetrics(Metrics):
         super().__init__(metrics, metric_aggregations)
         self.pcs = pca_decoder.pcs
         self.means = pca_decoder.means
-        self.reconstruct_data = lambda x: x @ self.pcs.T + self.means.T
+        self.reconstruct_data = lambda x: x @ np.transpose(self.pcs) + np.transpose(
+            self.means
+        )
         self.log_prefix = log_prefix
 
     def on_log_iteration(
@@ -337,13 +352,13 @@ class CallbackRunner:
 
     def __init__(
         self,
-        callbacks: list[BaseCallback],
+        callbacks: Sequence[BaseCallback],
     ) -> None:
 
-        self.computation_callbacks = [
+        self.computation_callbacks: list[ComputationCallback] = [
             c for c in callbacks if isinstance(c, ComputationCallback)
         ]
-        self.logging_callbacks = [
+        self.logging_callbacks: list[LoggingCallback] = [
             c for c in callbacks if isinstance(c, LoggingCallback)
         ]
 
@@ -361,7 +376,9 @@ class CallbackRunner:
             callback.on_train_begin()
 
     def on_log_iteration(
-        self, valid_data: dict[str, ValidationData], pred_data
+        self,
+        valid_data: dict[str, dict[str, ArrayLike]],
+        pred_data: dict[str, dict[str, ArrayLike]],
     ) -> dict[str, Any]:
         """Called at each validation/log iteration to run callbacks. First computes metrics with computation callbacks and then logs data with logging callbacks.
 
@@ -381,7 +398,7 @@ class CallbackRunner:
             dict_to_log.update(results)
 
         for callback in self.logging_callbacks:
-            callback.on_log_iteration(dict_to_log)
+            callback.on_log_iteration(dict_to_log)  # type: ignore[call-arg]
 
         return dict_to_log
 
@@ -403,6 +420,6 @@ class CallbackRunner:
             dict_to_log.update(results)
 
         for callback in self.logging_callbacks:
-            callback.on_log_iteration(dict_to_log)
+            callback.on_log_iteration(dict_to_log)  # type: ignore[call-arg]
 
         return dict_to_log

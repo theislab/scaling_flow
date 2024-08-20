@@ -5,8 +5,10 @@ from typing import Any
 import jax
 import jax.numpy as jnp
 
+from cfp._types import ArrayLike
+
 __all__ = [
-    "BaseData",
+    "BaseDataMixin",
     "ConditionData",
     "PredictionData",
     "TrainingData",
@@ -17,32 +19,32 @@ __all__ = [
 @dataclass
 class ReturnData:  # TODO: this should rather be a NamedTuple
     split_covariates_mask: jnp.ndarray | None
-    split_idx_to_covariates: dict[int, str] | None
+    split_idx_to_covariates: dict[int, tuple[Any, ...]]
     perturbation_covariates_mask: jnp.ndarray | None
-    perturbation_idx_to_covariates: dict[int, tuple[str, ...]] | None
+    perturbation_idx_to_covariates: dict[int, tuple[Any, ...]]
     perturbation_idx_to_id: dict[int, Any]
-    condition_data: dict[str | int, jnp.ndarray] | None
-    control_to_perturbation: dict[int, jnp.ndarray] | None
-    max_combination_length: int | None
+    condition_data: dict[str, ArrayLike]
+    control_to_perturbation: dict[int, ArrayLike]
+    max_combination_length: int
 
 
-class BaseData:
+class BaseDataMixin:
     """Base class for data containers."""
 
     @property
     def n_controls(self) -> int:
         """Returns the number of control covariate values."""
-        return len(self.split_idx_to_covariates)
+        return len(self.split_idx_to_covariates)  # type: ignore[attr-defined]
 
     @property
     def n_perturbations(self) -> int:
         """Returns the number of perturbation covariate combinations."""
-        return len(self.perturbation_idx_to_covariates)
+        return len(self.perturbation_idx_to_covariates)  # type: ignore[attr-defined]
 
     @property
     def n_perturbation_covariates(self) -> int:
         """Returns the number of perturbation covariates."""
-        return len(self.condition_data)
+        return len(self.condition_data)  # type: ignore[attr-defined]
 
     def _format_params(self, fmt: Callable[[Any], str]) -> str:
         params = {
@@ -56,7 +58,7 @@ class BaseData:
 
 
 @dataclass
-class ConditionData(BaseData):
+class ConditionData(BaseDataMixin):
     """Data container containing condition embeddings.
 
     Parameters
@@ -71,7 +73,7 @@ class ConditionData(BaseData):
         Data manager used to generate the data.
     """
 
-    condition_data: dict[int | str, jnp.ndarray] | None
+    condition_data: dict[str, ArrayLike]
     max_combination_length: int
     perturbation_idx_to_covariates: dict[int, tuple[str, ...]]
     perturbation_idx_to_id: dict[int, Any]
@@ -80,7 +82,7 @@ class ConditionData(BaseData):
 
 
 @dataclass
-class TrainingData(BaseData):
+class TrainingData(BaseDataMixin):
     """Training data.
 
     Parameters
@@ -110,7 +112,7 @@ class TrainingData(BaseData):
         jax.Array
     )  # (n_cells,), which cell assigned to which source distribution
     split_idx_to_covariates: dict[
-        int, str
+        int, tuple[Any, ...]
     ]  # (n_sources,) dictionary explaining split_covariates_mask
     perturbation_covariates_mask: (
         jax.Array
@@ -119,11 +121,9 @@ class TrainingData(BaseData):
         int, tuple[str, ...]
     ]  # (n_targets,), dictionary explaining perturbation_covariates_mask
     perturbation_idx_to_id: dict[int, Any]
-    condition_data: dict[
-        str | int, jnp.ndarray
-    ]  # (n_targets,) all embeddings for conditions
+    condition_data: dict[str, ArrayLike]  # (n_targets,) all embeddings for conditions
     control_to_perturbation: dict[
-        int, jax.Array
+        int, ArrayLike
     ]  # mapping from control idx to target distribution idcs
     max_combination_length: int
     null_value: Any
@@ -131,7 +131,7 @@ class TrainingData(BaseData):
 
 
 @dataclass
-class ValidationData(BaseData):
+class ValidationData(BaseDataMixin):
     """Data container for the validation data.
 
     Parameters
@@ -167,7 +167,7 @@ class ValidationData(BaseData):
         jax.Array
     )  # (n_cells,), which cell assigned to which source distribution
     split_idx_to_covariates: dict[
-        int, str
+        int, tuple[Any, ...]
     ]  # (n_sources,) dictionary explaining split_covariates_mask
     perturbation_covariates_mask: (
         jax.Array
@@ -176,9 +176,7 @@ class ValidationData(BaseData):
         int, tuple[str, ...]
     ]  # (n_targets,), dictionary explaining perturbation_covariates_mask
     perturbation_idx_to_id: dict[int, Any]
-    condition_data: dict[
-        str | int, jnp.ndarray
-    ]  # (n_targets,) all embeddings for conditions
+    condition_data: dict[str, ArrayLike]  # (n_targets,) all embeddings for conditions
     control_to_perturbation: dict[
         int, jax.Array
     ]  # mapping from control idx to target distribution idcs
@@ -188,24 +186,9 @@ class ValidationData(BaseData):
     n_conditions_on_log_iteration: int | None = None
     n_conditions_on_train_end: int | None = None
 
-    @property
-    def n_controls(self) -> int:
-        """Returns the number of control covariate values."""
-        return len(self.split_idx_to_covariates)
-
-    @property
-    def n_perturbations(self) -> int:
-        """Returns the number of perturbation covariate combinations."""
-        return len(self.perturbation_idx_to_covariates)
-
-    @property
-    def n_perturbation_covariates(self) -> int:
-        """Returns the number of perturbation covariates."""
-        return len(self.condition_data)
-
 
 @dataclass
-class PredictionData(BaseData):
+class PredictionData(BaseDataMixin):
     """Data container to perform prediction.
 
     Parameters
@@ -229,16 +212,14 @@ class PredictionData(BaseData):
         jax.Array
     )  # (n_cells,), which cell assigned to which source distribution
     split_idx_to_covariates: dict[
-        int, str
+        int, tuple[Any, ...]
     ]  # (n_sources,) dictionary explaining split_covariates_mask
     perturbation_idx_to_covariates: dict[
         int, tuple[str, ...]
     ]  # (n_targets,), dictionary explaining perturbation_covariates_mask
     perturbation_idx_to_id: dict[int, Any]
-    condition_data: dict[
-        str | int, jnp.ndarray
-    ]  # (n_targets,) all embeddings for conditions
-    control_to_perturbation: dict[int, jnp.ndarray] | None
+    condition_data: dict[str, ArrayLike]  # (n_targets,) all embeddings for conditions
+    control_to_perturbation: dict[int, ArrayLike]
     max_combination_length: int
     null_value: Any
     data_manager: Any
