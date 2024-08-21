@@ -37,9 +37,7 @@ class TestCellFlow:
 
         condition_encoder_kwargs = {}
         if solver == "genot":
-            condition_encoder_kwargs["genot_source_layers"] = (
-                ("mlp", {"dims": (32, 32)}),
-            )
+            condition_encoder_kwargs["genot_source_layers"] = (({"dims": (32, 32)}),)
             condition_encoder_kwargs["genot_source_dim"] = 32
 
         cf.prepare_model(
@@ -100,9 +98,7 @@ class TestCellFlow:
 
         condition_encoder_kwargs = {}
         if solver == "genot":
-            condition_encoder_kwargs["genot_source_layers"] = (
-                ("mlp", {"dims": (32, 32)}),
-            )
+            condition_encoder_kwargs["genot_source_layers"] = (({"dims": (32, 32)}),)
             condition_encoder_kwargs["genot_source_dim"] = 32
 
         cf.prepare_model(
@@ -243,9 +239,7 @@ class TestCellFlow:
 
         condition_encoder_kwargs = {}
         if solver == "genot":
-            condition_encoder_kwargs["genot_source_layers"] = (
-                ("mlp", {"dims": (32, 32)}),
-            )
+            condition_encoder_kwargs["genot_source_layers"] = (({"dims": (32, 32)}),)
             condition_encoder_kwargs["genot_source_dim"] = 32
 
         cf.prepare_model(
@@ -279,9 +273,7 @@ class TestCellFlow:
 
         condition_encoder_kwargs = {}
         if solver == "genot":
-            condition_encoder_kwargs["genot_source_layers"] = (
-                ("mlp", {"dims": (32, 32)}),
-            )
+            condition_encoder_kwargs["genot_source_layers"] = (({"dims": (32, 32)}),)
             condition_encoder_kwargs["genot_source_dim"] = 32
 
         cf.prepare_model(

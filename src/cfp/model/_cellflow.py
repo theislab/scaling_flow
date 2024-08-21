@@ -1,17 +1,22 @@
 import os
+import types
 from collections.abc import Callable, Sequence
+from dataclasses import field as dc_field
 from functools import partial
 from typing import Any, Literal
 
 import anndata as ad
 import cloudpickle
+import flax.linen as nn
 import jax
+import jax.numpy as jnp
 import optax
 import pandas as pd
 from numpy.typing import ArrayLike
 from ott.neural.methods.flows import dynamics
 from ott.solvers import utils as solver_utils
 
+from cfp._types import Layers_separate_input_t, Layers_t
 from cfp.data._data import BaseDataMixin, ValidationData
 from cfp.data._dataloader import PredictionSampler, TrainSampler, ValidationSampler
 from cfp.data._datamanager import DataManager
@@ -152,9 +157,19 @@ class CellFlow:
         hidden_dropout: float = 0.0,
         decoder_dims: Sequence[int] = (1024, 1024, 1024),
         decoder_dropout: float = 0.0,
+        pooling: Literal[
+            "mean", "attention_token", "attention_seed"
+        ] = "attention_token",
+        pooling_kwargs: dict[str, Any] = types.MappingProxyType({}),
+        layers_before_pool: Layers_separate_input_t | Layers_t = dc_field(
+            default_factory=lambda: []
+        ),
+        layers_after_pool: Layers_t = dc_field(default_factory=lambda: []),
+        cond_output_dropout: float = 0.0,
         condition_encoder_kwargs: dict[str, Any] | None = None,
         pool_sample_covariates: bool = True,
-        velocity_field_kwargs: dict[str, Any] | None = None,
+        vf_act_fn: Callable[[jnp.ndarray], jnp.ndarray] = nn.silu,
+        time_freqs: int = 1024,
         solver_kwargs: dict[str, Any] | None = None,
         flow: dict[Literal["constant_noise", "bridge"], float] | None = None,
         match_fn: Callable[[ArrayLike, ArrayLike], ArrayLike] = partial(
@@ -183,12 +198,24 @@ class CellFlow:
                 Dropout rate for the hidden layers.
             decoder_dims
                 Dimensions of the output layers.
+            pooling
+                Pooling method.
+            pooling_kwargs
+                Keyword arguments for the pooling method.
+            layers_before_pool
+                Layers before pooling. Either a sequence of tuples with layer type and parameters or a dictionary with input-specific layers.
+            layers_after_pool
+                Layers after pooling.
+            cond_output_dropout
+                Dropout rate for the last layer of the condition encoder.
             condition_encoder_kwargs
                 Keyword arguments for the condition encoder.
             pool_sample_covariates
                 Whether to include sample covariates in the pooling.
-            velocity_field_kwargs
-                Keyword arguments for the velocity field.
+            vf_act_fn
+                Activation function of the velocity field.
+            time_freqs
+                Frequency of the cyclical time encoding.
             solver_kwargs
                 Keyword arguments for the solver.
             decoder_dropout
@@ -216,7 +243,6 @@ class CellFlow:
         covariates_not_pooled = (
             [] if pool_sample_covariates else self.dm.sample_covariates
         )
-        velocity_field_kwargs = velocity_field_kwargs or {}
         solver_kwargs = solver_kwargs or {}
         flow = flow or {"constant_noise": 0.0}
 
@@ -226,14 +252,20 @@ class CellFlow:
             encode_conditions=encode_conditions,
             condition_embedding_dim=condition_embedding_dim,
             covariates_not_pooled=covariates_not_pooled,
+            pooling=pooling,
+            pooling_kwargs=pooling_kwargs,
+            layers_before_pool=layers_before_pool,
+            layers_after_pool=layers_after_pool,
+            cond_output_dropout=cond_output_dropout,
             condition_encoder_kwargs=condition_encoder_kwargs,
+            act_fn=vf_act_fn,
+            time_freqs=time_freqs,
             time_encoder_dims=time_encoder_dims,
             time_encoder_dropout=time_encoder_dropout,
             hidden_dims=hidden_dims,
             hidden_dropout=hidden_dropout,
             decoder_dims=decoder_dims,
             decoder_dropout=decoder_dropout,
-            **velocity_field_kwargs,
         )
 
         flow, noise = next(iter(flow.items()))
