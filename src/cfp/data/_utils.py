@@ -109,7 +109,7 @@ def get_fingerprints_from_dict(smiles, radius: int = 4, n_bits: int = 1024):
     return fingerprints
 
 
-def get_smiles_from_name(drugs: Seuqence[str]) -> pd.DataFrame:
+def get_smiles_from_name(drugs: Sequence[str]) -> pd.DataFrame:
     drugs = np.unique(drugs).tolist()
     smiles = {}
     not_found = []
