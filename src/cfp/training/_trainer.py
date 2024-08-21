@@ -12,14 +12,14 @@ from cfp.training._callbacks import BaseCallback, CallbackRunner
 
 
 class CellFlowTrainer:
-    """Trainer for the OTFM/GENOT model with a conditional velocity field.
+    """Trainer for the OTFM/GENOT solver with a conditional velocity field.
 
     Parameters
     ----------
         dataloader
             Data sampler.
-        model
-            OTFM/GENOT model with a conditional velocity field.
+        solver
+            OTFM/GENOT solver with a conditional velocity field.
         seed
             Random seed for subsampling validation data.
 
@@ -30,15 +30,15 @@ class CellFlowTrainer:
 
     def __init__(
         self,
-        model: _otfm.OTFlowMatching | _genot.GENOT,
+        solver: _otfm.OTFlowMatching | _genot.GENOT,
         seed: int = 0,
     ):
-        if not isinstance(model, (_otfm.OTFlowMatching | _genot.GENOT)):
+        if not isinstance(solver, (_otfm.OTFlowMatching | _genot.GENOT)):
             raise NotImplementedError(
-                f"Model must be an instance of OTFlowMatching or GENOT, got {type(model)}"
+                f"Solver must be an instance of OTFlowMatching or GENOT, got {type(solver)}"
             )
 
-        self.model = model
+        self.solver = solver
         self.rng_subsampling = np.random.default_rng(seed)
         self.training_logs: dict[str, Any] = {}
 
@@ -60,7 +60,7 @@ class CellFlowTrainer:
             src = batch["source"]
             condition = batch.get("condition", None)
             true_tgt = batch["target"]
-            valid_pred_data[val_key] = jax.tree.map(self.model.predict, src, condition)
+            valid_pred_data[val_key] = jax.tree.map(self.solver.predict, src, condition)
             valid_true_data[val_key] = true_tgt
 
         return valid_true_data, valid_pred_data
@@ -114,7 +114,7 @@ class CellFlowTrainer:
         for it in pbar:
             rng, rng_step_fn = jax.random.split(rng, 2)
             batch = dataloader.sample(rng)
-            loss = self.model.step_fn(rng_step_fn, batch)
+            loss = self.solver.step_fn(rng_step_fn, batch)
             self.training_logs["loss"].append(float(loss))
 
             if ((it - 1) % valid_freq == 0) and (it > 1):
@@ -143,5 +143,5 @@ class CellFlowTrainer:
             metrics = crun.on_train_end(valid_true_data, valid_pred_data)
             self._update_logs(metrics)
 
-        self.model.is_trained = True
-        return self.model
+        self.solver.is_trained = True
+        return self.solver
