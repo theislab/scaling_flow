@@ -302,9 +302,9 @@ class CellFlow:
             )
         else:
             raise NotImplementedError(
-                f"Solver must be an instance of OTFlowMatching or GENOT, got {type(self._model)}"
+                f"Solver must be an instance of OTFlowMatching or GENOT, got {type(self.model)}"
             )
-        self._trainer = CellFlowTrainer(model=self._model)  # type: ignore[arg-type]
+        self._trainer = CellFlowTrainer(model=self.model)  # type: ignore[arg-type]
 
     def train(
         self,
@@ -379,7 +379,7 @@ class CellFlow:
         -------
             A :class:`dict` with the predicted sample representation for each source distribution and condition.
         """
-        if not self._model.is_trained:
+        if not self.model.is_trained:  # type: ignore[union-attr]
             raise ValueError("Model not trained. Please call `train` first.")
 
         if adata is not None and covariate_data is not None:
@@ -401,7 +401,7 @@ class CellFlow:
         batch = pred_loader.sample()
         src = batch["source"]
         condition = batch.get("condition", None)
-        out = jax.tree.map(self._model.predict, src, condition)
+        out = jax.tree.map(self.model.predict, src, condition)  # type: ignore[union-attr]
 
         return out
 
@@ -426,7 +426,7 @@ class CellFlow:
         -------
             A class:`dict` with the condition embedding for each condition.
         """
-        if self._model is None:
+        if self.model is None:
             raise ValueError("Model not trained. Please call `train` first.")
 
         if not self.dm.is_conditional:
@@ -456,7 +456,7 @@ class CellFlow:
             else:
                 cov_combination = cond_data.perturbation_idx_to_covariates[i]  # type: ignore[union-attr]
                 c_key = tuple(cov_combination[i] for i in range(len(cov_combination)))
-            condition_embeddings[c_key] = self._model.get_condition_embedding(condition)
+            condition_embeddings[c_key] = self.model.get_condition_embedding(condition)
 
         return condition_embeddings
 
@@ -537,11 +537,6 @@ class CellFlow:
         return self._adata
 
     @property
-    def solver(self) -> _otfm.OTFlowMatching | _genot.GENOT | None:
-        """The solver to use for training."""
-        return self._model
-
-    @property
     def model(self) -> _otfm.OTFlowMatching | _genot.GENOT | None:
         """The trained model."""
         return self._model
@@ -569,4 +564,8 @@ class CellFlow:
     @velocity_field.setter
     def velocity_field(self, vf: ConditionalVelocityField) -> None:
         """Set the velocity field."""
+        if not isinstance(vf, ConditionalVelocityField):
+            raise ValueError(
+                f"Expected `vf` to be an instance of `ConditionalVelocityField`, found `{type(vf)}`."
+            )
         self._vf = vf
