@@ -168,7 +168,7 @@ class Metrics(ComputationCallback):
 
     def on_log_iteration(
         self,
-        validation_data: dict[str, ValidationData],
+        validation_data: dict[str, dict[str, ArrayLike]],
         predicted_data: dict[str, dict[str, ArrayLike]],
     ) -> dict[str, float]:
         """Called at each validation/log iteration to compute metrics
@@ -243,7 +243,7 @@ class PCADecodedMetrics(Metrics):
 
     def on_log_iteration(
         self,
-        validation_data: dict[str, ValidationData],
+        validation_data: dict[str, dict[str, ArrayLike]],
         predicted_data: dict[str, dict[str, ArrayLike]],
     ) -> dict[str, float]:
         """Called at each validation/log iteration to reconstruct the data and compute metrics on the reconstruction
