@@ -1,8 +1,9 @@
 from collections.abc import Iterable, Sequence
 from typing import Any
 
-import anndata as ad
 import numpy as np
+import pandas as pd
+import anndata as ad
 import sklearn.preprocessing as preprocessing
 
 from cfp._logging import logger
