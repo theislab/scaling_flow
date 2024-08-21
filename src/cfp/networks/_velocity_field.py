@@ -133,7 +133,8 @@ class ConditionalVelocityField(nn.Module):
     ) -> jnp.ndarray:
         """Forward pass through the neural vector field.
 
-        Args:
+        Parameters
+        ----------
             t
                 Time of shape ``[batch, 1]``.
             x
@@ -141,7 +142,7 @@ class ConditionalVelocityField(nn.Module):
             condition
                 Condition dictionary, with condition names as keys and condition representations of shape ``[batch, max_combination_length, condition_dim]`` as values.
             train
-                `True`, enables dropout for training.
+                If :obj:`True`, enables dropout for training.
 
         Returns
         -------
@@ -166,7 +167,8 @@ class ConditionalVelocityField(nn.Module):
     def get_condition_embedding(self, condition: dict[str, jnp.ndarray]) -> jnp.ndarray:
         """Get the embedding of the condition.
 
-        Args:
+        Parameters
+        ----------
             condition
                 Conditioning vector of shape ``[batch, ...]``.
 
@@ -195,7 +197,8 @@ class ConditionalVelocityField(nn.Module):
     ) -> train_state.TrainState:
         """Create the training state.
 
-        Args:
+        Parameters
+        ----------
             rng
                 Random number generator.
             optimizer
