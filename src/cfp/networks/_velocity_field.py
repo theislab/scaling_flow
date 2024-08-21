@@ -41,6 +41,8 @@ class ConditionalVelocityField(nn.Module):
             Layers before pooling. Either a sequence of tuples with layer type and parameters or a dictionary with input-specific layers.
         layers_after_pool
             Layers after pooling.
+        cond_output_dropout
+            Dropout rate for the last layer of the condition encoder.
         condition_encoder_kwargs
             Keyword arguments for the condition encoder.
         act_fn
@@ -76,6 +78,7 @@ class ConditionalVelocityField(nn.Module):
         default_factory=lambda: []
     )
     layers_after_pool: Layers_t = dc_field(default_factory=lambda: [])
+    cond_output_dropout: float = 0.0
     mask_value: float = 0.0
     condition_encoder_kwargs: dict[str, Any] = dc_field(default_factory=lambda: {})
     act_fn: Callable[[jnp.ndarray], jnp.ndarray] = nn.silu
@@ -96,6 +99,7 @@ class ConditionalVelocityField(nn.Module):
                 pooling_kwargs=self.pooling_kwargs,
                 layers_before_pool=self.layers_before_pool,
                 layers_after_pool=self.layers_after_pool,
+                output_dropout=self.cond_output_dropout,
                 covariates_not_pooled=self.covariates_not_pooled,
                 mask_value=self.mask_value,
                 **self.condition_encoder_kwargs,

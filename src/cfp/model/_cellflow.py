@@ -165,6 +165,7 @@ class CellFlow:
             default_factory=lambda: []
         ),
         layers_after_pool: Layers_t = dc_field(default_factory=lambda: []),
+        cond_output_dropout: float = 0.0,
         condition_encoder_kwargs: dict[str, Any] | None = None,
         pool_sample_covariates: bool = True,
         vf_act_fn: Callable[[jnp.ndarray], jnp.ndarray] = nn.silu,
@@ -205,6 +206,8 @@ class CellFlow:
                 Layers before pooling. Either a sequence of tuples with layer type and parameters or a dictionary with input-specific layers.
             layers_after_pool
                 Layers after pooling.
+            cond_output_dropout
+                Dropout rate for the last layer of the condition encoder.
             condition_encoder_kwargs
                 Keyword arguments for the condition encoder.
             pool_sample_covariates
@@ -253,6 +256,7 @@ class CellFlow:
             pooling_kwargs=pooling_kwargs,
             layers_before_pool=layers_before_pool,
             layers_after_pool=layers_after_pool,
+            cond_output_dropout=cond_output_dropout,
             condition_encoder_kwargs=condition_encoder_kwargs,
             act_fn=vf_act_fn,
             time_freqs=time_freqs,
