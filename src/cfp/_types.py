@@ -1,5 +1,5 @@
 from collections.abc import Callable, Sequence
-from typing import Any, Literal
+from typing import Any
 
 import numpy as np
 
@@ -18,5 +18,5 @@ ComputationCallback_t = Callable[
 ]
 LoggingCallback_t = Callable[[dict[str, ArrayLike]], dict[str, Any]]
 
-Layers_t = Sequence[tuple[Literal["mlp", "self_attention"], dict[str, Any]]]
+Layers_t = Sequence[dict[str, Any]]
 Layers_separate_input_t = dict[str, Layers_t]
