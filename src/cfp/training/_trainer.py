@@ -80,7 +80,7 @@ class CellFlowTrainer:
         valid_loaders: dict[str, ValidationSampler] | None = None,
         monitor_metrics: Sequence[str] = [],
         callbacks: Sequence[BaseCallback] = [],
-    ) -> None:
+    ) -> _otfm.OTFlowMatching | _genot.GENOT:
         """Trains the model.
 
         Parameters
@@ -98,7 +98,7 @@ class CellFlowTrainer:
 
         Returns
         -------
-            None
+            The trained model.
         """
         self.training_logs = {"loss": []}
         rng = jax.random.PRNGKey(0)
@@ -142,3 +142,6 @@ class CellFlowTrainer:
             )
             metrics = crun.on_train_end(valid_true_data, valid_pred_data)
             self._update_logs(metrics)
+
+        self.model.is_trained = True
+        return self.model

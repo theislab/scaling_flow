@@ -37,13 +37,13 @@ class CellFlow:
     def __init__(self, adata: ad.AnnData, solver: Literal["otfm", "genot"] = "otfm"):
 
         self._adata = adata
-        self._solver_class = _otfm.OTFlowMatching if solver == "otfm" else _genot.GENOT
-        self.dataloader: TrainSampler | None = None
-        self.trainer: CellFlowTrainer | None = None
-        self.model: _otfm.OTFlowMatching | _genot.GENOT | None = None
+        self._model_class = _otfm.OTFlowMatching if solver == "otfm" else _genot.GENOT
+        self._dataloader: TrainSampler | None = None
+        self._trainer: CellFlowTrainer | None = None
         self._validation_data: dict[str, ValidationData] = {}
-        self._solver: _otfm.OTFlowMatching | _genot.GENOT | None = None
+        self._model: _otfm.OTFlowMatching | _genot.GENOT | None = None
         self._condition_dim: int | None = None
+        self._vf: ConditionalVelocityField | None = None
 
     def prepare_data(
         self,
@@ -220,7 +220,7 @@ class CellFlow:
         solver_kwargs = solver_kwargs or {}
         flow = flow or {"constant_noise": 0.0}
 
-        vf = ConditionalVelocityField(
+        self._vf = ConditionalVelocityField(
             output_dim=self._data_dim,
             max_combination_length=self.train_data.max_combination_length,
             encode_conditions=encode_conditions,
@@ -246,9 +246,9 @@ class CellFlow:
                 f"The key of `flow` must be `'constant_noise'` or `'bridge'` but found {flow}."
             )
 
-        if self._solver_class == _otfm.OTFlowMatching:
-            self._solver = self._solver_class(
-                vf=vf,
+        if self._model_class == _otfm.OTFlowMatching:
+            self._model = self._model_class(
+                vf=self._vf,
                 match_fn=match_fn,
                 flow=flow,
                 optimizer=optimizer,
@@ -256,9 +256,9 @@ class CellFlow:
                 rng=jax.random.PRNGKey(seed),
                 **solver_kwargs,
             )
-        elif self._solver_class == _genot.GENOT:
-            self._solver = self._solver_class(
-                vf=vf,
+        elif self._model_class == _genot.GENOT:
+            self._model = self._model_class(
+                vf=self._vf,
                 data_match_fn=match_fn,
                 flow=flow,
                 source_dim=self._data_dim,
@@ -270,9 +270,9 @@ class CellFlow:
             )
         else:
             raise NotImplementedError(
-                f"Solver must be an instance of OTFlowMatching or GENOT, got {type(self._solver)}"
+                f"Solver must be an instance of OTFlowMatching or GENOT, got {type(self._model)}"
             )
-        self.trainer = CellFlowTrainer(model=self._solver)  # type: ignore[arg-type]
+        self._trainer = CellFlowTrainer(model=self._model)  # type: ignore[arg-type]
 
     def train(
         self,
@@ -304,25 +304,24 @@ class CellFlow:
         if self.train_data is None:
             raise ValueError("Data not initialized. Please call `prepare_data` first.")
 
-        if self.trainer is None:
+        if self._trainer is None:
             raise ValueError(
                 "Model not initialized. Please call `prepare_model` first."
             )
 
-        self.dataloader = TrainSampler(data=self.train_data, batch_size=batch_size)
+        self._dataloader = TrainSampler(data=self.train_data, batch_size=batch_size)
         validation_loaders = {
             k: ValidationSampler(v) for k, v in self._validation_data.items()
         }
 
-        self.trainer.train(
-            dataloader=self.dataloader,
+        self._model = self._trainer.train(
+            dataloader=self._dataloader,
             num_iterations=num_iterations,
             valid_freq=valid_freq,
             valid_loaders=validation_loaders,
             callbacks=callbacks,
             monitor_metrics=monitor_metrics,
         )
-        self.model = self.trainer.model
 
     def predict(
         self,
@@ -348,7 +347,7 @@ class CellFlow:
         -------
             A :class:`dict` with the predicted sample representation for each source distribution and condition.
         """
-        if self.model is None:
+        if not self._model.is_trained:
             raise ValueError("Model not trained. Please call `train` first.")
 
         if adata is not None and covariate_data is not None:
@@ -370,7 +369,7 @@ class CellFlow:
         batch = pred_loader.sample()
         src = batch["source"]
         condition = batch.get("condition", None)
-        out = jax.tree.map(self.model.predict, src, condition)
+        out = jax.tree.map(self._model.predict, src, condition)
 
         return out
 
@@ -395,7 +394,7 @@ class CellFlow:
         -------
             A class:`dict` with the condition embedding for each condition.
         """
-        if self.model is None:
+        if self._model is None:
             raise ValueError("Model not trained. Please call `train` first.")
 
         if not self.dm.is_conditional:
@@ -425,7 +424,7 @@ class CellFlow:
             else:
                 cov_combination = cond_data.perturbation_idx_to_covariates[i]  # type: ignore[union-attr]
                 c_key = tuple(cov_combination[i] for i in range(len(cov_combination)))
-            condition_embeddings[c_key] = self.model.get_condition_embedding(condition)
+            condition_embeddings[c_key] = self._model.get_condition_embedding(condition)
 
         return condition_embeddings
 
@@ -508,4 +507,34 @@ class CellFlow:
     @property
     def solver(self) -> _otfm.OTFlowMatching | _genot.GENOT | None:
         """The solver to use for training."""
-        return self._solver
+        return self._model
+
+    @property
+    def model(self) -> _otfm.OTFlowMatching | _genot.GENOT | None:
+        """The trained model."""
+        return self._model
+
+    @property
+    def dataloader(self) -> TrainSampler | None:
+        """The dataloader used for training."""
+        return self._dataloader
+
+    @property
+    def trainer(self) -> CellFlowTrainer | None:
+        """The trainer used for training."""
+        return self._trainer
+
+    @property
+    def validation_data(self) -> dict[str, ValidationData]:
+        """The validation data."""
+        return self._validation_data
+
+    @property
+    def velocity_field(self) -> ConditionalVelocityField | None:
+        """The velocity field."""
+        return self._vf
+
+    @velocity_field.setter
+    def velocity_field(self, vf: ConditionalVelocityField) -> None:
+        """Set the velocity field."""
+        self._vf = vf
