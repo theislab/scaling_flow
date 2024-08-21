@@ -16,25 +16,30 @@ cond["pert4_skip_pool"] = jnp.ones((1, 3, 5))
 layers_before_pool = [
     {
         "pert1": (
-            ("mlp", {"dims": (32, 32)}),
-            ("self_attention", {"num_heads": 4, "qkv_dim": 32}),
+            {"layer_type": "mlp", "dims": (32, 32)},
+            {"layer_type": "self_attention", "num_heads": 4, "qkv_dim": 32},
         ),
-        "pert2": (("mlp", {"dims": (32, 32)}),),
+        "pert2": ({"layer_type": "mlp", "dims": (32, 32)},),
         "pert3": (),
         "pert4_skip_pool": (),
     },
+    ({"layer_type": "mlp", "dims": (32, 32)},),
     (
-        ("mlp", {"dims": (32, 32)}),
-        (
-            "self_attention",
-            {"num_heads": [4, 8], "qkv_dim": [32, 64], "transformer_block": True},
-        ),
+        {
+            "layer_type": "self_attention",
+            "num_heads": [4, 8],
+            "qkv_dim": [32, 64],
+            "transformer_block": True,
+        },
     ),
     (),
 ]
 layers_after_pool = [
-    (("mlp", {"dims": (32, 32)}),),
-    (("mlp", {"dims": (32, 32)}), ("self_attention", {"num_heads": 4, "qkv_dim": 12})),
+    ({"layer_type": "mlp", "dims": (32, 32)},),
+    (
+        {"layer_type": "mlp", "dims": (32, 32)},
+        {"layer_type": "self_attention", "num_heads": 4, "qkv_dim": 12},
+    ),
     (),
 ]
 

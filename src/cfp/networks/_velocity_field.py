@@ -1,6 +1,6 @@
 from collections.abc import Callable, Sequence
 from dataclasses import field as dc_field
-from typing import Any
+from typing import Any, Literal
 
 import jax
 import jax.numpy as jnp
@@ -11,6 +11,7 @@ from ott.neural.networks.layers import time_encoder
 
 from cfp._constants import GENOT_CELL_KEY
 from cfp._logging import logger
+from cfp._types import Layers_separate_input_t, Layers_t
 from cfp.networks._modules import MLPBlock
 from cfp.networks._set_encoders import ConditionEncoder
 
@@ -20,7 +21,8 @@ __all__ = ["ConditionalVelocityField"]
 class ConditionalVelocityField(nn.Module):
     """Parameterized neural vector field with conditions.
 
-    Args:
+    Parameters
+    ----------
         output_dim
             Dimensionality of the output.
         max_combination_length
@@ -31,6 +33,16 @@ class ConditionalVelocityField(nn.Module):
             Dimensions of the condition embedding.
         covariates_not_pooled
             Covariates that will escape pooling (should be identical across all set elements).
+        pooling
+            Pooling method.
+        pooling_kwargs
+            Keyword arguments for the pooling method.
+        layers_before_pool
+            Layers before pooling. Either a sequence of tuples with layer type and parameters or a dictionary with input-specific layers.
+        layers_after_pool
+            Layers after pooling.
+        cond_output_dropout
+            Dropout rate for the last layer of the condition encoder.
         condition_encoder_kwargs
             Keyword arguments for the condition encoder.
         act_fn
@@ -59,8 +71,16 @@ class ConditionalVelocityField(nn.Module):
     max_combination_length: int
     encode_conditions: bool = True
     condition_embedding_dim: int = 32
-    covariates_not_pooled: Sequence[str] = dc_field(default_factory=list)
-    condition_encoder_kwargs: dict[str, Any] = dc_field(default_factory=dict)
+    covariates_not_pooled: Sequence[str] = dc_field(default_factory=lambda: [])
+    pooling: Literal["mean", "attention_token", "attention_seed"] = "attention_token"
+    pooling_kwargs: dict[str, Any] = dc_field(default_factory=lambda: {})
+    layers_before_pool: Layers_separate_input_t | Layers_t = dc_field(
+        default_factory=lambda: []
+    )
+    layers_after_pool: Layers_t = dc_field(default_factory=lambda: [])
+    cond_output_dropout: float = 0.0
+    mask_value: float = 0.0
+    condition_encoder_kwargs: dict[str, Any] = dc_field(default_factory=lambda: {})
     act_fn: Callable[[jnp.ndarray], jnp.ndarray] = nn.silu
     time_freqs: int = 1024
     time_encoder_dims: Sequence[int] = (1024, 1024, 1024)
@@ -75,7 +95,13 @@ class ConditionalVelocityField(nn.Module):
         if self.encode_conditions:
             self.condition_encoder = ConditionEncoder(
                 output_dim=self.condition_embedding_dim,
+                pooling=self.pooling,
+                pooling_kwargs=self.pooling_kwargs,
+                layers_before_pool=self.layers_before_pool,
+                layers_after_pool=self.layers_after_pool,
+                output_dropout=self.cond_output_dropout,
                 covariates_not_pooled=self.covariates_not_pooled,
+                mask_value=self.mask_value,
                 **self.condition_encoder_kwargs,
             )
         self.time_encoder = MLPBlock(
@@ -107,7 +133,8 @@ class ConditionalVelocityField(nn.Module):
     ) -> jnp.ndarray:
         """Forward pass through the neural vector field.
 
-        Args:
+        Parameters
+        ----------
             t
                 Time of shape ``[batch, 1]``.
             x
@@ -115,7 +142,7 @@ class ConditionalVelocityField(nn.Module):
             condition
                 Condition dictionary, with condition names as keys and condition representations of shape ``[batch, max_combination_length, condition_dim]`` as values.
             train
-                `True`, enables dropout for training.
+                If :obj:`True`, enables dropout for training.
 
         Returns
         -------
@@ -140,7 +167,8 @@ class ConditionalVelocityField(nn.Module):
     def get_condition_embedding(self, condition: dict[str, jnp.ndarray]) -> jnp.ndarray:
         """Get the embedding of the condition.
 
-        Args:
+        Parameters
+        ----------
             condition
                 Conditioning vector of shape ``[batch, ...]``.
 
@@ -169,7 +197,8 @@ class ConditionalVelocityField(nn.Module):
     ) -> train_state.TrainState:
         """Create the training state.
 
-        Args:
+        Parameters
+        ----------
             rng
                 Random number generator.
             optimizer
