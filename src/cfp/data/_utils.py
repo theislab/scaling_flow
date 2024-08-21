@@ -24,6 +24,7 @@ def encode_onehot(
     adata: ad.AnnData,
     covariate_keys: str | Sequence[str],
     uns_key: Sequence[str] = "onehot",
+    exclude_values: str | Sequence[Any] = None,
     copy: bool = False,
 ) -> None | ad.AnnData:
     """Encodes covariates `adata.obs` as one-hot vectors and stores them in `adata.uns`.
@@ -32,6 +33,7 @@ def encode_onehot(
         adata: Annotated data matrix.
         covariate_keys: Keys of the covariates to encode.
         uns_key: Key in `adata.uns` to store the one-hot encodings.
+        exclude_values: Values to exclude from encoding.
         copy: Return a copy of `adata` instead of updating it in place.
 
     Returns
@@ -41,12 +43,15 @@ def encode_onehot(
     adata = adata.copy() if copy else adata
 
     covariate_keys = _to_list(covariate_keys)
-    all_values = np.unique(adata.obs[covariate_keys].values.flatten()).reshape(-1, 1)
+    exclude_values = _to_list(exclude_values)
+
+    all_values = np.unique(adata.obs[covariate_keys].values.flatten())
+    values_encode = np.setdiff1d(all_values, exclude_values).reshape(-1, 1)
     encoder = preprocessing.OneHotEncoder(sparse_output=False)
-    encodings = encoder.fit_transform(all_values)
+    encodings = encoder.fit_transform(values_encode)
 
     adata.uns[uns_key] = {}
-    for value, encoding in zip(all_values, encodings, strict=False):
+    for value, encoding in zip(values_encode, encodings, strict=False):
         adata.uns[uns_key][value[0]] = encoding
 
     if copy:
