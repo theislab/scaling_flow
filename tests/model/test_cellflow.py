@@ -69,8 +69,8 @@ class TestCellFlow:
             adata_perturbation.obs, rep_dict=adata_perturbation.uns
         )
         assert isinstance(cond_embed, pd.DataFrame)
-        assert out.shape[0] == 1
-        assert out.shape[1] == condition_embedding_dim
+        assert cond_embed.shape[0] == adata_perturbation.n_obs
+        assert cond_embed.shape[1] == condition_embedding_dim
 
     @pytest.mark.parametrize("solver", ["otfm", "genot"])
     @pytest.mark.parametrize("perturbation_covariate_reps", [{}, {"drug": "drug"}])

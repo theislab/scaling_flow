@@ -18,7 +18,7 @@ from cfp.plotting._utils import (
 )
 
 
-def plot_embeddings(
+def plot_condition_embedding(
     adata: ad.AnnData,
     embedding: Literal["raw_embedding", "UMAP", "PCA", "Kernel_PCA"],
     dimensions: tuple[int, int] = (0, 1),
@@ -33,7 +33,7 @@ def plot_embeddings(
     embedding_kwargs: dict[str, Any] = types.MappingProxyType({}),
     **kwargs: Any,
 ) -> mpl.figure.Figure:
-    """Plot embeddings.
+    """Plot embedding of the conditions.
 
     Parameters
     ----------

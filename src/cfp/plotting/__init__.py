@@ -1,3 +1,3 @@
-from cfp.plotting._plotting import plot_embeddings
+from cfp.plotting._plotting import plot_condition_embedding
 
-__all__ = ["plot_embeddings"]
+__all__ = ["plot_condition_embedding"]
