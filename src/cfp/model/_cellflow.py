@@ -463,14 +463,15 @@ class CellFlow:
                 c_key = tuple(cov_combination[i] for i in range(len(cov_combination)))
             condition_embeddings[c_key] = self.solver.get_condition_embedding(condition)
 
-        if key_added is not None:
-            _utils.set_plotting_vars(
-                self.adata, key=key_added, value=condition_embeddings
-            )
-
-        return pd.DataFrame.from_dict(
+        df = pd.DataFrame.from_dict(
             {k: v[0] for k, v in condition_embeddings.items()}  # type: ignore[index]
         ).T
+        df.index.set_names(cond_data.condition_data.keys(), inplace=True)  # type: ignore[union-attr]
+
+        if key_added is not None:
+            _utils.set_plotting_vars(self.adata, key=key_added, value=df)
+
+        return df
 
     def save(
         self,

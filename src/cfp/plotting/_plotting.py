@@ -8,7 +8,6 @@ import seaborn as sns
 from adjustText import adjust_text
 
 from cfp import _constants
-from cfp.model import CellFlow
 from cfp.plotting._utils import (
     _compute_kernel_pca_from_df,
     _compute_pca_from_df,
@@ -19,10 +18,15 @@ from cfp.plotting._utils import (
 )
 
 
+class CellFlow:
+    pass
+
+
 def plot_embeddings(
     obj: ad.AnnData | CellFlow,
     embedding: Literal["raw_embedding", "UMAP", "PCA", "Kernel_PCA"],
     dimensions: tuple[int, int] = (0, 1),
+    hue: str | None = None,
     key: str = _constants.CONDITION_EMBEDDING,
     labels: list[str] = None,
     col_dict: dict[str, str] | None = None,
@@ -32,6 +36,39 @@ def plot_embeddings(
     return_fig: bool = True,
     **kwargs: Any,
 ) -> mpl.figure.Figure:
+    """Plot embeddings.
+
+    Parameters
+    ----------
+        obj
+            :class:`anndata.AnnData` or :class:`cfp.model.CellFlow` object.
+        embedding
+            Embedding to plot. Options are "raw_embedding", "UMAP", "PCA", "Kernel_PCA".
+        dimensions
+            Dimensions of the embedding to plot.
+        hue
+            Covariate to color by.
+        key
+            Key in `adata.uns` where the embedding is stored. #TODO: correct
+        labels
+            TODO
+        col_dict
+            TODO
+        title
+            Title of the plot.
+        show_lines
+            Whether to show lines connecting points.
+        show_text
+            Whether to show text labels.
+        return_fig
+            Whether to return the figure.
+        kwargs
+            Additional keyword arguments for the embedding method.
+
+    Returns
+    -------
+        :obj:`None` or :class:`matplotlib.figure.Figure`, depending on `return_fig`.
+    """
     adata = _input_to_adata(obj)
     df = get_plotting_vars(adata, key=key)
     if embedding == "raw_embedding":
@@ -70,11 +107,19 @@ def plot_embeddings(
     if (col_dict is None) and labels is not None:
         col_dict = _get_colors(labels)
 
+    index_name = emb.index.names
+    emb = emb.reset_index()
+    emb.set_index(index_name, drop=False)
+    if hue not in index_name:
+        raise ValueError(
+            f"{hue} not found in index names. Valid values for `hue` are {index_name}."
+        )
+
     sns.scatterplot(
         data=emb,
         x=dimensions[0],
         y=dimensions[1],
-        hue=labels_name,
+        hue=hue,
         palette=col_dict,
         alpha=circe_transparency,
         edgecolor="none",
@@ -126,11 +171,11 @@ def plot_embeddings(
         ax.axis("equal")
         ax.axis("square")
 
-    if title:
-        ax.set_title(title, fontsize=fontsize, fontweight="bold")
+    title = title if title else embedding
+    ax.set_title(title, fontsize=fontsize, fontweight="bold")
 
-    ax.set_xlabel("dim1", fontsize=fontsize)
-    ax.set_ylabel("dim2", fontsize=fontsize)
+    ax.set_xlabel(f"dim {dimensions[0]}", fontsize=fontsize)
+    ax.set_ylabel(f"dim {dimensions[1]}", fontsize=fontsize)
     ax.xaxis.set_tick_params(labelsize=fontsize)
     ax.yaxis.set_tick_params(labelsize=fontsize)
 

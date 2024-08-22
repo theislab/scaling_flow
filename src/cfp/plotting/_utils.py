@@ -10,7 +10,9 @@ from sklearn.decomposition import KernelPCA
 from sklearn.metrics.pairwise import cosine_similarity
 
 from cfp import _constants, _logging
-from cfp.model import CellFlow
+
+class CellFlow:
+    pass
 
 
 def set_plotting_vars(
@@ -90,7 +92,7 @@ def _compute_umap_from_df(
 
     return pd.DataFrame(
         data=adata_tmp.obsm["X_umap"],
-        columns=[f"dim{i}" for i in range(n_components)],
+        columns=[list(range(n_components))],
         index=df.index,
     )
 
@@ -100,7 +102,7 @@ def _compute_pca_from_df(df: pd.DataFrame, n_components: int = 30) -> pd.DataFra
     sc.pp.pca(adata_tmp, n_comps=n_components)
     return pd.DataFrame(
         data=adata_tmp.obsm["X_pca"],
-        columns=[f"dim{i}" for i in range(adata_tmp.obsm["X_pca"].shape[1])],
+        columns=[list(range(adata_tmp.obsm["X_pca"].shape[1]))],
         index=df.index,
     )
 
@@ -113,6 +115,4 @@ def _compute_kernel_pca_from_df(
     X = KernelPCA(n_components=n_components, kernel="precomputed").fit_transform(
         similarity_matrix
     )
-    return pd.DataFrame(
-        data=X, columns=[f"dim{i}" for i in range(n_components)], index=df.index
-    )
+    return pd.DataFrame(data=X, columns=list(range(n_components)), index=df.index)

@@ -1,4 +1,5 @@
 import jax
+import pandas as pd
 import pytest
 
 import cfp
@@ -67,8 +68,7 @@ class TestCellFlow:
         cond_embed = cf.get_condition_embedding(
             adata_perturbation.obs, rep_dict=adata_perturbation.uns
         )
-        assert isinstance(cond_embed, dict)
-        out = next(iter(cond_embed.values()))
+        assert isinstance(cond_embed, pd.DataFrame)
         assert out.shape[0] == 1
         assert out.shape[1] == condition_embedding_dim
 
@@ -128,8 +128,8 @@ class TestCellFlow:
         cond_embed = cf.get_condition_embedding(
             adata_perturbation.obs, rep_dict=adata_perturbation.uns
         )
-        out = next(iter(cond_embed.values()))
-        assert isinstance(cond_embed, dict)
+
+        assert isinstance(cond_embed, pd.DataFrame)
         assert out.shape[0] == 1
         assert out.shape[1] == condition_embedding_dim
 
