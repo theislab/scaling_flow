@@ -18,10 +18,6 @@ from cfp.plotting._utils import (
 )
 
 
-class CellFlow:
-    pass
-
-
 def plot_embeddings(
     adata: ad.AnnData,
     embedding: Literal["raw_embedding", "UMAP", "PCA", "Kernel_PCA"],
