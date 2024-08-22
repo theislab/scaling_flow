@@ -280,7 +280,7 @@ class CellFlow:
 
         if self._solver_class == _otfm.OTFlowMatching:
             self._solver = self._solver_class(
-                vf=self._vf,
+                vf=self.vf,
                 match_fn=match_fn,
                 flow=flow,
                 optimizer=optimizer,
@@ -290,7 +290,7 @@ class CellFlow:
             )
         elif self._solver_class == _genot.GENOT:
             self._solver = self._solver_class(
-                vf=self._vf,
+                vf=self.vf,
                 data_match_fn=match_fn,
                 flow=flow,
                 source_dim=self._data_dim,
