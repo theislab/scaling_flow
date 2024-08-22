@@ -11,6 +11,7 @@ from sklearn.metrics.pairwise import cosine_similarity
 
 from cfp import _constants, _logging
 
+
 class CellFlow:
     pass
 
@@ -64,17 +65,6 @@ def get_plotting_vars(adata: ad.AnnData, *, key: str) -> Any:
         return adata.uns[uns_key][key]
     except KeyError:
         raise KeyError(f"No data found in `adata.uns[{uns_key!r}][{key!r}]`.") from None
-
-
-def _input_to_adata(obj: ad.AnnData | CellFlow) -> ad.AnnData:
-    if isinstance(obj, ad.AnnData):
-        return obj
-    elif isinstance(obj, CellFlow):
-        return obj.adata
-    else:
-        raise ValueError(
-            f"obj must be an AnnData or CellFlow object, but found {type(obj)}"
-        )
 
 
 def _compute_umap_from_df(

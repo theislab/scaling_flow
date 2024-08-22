@@ -1,10 +1,10 @@
+import types
 from typing import Any, Literal
 
 import anndata as ad
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 import numpy as np
-import types
 import seaborn as sns
 from adjustText import adjust_text
 
@@ -14,7 +14,6 @@ from cfp.plotting._utils import (
     _compute_pca_from_df,
     _compute_umap_from_df,
     _get_colors,
-    _input_to_adata,
     get_plotting_vars,
 )
 
@@ -24,7 +23,7 @@ class CellFlow:
 
 
 def plot_embeddings(
-    obj: ad.AnnData | CellFlow,
+    adata: ad.AnnData,
     embedding: Literal["raw_embedding", "UMAP", "PCA", "Kernel_PCA"],
     dimensions: tuple[int, int] = (0, 1),
     hue: str | None = None,
@@ -42,8 +41,8 @@ def plot_embeddings(
 
     Parameters
     ----------
-        obj
-            :class:`anndata.AnnData` or :class:`cfp.model.CellFlow` object.
+        adata
+            :class:`anndata.AnnData` object from a CellFlow model.
         embedding
             Embedding to plot. Options are "raw_embedding", "UMAP", "PCA", "Kernel_PCA".
         dimensions
@@ -73,7 +72,6 @@ def plot_embeddings(
     -------
         :obj:`None` or :class:`matplotlib.figure.Figure`, depending on `return_fig`.
     """
-    adata = _input_to_adata(obj)
     df = get_plotting_vars(adata, key=key)
     if embedding == "raw_embedding":
         emb = df[list(dimensions)]
