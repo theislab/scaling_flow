@@ -65,11 +65,10 @@ class TestCellFlow:
         assert out.shape[0] == adata_perturbation.n_obs
         assert out.shape[1] == cf._data_dim
 
-        cond_embed = cf.get_condition_embedding(
-            adata_perturbation.obs, rep_dict=adata_perturbation.uns
-        )
+        conds = adata_perturbation.obs.drop_duplicates(subset=["drug1", "drug2"])
+        cond_embed = cf.get_condition_embedding(conds, rep_dict=adata_perturbation.uns)
         assert isinstance(cond_embed, pd.DataFrame)
-        assert cond_embed.shape[0] == adata_perturbation.n_obs
+        assert cond_embed.shape[0] == conds.shape[0]
         assert cond_embed.shape[1] == condition_embedding_dim
 
     @pytest.mark.parametrize("solver", ["otfm", "genot"])
