@@ -92,7 +92,7 @@ def _compute_umap_from_df(
 
     return pd.DataFrame(
         data=adata_tmp.obsm["X_umap"],
-        columns=[list(range(n_components))],
+        columns=list(range(n_components)),
         index=df.index,
     )
 
@@ -102,7 +102,7 @@ def _compute_pca_from_df(df: pd.DataFrame, n_components: int = 30) -> pd.DataFra
     sc.pp.pca(adata_tmp, n_comps=n_components)
     return pd.DataFrame(
         data=adata_tmp.obsm["X_pca"],
-        columns=[list(range(adata_tmp.obsm["X_pca"].shape[1]))],
+        columns=list(range(adata_tmp.obsm["X_pca"].shape[1])),
         index=df.index,
     )
 

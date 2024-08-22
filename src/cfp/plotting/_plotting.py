@@ -4,6 +4,7 @@ import anndata as ad
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 import numpy as np
+import types
 import seaborn as sns
 from adjustText import adjust_text
 
@@ -34,6 +35,7 @@ def plot_embeddings(
     show_lines: bool = False,
     show_text: bool = False,
     return_fig: bool = True,
+    embedding_kwargs: dict[str, Any] = types.MappingProxyType({}),
     **kwargs: Any,
 ) -> mpl.figure.Figure:
     """Plot embeddings.
@@ -62,8 +64,10 @@ def plot_embeddings(
             Whether to show text labels.
         return_fig
             Whether to return the figure.
-        kwargs
+        embedding_kwargs
             Additional keyword arguments for the embedding method.
+        kwargs
+            Additional keyword arguments for plotting.
 
     Returns
     -------
@@ -74,7 +78,7 @@ def plot_embeddings(
     if embedding == "raw_embedding":
         emb = df[list(dimensions)]
     elif embedding == "UMAP":
-        emb = _compute_umap_from_df(df)
+        emb = _compute_umap_from_df(df, **embedding_kwargs)
     elif embedding == "PCA":
         emb = _compute_pca_from_df(df)
     elif embedding == "Kernel_PCA":
@@ -107,12 +111,9 @@ def plot_embeddings(
     if (col_dict is None) and labels is not None:
         col_dict = _get_colors(labels)
 
-    index_name = emb.index.names
-    emb = emb.reset_index()
-    emb.set_index(index_name, drop=False)
-    if hue not in index_name:
+    if hue is not None and hue not in df.index.names:
         raise ValueError(
-            f"{hue} not found in index names. Valid values for `hue` are {index_name}."
+            f"{hue} not found in index names. Valid values for `hue` are {df.index.names}."
         )
 
     sns.scatterplot(
