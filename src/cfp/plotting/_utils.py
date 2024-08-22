@@ -12,7 +12,6 @@ from sklearn.metrics.pairwise import cosine_similarity
 from cfp import _constants, _logging
 
 
-
 def set_plotting_vars(
     adata: ad.AnnData,
     *,

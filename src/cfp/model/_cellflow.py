@@ -466,7 +466,10 @@ class CellFlow:
         df = pd.DataFrame.from_dict(
             {k: v[0] for k, v in condition_embeddings.items()}  # type: ignore[index]
         ).T
-        df.index.set_names(cond_data.condition_data.keys(), inplace=True)  # type: ignore[union-attr]
+        indices = list(self.dm.sample_covariates)
+        for pert_cov in self.dm.perturbation_covariates:
+            indices += [pert_cov] * self.dm.max_combination_length
+        df.index.set_names(indices, inplace=True)
 
         if key_added is not None:
             _utils.set_plotting_vars(self.adata, key=key_added, value=df)
