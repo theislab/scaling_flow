@@ -193,7 +193,7 @@ class Metrics(ComputationCallback):
 
     def on_train_end(
         self,
-        validation_data: dict[str, ValidationData],
+        validation_data: dict[str, dict[str, ArrayLike]],
         predicted_data: dict[str, dict[str, ArrayLike]],
     ) -> dict[str, float]:
         """Called at the end of training to compute metrics

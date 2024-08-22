@@ -36,6 +36,7 @@ dependencies = [
     "diffrax",
     "session-info",
     "diffrax",
+    "adjustText",
 ]
 
 [project.optional-dependencies]
