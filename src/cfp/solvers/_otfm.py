@@ -43,6 +43,7 @@ class OTFlowMatching:
         ] = solver_utils.uniform_sampler,
         **kwargs: Any,
     ):
+        self._is_trained: bool = False
         self.vf = vf
         self.flow = flow
         self.time_sampler = time_sampler
@@ -184,3 +185,12 @@ class OTFlowMatching:
 
         x_pred = jax.jit(jax.vmap(solve_ode, in_axes=[0, None]))(x, condition)
         return np.array(x_pred)
+
+    @property
+    def is_trained(self) -> bool:
+        """Whether the model is trained."""
+        return self._is_trained
+
+    @is_trained.setter
+    def is_trained(self, value: bool) -> None:
+        self._is_trained = value
