@@ -1,5 +1,5 @@
 from collections.abc import Iterable, Sequence
-from typing import Any
+from typing import Any, Literal
 
 import numpy as np
 import pandas as pd
@@ -8,7 +8,7 @@ import sklearn.preprocessing as preprocessing
 
 from cfp._logging import logger
 
-__all__ = ["encode_onehot"]
+__all__ = ["encode_onehot", "pca", "annotate_compounds"]
 
 
 def encode_onehot(
@@ -130,8 +130,9 @@ def annotate_compounds(
 
     not_found = adata.obs[query_id][adata.obs["smiles"].isna()].unique().tolist()
     if not_found:
-        print(
-            f"Could not find annotations for the following compounds: {', '.join(not_found)}"
+        logger.warning(
+            f"Could not find annotations for the following compounds: {', '.join(not_found)}",
+            stacklavel=2,
         )
 
     if copy:
