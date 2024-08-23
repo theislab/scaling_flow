@@ -134,7 +134,7 @@ def project_pca(
         ref_means = ref_adata.varm["X_mean"]
         ref_pcs = ref_adata.varm["PCs"]
 
-    query_adata.obsm["X_pca"] = (X - np.transpose(ref_means)) @ ref_pcs
+    query_adata.obsm["X_pca"] = np.array((X - np.transpose(ref_means)) @ ref_pcs)
 
     if copy:
         return query_adata
