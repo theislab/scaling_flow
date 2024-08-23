@@ -9,7 +9,7 @@ import sklearn.preprocessing as preprocessing
 from cfp._logging import logger
 from cfp.data._utils import _to_list
 
-__all__ = ["encode_onehot", "annotate_compounds", "compound_fingerprints"]
+__all__ = ["encode_onehot", "annotate_compounds", "get_molecular_fingerprints"]
 
 
 def annotate_compounds(
@@ -78,7 +78,7 @@ def _get_fingerprint(smiles: str, radius: int = 4, n_bits: int = 1024):
     return np.array(mfpgen.GetFingerprint(mmol))
 
 
-def compound_fingerprints(
+def get_molecular_fingerprints(
     adata,
     compound_key: str,
     uns_key: str | None = None,
