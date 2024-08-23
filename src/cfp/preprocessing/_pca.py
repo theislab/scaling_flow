@@ -3,6 +3,8 @@ import anndata as ad
 import scanpy as sc
 from scipy.sparse import csr_matrix
 
+__all__ = ["centered_pca", "reconstruct_pca", "project_pca"]
+
 
 def centered_pca(
     adata: ad.AnnData,
