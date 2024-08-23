@@ -9,7 +9,7 @@ import sklearn.preprocessing as preprocessing
 from cfp._logging import logger
 from cfp.data._utils import _to_list
 
-__all__ = ["encode_onehot", "pca", "annotate_compounds", "compound_fingerprints"]
+__all__ = ["encode_onehot", "annotate_compounds", "compound_fingerprints"]
 
 
 def annotate_compounds(
@@ -168,28 +168,5 @@ def encode_onehot(
     for value, encoding in zip(values_encode, encodings, strict=False):
         adata.uns[uns_key][value[0]] = encoding
 
-    if copy:
-        return adata
-
-
-def pca(adata: ad.AnnData, n_comps: int = 50, copy: bool = False):
-    """Performs PCA on the data matrix and stores the results in `adata`.
-
-    Args:
-        adata: Annotated data matrix.
-        n_comps: Number of principal components to compute.
-        copy: Return a copy of `adata` instead of updating it in place.
-
-    Returns
-    -------
-        If `copy` is `True`, returns a new `AnnData` object with the PCA results stored in `adata.obsm`. Otherwise, updates `adata` in place.
-    """
-    adata = adata.copy() if copy else adata
-
-    adata.varm["X_mean"] = adata.X.mean(axis=0).T
-    adata.layers["X_centered"] = csr_matrix(adata.X.A - adata.varm["X_mean"].T)
-    adata.obsm["X_pca"] = sc.pp.pca(
-        adata.layers["X_centered"], zero_center=False, n_comps=n_comps
-    )
     if copy:
         return adata
