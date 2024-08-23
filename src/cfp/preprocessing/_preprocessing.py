@@ -9,7 +9,7 @@ import sklearn.preprocessing as preprocessing
 from cfp._logging import logger
 from cfp.data._utils import _to_list
 
-__all__ = ["encode_onehot", "pca", "annotate_compounds"]
+__all__ = ["encode_onehot", "pca", "annotate_compounds", "compound_fingerprints"]
 
 
 def annotate_compounds(
@@ -40,7 +40,7 @@ def annotate_compounds(
     except ImportError:
         raise ImportError(
             "pertpy is not installed. To annotate compounds, please install it via `pip install pertpy`."
-        )
+        ) from None
 
     adata = adata.copy() if copy else adata
 
@@ -59,16 +59,23 @@ def annotate_compounds(
         return adata
 
 
-def _get_fingerprint(smiles, radius: int = 4, n_bits: int = 1024):
-    m = Chem.MolFromSmiles(smiles, sanitize=False)
+def _get_fingerprint(smiles: str, radius: int = 4, n_bits: int = 1024):
+    """Computes Morgan fingerprints for a given SMILES string."""
     try:
-        Chem.SanitizeMol(m)
+        from rdkit import Chem
+        import rdkit.Chem.rdFingerprintGenerator as rfg
+    except ImportError:
+        raise ImportError(
+            "rdkit is not installed. To compute fingerprints, please install it via `pip install rdkit`."
+        ) from None
+
+    try:
+        mmol = Chem.MolFromSmiles(smiles, sanitize=True)
     except:
         return None
-    mfpgen = Chem.rdFingerprintGenerator.GetMorganGenerator(
-        radius=radius, fpSize=n_bits
-    )
-    return mfpgen.GetFingerprint(m)
+
+    mfpgen = rfg.GetMorganGenerator(radius=radius, fpSize=n_bits)
+    return np.array(mfpgen.GetFingerprint(mmol))
 
 
 def compound_fingerprints(
@@ -93,6 +100,9 @@ def compound_fingerprints(
     Returns
     -------
         Updates `adata.uns` with the computed fingerprints.
+
+        Sets the following fields:
+        `.uns[uns_key]`: Dictionary containing the fingerprints for each compound.
     """
     adata = adata.copy() if copy else adata
 
@@ -100,13 +110,16 @@ def compound_fingerprints(
         uns_key = f"{compound_key}_fingerprints"
 
     smiles_dict = (
-        adata.obs.set_index(compound_key)[smiles_key].drop_duplicates().to_dict()
+        adata.obs[[compound_key, smiles_key]]
+        .drop_duplicates()
+        .set_index(compound_key)[smiles_key]
+        .to_dict()
     )
 
     valid_fingerprints = {}
     not_found = []
-    for comp, smile in smiles_dict.items():
-        comp_fp = _get_fingerprint(smile, radius=radius, n_bits=n_bits)
+    for comp, smiles in smiles_dict.items():
+        comp_fp = _get_fingerprint(smiles, radius=radius, n_bits=n_bits)
         if comp_fp is not None:
             valid_fingerprints[comp] = comp_fp
         else:
