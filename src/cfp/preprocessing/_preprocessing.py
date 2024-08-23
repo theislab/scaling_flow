@@ -7,6 +7,7 @@ import anndata as ad
 import sklearn.preprocessing as preprocessing
 
 from cfp._logging import logger
+from cfp.data._utils import _to_list
 
 __all__ = ["encode_onehot", "pca", "annotate_compounds"]
 
@@ -119,7 +120,9 @@ def annotate_compounds(
     try:
         import pertpy as pt
     except ImportError:
-        raise ImportError("Please install pertpy to annotate compounds")
+        raise ImportError(
+            "pertpy is not installed. To annotate compounds, please install it via `pip install pertpy`."
+        )
 
     adata = adata.copy() if copy else adata
 
@@ -131,8 +134,7 @@ def annotate_compounds(
     not_found = adata.obs[query_id][adata.obs["smiles"].isna()].unique().tolist()
     if not_found:
         logger.warning(
-            f"Could not find annotations for the following compounds: {', '.join(not_found)}",
-            stacklavel=2,
+            f"Could not find annotations for the following compounds: {', '.join(not_found)}"
         )
 
     if copy:
