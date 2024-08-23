@@ -34,7 +34,7 @@ class TestTrainer:
             rng=vf_rng,
         )
 
-        trainer = cfp.training.CellFlowTrainer(model=model)
+        trainer = cfp.training.CellFlowTrainer(solver=model)
         trainer.train(
             dataloader=dataloader,
             num_iterations=2,
@@ -70,7 +70,7 @@ class TestTrainer:
         metric_to_compute = "e_distance"
         metrics_callback = cfp.training.Metrics(metrics=[metric_to_compute])
 
-        trainer = cfp.training.CellFlowTrainer(model=model)
+        trainer = cfp.training.CellFlowTrainer(solver=model)
         trainer.train(
             dataloader=dataloader,
             valid_loaders=valid_loader if use_validdata else None,

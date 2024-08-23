@@ -46,10 +46,10 @@ class TestCellFlow:
             decoder_dims=(32, 32),
             condition_encoder_kwargs=condition_encoder_kwargs,
         )
-        assert cf.trainer is not None
+        assert cf._trainer is not None
 
         cf.train(num_iterations=3)
-        assert cf.dataloader is not None
+        assert cf._dataloader is not None
 
         # we assume these are all source cells now in adata_perturbation
         adata_perturbation_pred = adata_perturbation.copy()
@@ -107,10 +107,10 @@ class TestCellFlow:
             decoder_dims=(32, 32),
             condition_encoder_kwargs=condition_encoder_kwargs,
         )
-        assert cf.trainer is not None
+        assert cf._trainer is not None
 
         cf.train(num_iterations=3)
-        assert cf.dataloader is not None
+        assert cf._dataloader is not None
 
         # we assume these are all source cells now in adata_perturbation
         adata_perturbation_pred = adata_perturbation.copy()
@@ -248,14 +248,14 @@ class TestCellFlow:
             decoder_dims=(32, 32),
             condition_encoder_kwargs=condition_encoder_kwargs,
         )
-        assert cf.trainer is not None
+        assert cf._trainer is not None
 
         metric_to_compute = "r_squared"
         metrics_callback = cfp.training.Metrics(metrics=[metric_to_compute])
 
         cf.train(num_iterations=3, callbacks=[metrics_callback], valid_freq=1)
-        assert cf.dataloader is not None
-        assert f"val_{metric_to_compute}_mean" in cf.trainer.training_logs
+        assert cf._dataloader is not None
+        assert f"val_{metric_to_compute}_mean" in cf._trainer.training_logs
 
     @pytest.mark.parametrize("solver", ["otfm", "genot"])
     def test_cellflow_predict(

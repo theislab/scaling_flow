@@ -83,6 +83,7 @@ class GENOT:
         ) = None,
         **kwargs: Any,
     ):
+        self._is_trained: bool = False
         self.vf = vf
         self.flow = flow
         self.data_match_fn = jax.jit(data_match_fn)
@@ -286,3 +287,12 @@ class GENOT:
             latent, condition, source
         )
         return np.array(x_pred)
+
+    @property
+    def is_trained(self) -> bool:
+        """If the model is trained."""
+        return self._is_trained
+
+    @is_trained.setter
+    def is_trained(self, value) -> None:
+        self._is_trained = value
