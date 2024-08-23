@@ -116,6 +116,11 @@ def annotate_compounds(
     Returns
     -------
         If `copy` is `True`, returns a new `AnnData` object with the compound annotations stored in `adata.obs`. Otherwise, updates `adata` in place.
+
+        Sets the following fields:
+        `.obs["pubchem_name"]`: Name of the compound.
+        `.obs["pubchem_ID"]`: PubChem CID of the compound.
+        `.obs["smiles"]`: SMILES representation of the compound.
     """
     try:
         import pertpy as pt
