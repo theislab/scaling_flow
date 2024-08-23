@@ -12,10 +12,57 @@ from cfp.data._utils import _to_list
 __all__ = ["encode_onehot", "pca", "annotate_compounds"]
 
 
+def annotate_compounds(
+    adata,
+    query_id: str,
+    query_id_type: Literal["name", "cid"] = "name",
+    copy: bool = False,
+):
+    """Annotates compounds in `adata` using pertpy and PubChem.
+
+    Args:
+        An :class:`~anndata.AnnData` object.
+        query_id: Key in `adata.obs` containing the compound identifiers.
+        query_id_type: Type of the compound identifier.
+        copy: Return a copy of `adata` instead of updating it in place.
+
+    Returns
+    -------
+        If `copy` is `True`, returns a new `AnnData` object with the compound annotations stored in `adata.obs`. Otherwise, updates `adata` in place.
+
+        Sets the following fields:
+        `.obs["pubchem_name"]`: Name of the compound.
+        `.obs["pubchem_ID"]`: PubChem CID of the compound.
+        `.obs["smiles"]`: SMILES representation of the compound.
+    """
+    try:
+        import pertpy as pt
+    except ImportError:
+        raise ImportError(
+            "pertpy is not installed. To annotate compounds, please install it via `pip install pertpy`."
+        )
+
+    adata = adata.copy() if copy else adata
+
+    c_meta = pt.metadata.Compound()
+    c_meta.annotate_compounds(
+        adata, query_id=query_id, query_id_type=query_id_type, verbosity=0, copy=False
+    )
+
+    not_found = adata.obs[query_id][adata.obs["smiles"].isna()].unique().tolist()
+    if not_found:
+        logger.warning(
+            f"Could not find annotations for the following compounds: {', '.join(not_found)}"
+        )
+
+    if copy:
+        return adata
+
+
 def encode_onehot(
     adata: ad.AnnData,
     covariate_keys: str | Sequence[str],
-    uns_key: Sequence[str] = "onehot",
+    uns_key: Sequence[str],
     exclude_values: str | Sequence[Any] = None,
     copy: bool = False,
 ) -> None | ad.AnnData:
@@ -25,12 +72,15 @@ def encode_onehot(
         adata: Annotated data matrix.
         covariate_keys: Keys of the covariates to encode.
         uns_key: Key in `adata.uns` to store the one-hot encodings.
-        exclude_values: Values to exclude from encoding.
+        exclude_values: Values to exclude from encoding. These would usually be the control values.
         copy: Return a copy of `adata` instead of updating it in place.
 
     Returns
     -------
         If `copy` is `True`, returns a new `AnnData` object with the one-hot encodings stored in `adata.uns`. Otherwise, updates `adata` in place.
+
+        Sets the following fields:
+        `.uns[uns_key]`: Dictionary containing the one-hot encodings for each covariate.
     """
     adata = adata.copy() if copy else adata
 
@@ -97,50 +147,3 @@ def get_fingerprints_from_dict(smiles, radius: int = 4, n_bits: int = 1024):
         fingerprints[drug] = drug_fp
 
     return fingerprints
-
-
-def annotate_compounds(
-    adata,
-    query_id: str,
-    query_id_type: Literal["name", "cid"] = "name",
-    copy: bool = False,
-):
-    """Annotates compounds in `adata` using pertpy and PubChem.
-
-    Args:
-        An :class:`~anndata.AnnData` object.
-        query_id: Key in `adata.obs` containing the compound identifiers.
-        query_id_type: Type of the compound identifier.
-        copy: Return a copy of `adata` instead of updating it in place.
-
-    Returns
-    -------
-        If `copy` is `True`, returns a new `AnnData` object with the compound annotations stored in `adata.obs`. Otherwise, updates `adata` in place.
-
-        Sets the following fields:
-        `.obs["pubchem_name"]`: Name of the compound.
-        `.obs["pubchem_ID"]`: PubChem CID of the compound.
-        `.obs["smiles"]`: SMILES representation of the compound.
-    """
-    try:
-        import pertpy as pt
-    except ImportError:
-        raise ImportError(
-            "pertpy is not installed. To annotate compounds, please install it via `pip install pertpy`."
-        )
-
-    adata = adata.copy() if copy else adata
-
-    c_meta = pt.metadata.Compound()
-    c_meta.annotate_compounds(
-        adata, query_id=query_id, query_id_type=query_id_type, verbosity=0, copy=False
-    )
-
-    not_found = adata.obs[query_id][adata.obs["smiles"].isna()].unique().tolist()
-    if not_found:
-        logger.warning(
-            f"Could not find annotations for the following compounds: {', '.join(not_found)}"
-        )
-
-    if copy:
-        return adata
