@@ -98,25 +98,41 @@ def get_fingerprints_from_dict(smiles, radius: int = 4, n_bits: int = 1024):
     return fingerprints
 
 
-def get_smiles_from_name(drugs: Sequence[str]) -> pd.DataFrame:
-    drugs = np.unique(drugs).tolist()
-    smiles = {}
-    not_found = []
-    for drug in drugs:
-        try:
-            compounds = pcp.get_compounds(drug, "name")
-        except:
-            not_found.append(drug)
-            continue
-        else:
-            if len(compounds) > 1:
-                logger.info(f"Multiple compounds found for {drug}, taking first")
-            if len(compounds) == 0:
-                not_found.append(drug)
-                continue
-            smiles[drug] = compounds[0].canonical_smiles
+def annotate_compounds(
+    adata,
+    query_id: str,
+    query_id_type: Literal["name", "cid"] = "name",
+    copy: bool = False,
+):
+    """Annotates compounds in `adata` using pertpy and PubChem.
 
-    if len(not_found) > 0:
-        logger.info(f"Could not find smiles for the following drugs: {not_found}")
+    Args:
+        An :class:`~anndata.AnnData` object.
+        query_id: Key in `adata.obs` containing the compound identifiers.
+        query_id_type: Type of the compound identifier.
+        copy: Return a copy of `adata` instead of updating it in place.
 
-    return smiles
+    Returns
+    -------
+        If `copy` is `True`, returns a new `AnnData` object with the compound annotations stored in `adata.obs`. Otherwise, updates `adata` in place.
+    """
+    try:
+        import pertpy as pt
+    except ImportError:
+        raise ImportError("Please install pertpy to annotate compounds")
+
+    adata = adata.copy() if copy else adata
+
+    c_meta = pt.metadata.Compound()
+    c_meta.annotate_compounds(
+        adata, query_id=query_id, query_id_type=query_id_type, verbosity=0, copy=False
+    )
+
+    not_found = adata.obs[query_id][adata.obs["smiles"].isna()].unique().tolist()
+    if not_found:
+        print(
+            f"Could not find annotations for the following compounds: {', '.join(not_found)}"
+        )
+
+    if copy:
+        return adata
