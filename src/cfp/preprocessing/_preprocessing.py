@@ -59,6 +59,70 @@ def annotate_compounds(
         return adata
 
 
+def _get_fingerprint(smiles, radius: int = 4, n_bits: int = 1024):
+    m = Chem.MolFromSmiles(smiles, sanitize=False)
+    try:
+        Chem.SanitizeMol(m)
+    except:
+        return None
+    mfpgen = Chem.rdFingerprintGenerator.GetMorganGenerator(
+        radius=radius, fpSize=n_bits
+    )
+    return mfpgen.GetFingerprint(m)
+
+
+def compound_fingerprints(
+    adata,
+    compound_key: str,
+    uns_key: str | None = None,
+    smiles_key: str = "smiles",
+    radius: int = 4,
+    n_bits: int = 1024,
+    copy: bool = False,
+):
+    """Computes Morgan fingerprints for compounds in `adata` and stores them in `adata.uns`.
+
+    Args:
+        adata: Annotated data matrix.
+        compound_key: Key in `adata.obs` containing the compound identifiers.
+        uns_key: Key in `adata.uns` to store the fingerprints.
+        smiles_key: Key in `adata.obs` containing the SMILES representations of the compounds.
+        radius: Radius of the Morgan fingerprint.
+        n_bits: Number of bits in the fingerprint.
+
+    Returns
+    -------
+        Updates `adata.uns` with the computed fingerprints.
+    """
+    adata = adata.copy() if copy else adata
+
+    if uns_key is None:
+        uns_key = f"{compound_key}_fingerprints"
+
+    smiles_dict = (
+        adata.obs.set_index(compound_key)[smiles_key].drop_duplicates().to_dict()
+    )
+
+    valid_fingerprints = {}
+    not_found = []
+    for comp, smile in smiles_dict.items():
+        comp_fp = _get_fingerprint(smile, radius=radius, n_bits=n_bits)
+        if comp_fp is not None:
+            valid_fingerprints[comp] = comp_fp
+        else:
+            not_found.append(comp)
+
+    if not_found:
+        logger.warning(
+            f"Could not compute fingerprints for the following compounds: {', '.join(not_found)}"
+        )
+
+    adata.uns[uns_key] = valid_fingerprints
+
+    if copy:
+        return adata
+
+
 def encode_onehot(
     adata: ad.AnnData,
     covariate_keys: str | Sequence[str],
@@ -121,29 +185,3 @@ def pca(adata: ad.AnnData, n_comps: int = 50, copy: bool = False):
     )
     if copy:
         return adata
-
-
-def get_fingerprint(smiles, radius: int = 4, n_bits: int = 1024):
-    m = Chem.MolFromSmiles(smiles, sanitize=False)
-    try:
-        Chem.SanitizeMol(m)
-    except:
-        return None
-    mfpgen = Chem.rdFingerprintGenerator.GetMorganGenerator(
-        radius=radius, fpSize=n_bits
-    )
-    return mfpgen.GetFingerprint(m)
-
-
-def get_fingerprints_from_dict(smiles, radius: int = 4, n_bits: int = 1024):
-    fingerprints = {}
-    for drug, smile in smiles.items():
-        drug_fp = get_fingerprint(smile, radius=radius, n_bits=n_bits)
-
-        if drug_fp is None:
-            logger.warning(f"Could not generate fingerprint for {drug}")
-            continue
-
-        fingerprints[drug] = drug_fp
-
-    return fingerprints
