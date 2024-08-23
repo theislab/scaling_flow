@@ -109,12 +109,7 @@ def compound_fingerprints(
     if uns_key is None:
         uns_key = f"{compound_key}_fingerprints"
 
-    smiles_dict = (
-        adata.obs[[compound_key, smiles_key]]
-        .drop_duplicates()
-        .set_index(compound_key)[smiles_key]
-        .to_dict()
-    )
+    smiles_dict = adata.obs.set_index(compound_key)[smiles_key].to_dict()
 
     valid_fingerprints = {}
     not_found = []
