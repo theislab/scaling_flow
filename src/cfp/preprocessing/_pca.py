@@ -15,12 +15,18 @@ def centered_pca(
 ):
     """Performs PCA on the centered data matrix and stores the results in `adata.obsm`.
 
-    Args:
-        adata: Annotated data matrix.
-        n_comps: Number of principal components to compute.
-        layer: Layer to use for PCA.
-        copy: Return a copy of `adata` instead of updating it in place.
-        **kwargs: Additional arguments to pass to `scanpy.pp.pca`.
+    Parameters
+    ----------
+    adata : ad.AnnData
+        An :class:`~anndata.AnnData` object.
+    n_comps : int
+        Number of principal components to compute.
+    layer : str
+        Layer in `adata.layers` to use for PCA.
+    copy : bool
+        Return a copy of `adata` instead of updating it in place.
+    kwargs : dict
+        Additional arguments to pass to `scanpy.pp.pca`.
 
     Returns
     -------
@@ -62,12 +68,20 @@ def reconstruct_pca(
 ):
     """Performs PCA on the data matrix and projects the data to the principal components.
 
-    Args:
-        query_adata: Query annotated data matrix.
-        ref_adata: Reference annotated data matrix.
-        ref_means: Mean of the reference data matrix.
-        ref_pcs: Principal components of the reference data.
-        use_query_rep: Representation to use for PCA.
+    Parameters
+    ----------
+    query_adata : ad.AnnData
+        An :class:`~anndata.AnnData` object with the query data.
+    use_rep : str
+        Representation to use for PCA. If `X`, uses `adata.X`. Otherwise, uses `adata.obsm[use_rep]`.
+    ref_adata : ad.AnnData
+        An :class:`~anndata.AnnData` object with the reference data.
+    ref_means : np.ndarray
+        Mean of the reference data.
+    ref_pcs : np.ndarray
+        Principal components of the reference data.
+    copy : bool
+        Return a copy of `adata` instead of updating it in place.
 
     Returns
     -------
@@ -106,13 +120,18 @@ def project_pca(
 ):
     """Projects the query data to the principal components of the reference data.
 
-    Args:
-        query_adata: Query annotated data matrix.
-        ref_adata: Reference annotated data matrix.
-        ref_means: Mean of the reference data matrix.
-        ref_pcs: Principal components of the reference data.
-        use_query_rep: Representation to use for PCA.
-        copy: Return a copy of `adata` instead of updating it in place.
+    Parameters
+    ----------
+    query_adata : ad.AnnData
+        An :class:`~anndata.AnnData` object with the query data.
+    ref_adata : ad.AnnData
+        An :class:`~anndata.AnnData` object with the reference data containing `adata.varm["X_mean"]` and `adata.varm["PCs"]`.
+    ref_means : np.ndarray
+        Mean of the reference data.
+    ref_pcs : np.ndarray
+        Principal components of the reference data.
+    layer : str
+        Layer in `adata.layers` to use for PCA.
 
     Returns
     -------

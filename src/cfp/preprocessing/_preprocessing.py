@@ -20,11 +20,16 @@ def annotate_compounds(
 ):
     """Annotates compounds in `adata` using pertpy and PubChem.
 
-    Args:
+    Parameters
+    ----------
+    adata: ad.AnnData
         An :class:`~anndata.AnnData` object.
-        query_id: Key in `adata.obs` containing the compound identifiers.
-        query_id_type: Type of the compound identifier.
-        copy: Return a copy of `adata` instead of updating it in place.
+    query_id: str
+        Key in `adata.obs` containing the compound identifiers.
+    query_id_type: str
+        Type of the compound identifiers. Either "name" or "cid".
+    copy: bool
+        Return a copy of `adata` instead of updating it in place.
 
     Returns
     -------
@@ -89,13 +94,22 @@ def get_molecular_fingerprints(
 ):
     """Computes Morgan fingerprints for compounds in `adata` and stores them in `adata.uns`.
 
-    Args:
-        adata: Annotated data matrix.
-        compound_key: Key in `adata.obs` containing the compound identifiers.
-        uns_key: Key in `adata.uns` to store the fingerprints.
-        smiles_key: Key in `adata.obs` containing the SMILES representations of the compounds.
-        radius: Radius of the Morgan fingerprint.
-        n_bits: Number of bits in the fingerprint.
+    Parameters
+    ----------
+    adata: ad.AnnData
+        An :class:`~anndata.AnnData` object.
+    compound_key: str
+        Key in `adata.obs` containing the compound identifiers.
+    uns_key: str
+        Key in `adata.uns` to store the fingerprints.
+    smiles_key: str
+        Key in `adata.obs` containing the SMILES representations.
+    radius: int
+        Radius of the Morgan fingerprints.
+    n_bits: int
+        Number of bits in the fingerprint.
+    copy: bool
+        Return a copy of `adata` instead of updating it in place
 
     Returns
     -------
@@ -140,12 +154,18 @@ def encode_onehot(
 ) -> None | ad.AnnData:
     """Encodes covariates `adata.obs` as one-hot vectors and stores them in `adata.uns`.
 
-    Args:
-        adata: Annotated data matrix.
-        covariate_keys: Keys of the covariates to encode.
-        uns_key: Key in `adata.uns` to store the one-hot encodings.
-        exclude_values: Values to exclude from encoding. These would usually be the control values.
-        copy: Return a copy of `adata` instead of updating it in place.
+    Parameters
+    ----------
+    adata : ad.AnnData
+        An :class:`~anndata.AnnData` object.
+    covariate_keys : str | Sequence[str]
+        Key(s) in `adata.obs` containing the covariate(s) to encode.
+    uns_key : str
+        Key in `adata.uns` to store the one-hot encodings.
+    exclude_values : str | Sequence[Any]
+        Value(s) to exclude from the one-hot encoding.
+    copy : bool
+        Return a copy of `adata` instead of updating it in place.
 
     Returns
     -------

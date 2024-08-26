@@ -25,9 +25,9 @@ def compute_wknn(
     key_added: str = "wknn",
     query2ref: bool = True,
     ref2query: bool = False,
-    weighting_scheme: Literal[
-        "n", "top_n", "jaccard", "jaccard_square"
-    ] = "jaccard_square",
+    weighting_scheme: (
+        Literal["top_n", "jaccard", "jaccard_square"] | None
+    ) = "jaccard_square",
     top_n: Optional[int] = None,
     copy: bool = False,
 ):
@@ -37,23 +37,30 @@ def compute_wknn(
     Parameters
     ----------
     ref_adata : ad.AnnData
-        The reference AnnData object to build ref-query neighbor graph
+        An :class:`~anndata.AnnData` object with the reference representation to build ref-query neighbor graph
     query_adata : ad.AnnData
-        The query AnnData object to build ref-query neighbor graph
-    k : int
+        An :class:`~anndata.AnnData` object with the query representation to build ref-query neighbor graph
+    n_neighbors : int
         Number of neighbors per cell
     ref_rep_key : str
-        Key in `adata.obsm` containing the reference representation
+        Key in `ref_adata.obsm` containing the reference representation
     query_rep_key : str
-        Key in `adata.obsm` containing the query representation
+        Key in `query_adata.obsm` containing the query representation
+    key_added : str
+        Key to store the weighted k-nearest neighbors graph in `adata.uns`
     query2ref : bool
         Consider query-to-ref neighbors
     ref2query : bool
         Consider ref-to-query neighbors
     weighting_scheme : str
-        How to weight edges in the ref-query neighbor graph
+        How to weight edges in the ref-query neighbor graph. Options are:
+        - `None`: No weighting
+        - `"top_n"`: Binaries edges based on the top `top_n` neighbors.
+        - `"jaccard"`: Weight edges based on the Jaccard index.
+        - `"jaccard_square"`: Weight edges based on the square of the Jaccard index.
     top_n : int
         The number of top neighbors to consider
+    copy : bool
 
     Returns
     -------
@@ -95,9 +102,9 @@ def transfer_labels(
     Parameters
     ----------
     query_adata : ad.AnnData
-        The query AnnData object to transfer labels to
+        An :class:`~anndata.AnnData` object with the query data
     ref_adata : ad.AnnData
-        The reference AnnData object to transfer labels from
+        An :class:`~anndata.AnnData` object with the reference data
     label_key : str
         Key in `ref_adata.obs` containing the labels
     wknn_key : str
@@ -234,8 +241,6 @@ def _get_wknn(
         How to weight edges in the ref-query neighbor graph
     top_n : int
         The number of top neighbors to consider
-    return_adjs : bool
-        Whether to return the adjacency matrices of ref-query, query-ref, ref-ref, and ref-ref for weighting
     """
     adj_q2r = _build_nn(ref=ref, query=query, k=k)
 
