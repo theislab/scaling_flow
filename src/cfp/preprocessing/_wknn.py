@@ -147,6 +147,7 @@ def _nn2adj(
     n2: int | None = None,
 ) -> sparse.csr_matrix:
     """Converts nearest neighbors indices and distances to a sparse adjacency matrix"""
+    distances, indices = np.array(distances), np.array(indices)
 
     if n1 is None:
         n1 = indices.shape[0]

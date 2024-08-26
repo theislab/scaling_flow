@@ -5,22 +5,25 @@ import pytest
 
 class TestPreprocessing:
     @pytest.mark.parametrize(
-        "query_id_and_type", [("compound_name", "name"), ("compound_cid", "cid")]
+        "query_key_and_type", [("compound_name", "name"), ("compound_cid", "cid")]
     )
     def test_annotate_compounds(
-        self, adata_with_compounds: ad.AnnData, query_id_and_type
+        self, adata_with_compounds: ad.AnnData, query_key_and_type
     ):
         import cfp
 
+        prefix = "compound"
+
         cfp.pp.annotate_compounds(
             adata_with_compounds,
-            query_id=query_id_and_type[0],
-            query_id_type=query_id_and_type[1],
+            query_keys=query_key_and_type[0],
+            query_id_type=query_key_and_type[1],
+            obs_key_prefixes=[prefix],
             copy=False,
         )
-        assert "pubchem_name" in adata_with_compounds.obs
-        assert "pubchem_ID" in adata_with_compounds.obs
-        assert "smiles" in adata_with_compounds.obs
+        assert f"{prefix}_pubchem_name" in adata_with_compounds.obs
+        assert f"{prefix}_pubchem_ID" in adata_with_compounds.obs
+        assert f"{prefix}_smiles" in adata_with_compounds.obs
 
     @pytest.mark.parametrize("n_bits", [512, 1024])
     def test_get_molecular_fingerprints(self, adata_with_compounds: ad.AnnData, n_bits):

@@ -4,6 +4,7 @@ from typing import Any, Literal
 import anndata as ad
 import numpy as np
 import sklearn.preprocessing as preprocessing
+from numpy.typing import ArrayLike
 
 from cfp._logging import logger
 from cfp.data._utils import _to_list
@@ -62,7 +63,7 @@ def annotate_compounds(
         )
 
     c_meta = pt.metadata.Compound()
-    for query_key, prefix in zip(query_keys, obs_key_prefixes):
+    for query_key, prefix in zip(query_keys, obs_key_prefixes, strict=False):
         c_meta.annotate_compounds(
             adata,
             query_id=query_key,
@@ -92,7 +93,7 @@ def annotate_compounds(
 
 def _get_fingerprint(
     smiles: str, radius: int = 4, n_bits: int = 1024
-) -> np.ndarray | None:
+) -> ArrayLike | None:
     """Computes Morgan fingerprints for a given SMILES string."""
     try:
         import rdkit.Chem.rdFingerprintGenerator as rfg
@@ -113,7 +114,7 @@ def _get_fingerprint(
 
 def get_molecular_fingerprints(
     adata,
-    compound_keys: str,
+    compound_key: str,
     uns_key_added: str | None = None,
     smiles_key: str = "smiles",
     radius: int = 4,
