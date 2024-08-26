@@ -205,3 +205,22 @@ def adata_pca() -> ad.AnnData:
     sc.pp.pca(adata, zero_center=False, n_comps=n_pca)
 
     return adata
+
+
+@pytest.fixture()
+def adata_with_compounds() -> ad.AnnData:
+    import scanpy as sc
+    from scipy.sparse import csr_matrix
+
+    n_obs = 10
+    n_vars = 50
+    compound_names = np.array(["AZD1390", "Dabrafenib Mesylate", "GW0742"])
+    compound_cids = np.array([126689157, 44516822, 9934458])
+    compound_idcs = np.random.choice(len(compound_names), n_obs)
+
+    X_data = np.random.rand(n_obs, n_vars)
+    adata = ad.AnnData(X=X_data)
+    adata.obs["compound_name"] = compound_names[compound_idcs]
+    adata.obs["compound_cid"] = compound_cids[compound_idcs]
+
+    return adata
