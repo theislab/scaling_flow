@@ -5,7 +5,7 @@ import pytest
 
 class TestPreprocessing:
     @pytest.mark.parametrize(
-        "query_key_and_type",
+        "compound_key_and_type",
         [
             (["compound_name"], "name"),
             (["compound_cid"], "cid"),
@@ -13,7 +13,7 @@ class TestPreprocessing:
         ],
     )
     def test_annotate_compounds(
-        self, adata_with_compounds: ad.AnnData, query_key_and_type
+        self, adata_with_compounds: ad.AnnData, compound_key_and_type
     ):
         import cfp
 
@@ -21,15 +21,15 @@ class TestPreprocessing:
 
         cfp.pp.annotate_compounds(
             adata_with_compounds,
-            query_keys=query_key_and_type[0],
-            query_id_type=query_key_and_type[1],
+            compound_keys=compound_key_and_type[0],
+            query_id_type=compound_key_and_type[1],
             copy=False,
         )
 
-        for query_key in query_key_and_type[0]:
-            assert f"{query_key}_pubchem_name" in adata_with_compounds.obs
-            assert f"{query_key}_pubchem_ID" in adata_with_compounds.obs
-            assert f"{query_key}_smiles" in adata_with_compounds.obs
+        for compound_key in compound_key_and_type[0]:
+            assert f"{compound_key}_pubchem_name" in adata_with_compounds.obs
+            assert f"{compound_key}_pubchem_ID" in adata_with_compounds.obs
+            assert f"{compound_key}_smiles" in adata_with_compounds.obs
 
     @pytest.mark.parametrize("n_bits", [512, 1024])
     @pytest.mark.parametrize(

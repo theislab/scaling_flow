@@ -14,7 +14,7 @@ __all__ = ["encode_onehot", "annotate_compounds", "get_molecular_fingerprints"]
 
 def annotate_compounds(
     adata,
-    query_keys: str | Sequence[str],
+    compound_keys: str | Sequence[str],
     query_id_type: Literal["name", "cid"] = "name",
     obs_key_prefixes: str | Sequence[str] | None = None,
     copy: bool = False,
@@ -25,12 +25,12 @@ def annotate_compounds(
     ----------
     adata: ad.AnnData
         An :class:`~anndata.AnnData` object.
-    query_keys: str
+    compound_keys: str
         Key(s) in `adata.obs` containing the compound identifiers.
     query_id_type: str
         Type of the compound identifiers. Either "name" or "cid".
     obs_key_prefixes: str
-        Prefix for the keys in `adata.obs` to store the annotations. If `None`, uses `query_keys` as prefixes.
+        Prefix for the keys in `adata.obs` to store the annotations. If `None`, uses `compound_keys` as prefixes.
     copy: bool
         Return a copy of `adata` instead of updating it in place.
 
@@ -38,7 +38,7 @@ def annotate_compounds(
     -------
         If `copy` is :obj:`True`, returns a new :class:`~anndata.AnnData` object with the compound annotations stored in `adata.obs`. Otherwise, updates `adata` in place.
 
-        Sets the following fields for each value in `query_keys`:
+        Sets the following fields for each value in `compound_keys`:
         `.obs[f"{obs_key_prefix}_pubchem_name"]`: Name of the compound.
         `.obs[f"{obs_key_prefix}_pubchem_ID"]`: PubChem CID of the compound.
         `.obs[f"{obs_key_prefix}_smiles"]`: SMILES representation of the compound.
@@ -52,20 +52,20 @@ def annotate_compounds(
 
     adata = adata.copy() if copy else adata
 
-    query_keys = _to_list(query_keys)
+    compound_keys = _to_list(compound_keys)
     obs_key_prefixes = (
-        _to_list(obs_key_prefixes) if obs_key_prefixes is not None else query_keys
+        _to_list(obs_key_prefixes) if obs_key_prefixes is not None else compound_keys
     )
 
-    if len(query_keys) != len(obs_key_prefixes):
+    if len(compound_keys) != len(obs_key_prefixes):
         raise ValueError(
-            "The number of `query_keys` must match the number of values in `obs_key_prefixes`."
+            "The number of `compound_keys` must match the number of values in `obs_key_prefixes`."
         )
 
     # Annotate compounds in each query column
     not_found = set()
     c_meta = pt.metadata.Compound()
-    for query_key, prefix in zip(query_keys, obs_key_prefixes, strict=False):
+    for query_key, prefix in zip(compound_keys, obs_key_prefixes, strict=False):
         c_meta.annotate_compounds(
             adata,
             query_id=query_key,
