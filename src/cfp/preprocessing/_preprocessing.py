@@ -13,20 +13,23 @@ __all__ = ["encode_onehot", "annotate_compounds", "get_molecular_fingerprints"]
 
 def annotate_compounds(
     adata,
-    query_id: str,
+    query_keys: str | Sequence[str],
     query_id_type: Literal["name", "cid"] = "name",
+    obs_key_prefixes: str | Sequence[str] | None = None,
     copy: bool = False,
-):
+) -> None | ad.AnnData:
     """Annotates compounds in `adata` using pertpy and PubChem.
 
     Parameters
     ----------
     adata: ad.AnnData
         An :class:`~anndata.AnnData` object.
-    query_id: str
-        Key in `adata.obs` containing the compound identifiers.
+    query_keys: str
+        Key(s) in `adata.obs` containing the compound identifiers.
     query_id_type: str
         Type of the compound identifiers. Either "name" or "cid".
+    obs_key_prefixes: str
+        Prefix for the keys in `adata.obs` to store the annotations. If `None`, uses `query_keys` as prefixes.
     copy: bool
         Return a copy of `adata` instead of updating it in place.
 
@@ -34,10 +37,10 @@ def annotate_compounds(
     -------
         If `copy` is :obj:`True`, returns a new :class:`~anndata.AnnData` object with the compound annotations stored in `adata.obs`. Otherwise, updates `adata` in place.
 
-        Sets the following fields:
-        `.obs["pubchem_name"]`: Name of the compound.
-        `.obs["pubchem_ID"]`: PubChem CID of the compound.
-        `.obs["smiles"]`: SMILES representation of the compound.
+        Sets the following fields for each value in `query_keys`:
+        `.obs[f"{obs_key_prefix}_pubchem_name"]`: Name of the compound.
+        `.obs[f"{obs_key_prefix}_pubchem_ID"]`: PubChem CID of the compound.
+        `.obs[f"{obs_key_prefix}_smiles"]`: SMILES representation of the compound.
     """
     try:
         import pertpy as pt
@@ -48,22 +51,48 @@ def annotate_compounds(
 
     adata = adata.copy() if copy else adata
 
-    c_meta = pt.metadata.Compound()
-    c_meta.annotate_compounds(
-        adata, query_id=query_id, query_id_type=query_id_type, verbosity=0, copy=False
+    query_keys = _to_list(query_keys)
+    obs_key_prefixes = (
+        _to_list(obs_key_prefixes) if obs_key_prefixes is not None else query_keys
     )
 
-    not_found = adata.obs[query_id][adata.obs["smiles"].isna()].unique().tolist()
-    if not_found:
-        logger.warning(
-            f"Could not find annotations for the following compounds: {', '.join(not_found)}"
+    if len(query_keys) != len(obs_key_prefixes):
+        raise ValueError(
+            "The number of `query_keys` must match the number of values in `obs_key_prefixes`."
+        )
+
+    c_meta = pt.metadata.Compound()
+    for query_key, prefix in zip(query_keys, obs_key_prefixes):
+        c_meta.annotate_compounds(
+            adata,
+            query_id=query_key,
+            query_id_type=query_id_type,
+            verbosity=0,
+            copy=False,
+        )
+
+        not_found = adata.obs[query_key][adata.obs["smiles"].isna()].unique().tolist()
+        if not_found:
+            logger.warning(
+                f"Could not find annotations for the following compounds: {', '.join(not_found)}"
+            )
+
+        adata.obs.rename(
+            columns={
+                "pubchem_name": f"{prefix}_pubchem_name",
+                "pubchem_ID": f"{prefix}_pubchem_ID",
+                "smiles": f"{prefix}_smiles",
+            },
+            inplace=True,
         )
 
     if copy:
         return adata
 
 
-def _get_fingerprint(smiles: str, radius: int = 4, n_bits: int = 1024):
+def _get_fingerprint(
+    smiles: str, radius: int = 4, n_bits: int = 1024
+) -> np.ndarray | None:
     """Computes Morgan fingerprints for a given SMILES string."""
     try:
         import rdkit.Chem.rdFingerprintGenerator as rfg
@@ -84,13 +113,13 @@ def _get_fingerprint(smiles: str, radius: int = 4, n_bits: int = 1024):
 
 def get_molecular_fingerprints(
     adata,
-    compound_key: str,
+    compound_keys: str,
     uns_key_added: str | None = None,
     smiles_key: str = "smiles",
     radius: int = 4,
     n_bits: int = 1024,
     copy: bool = False,
-):
+) -> None | ad.AnnData:
     """Computes Morgan fingerprints for compounds in `adata` and stores them in `adata.uns`.
 
     Parameters

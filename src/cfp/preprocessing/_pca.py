@@ -13,7 +13,7 @@ def centered_pca(
     layer: str | None = None,
     copy: bool = False,
     **kwargs,
-):
+) -> ad.AnnData | None:
     """Performs PCA on the centered data matrix and stores the results in `adata.obsm`.
 
     Parameters
@@ -67,7 +67,7 @@ def reconstruct_pca(
     ref_pcs: ArrayLike | None = None,
     layers_key_added: str = "X_recon",
     copy: bool = False,
-):
+) -> ad.AnnData | None:
     """Performs PCA on the data matrix and projects the data to the principal components.
 
     Parameters
@@ -124,7 +124,7 @@ def project_pca(
     layer: str | None = None,
     obsm_key_added: str = "X_pca",
     copy: bool = False,
-):
+) -> ad.AnnData | None:
     """Projects the query data to the principal components of the reference data.
 
     Parameters

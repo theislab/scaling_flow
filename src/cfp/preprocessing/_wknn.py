@@ -26,7 +26,7 @@ def compute_wknn(
     ) = "jaccard_square",
     top_n: int | None = None,
     copy: bool = False,
-):
+) -> ad.AnnData | None:
     """
     Compute the weighted k-nearest neighbors graph between the reference and query datasets
 
@@ -93,7 +93,7 @@ def transfer_labels(
     label_key: str,
     wknn_key: str = "wknn",
     copy: bool = False,
-):
+) -> ad.AnnData | None:
     """Transfer labels from the reference to the query dataset.
 
     Parameters
