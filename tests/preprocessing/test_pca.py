@@ -28,6 +28,12 @@ class TestPCA:
             copy=False,
         )
         assert layers_key_added in adata_pca.layers
+        assert np.allclose(
+            adata_pca.layers[layers_key_added],
+            adata_pca.X.toarray(),
+            atol=1e-6,
+            rtol=0.0,
+        )
 
     def test_reconstruct_pca_with_array_input(self, adata_pca: ad.AnnData):
         import cfp
