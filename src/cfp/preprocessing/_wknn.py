@@ -1,17 +1,11 @@
+import jax
 import scanpy as sc
 import numpy as np
 import pandas as pd
 import anndata as ad
-from pynndescent import NNDescent
 
 from scipy import sparse
-from typing import Optional, Union, Mapping, Literal
-import warnings
-import sys
-import os
-import importlib.util
-import argparse
-import tqdm
+from typing import Optional, Literal
 
 from cfp._logging import logger
 
@@ -61,6 +55,7 @@ def compute_wknn(
     top_n : int
         The number of top neighbors to consider
     copy : bool
+        Return a copy of `ref_adata` instead of updating it in place
 
     Returns
     -------
@@ -192,12 +187,15 @@ def _build_nn(
     if query is None:
         query = ref
 
-    if torch.cuda.is_available() and importlib.util.find_spec("cuml"):
-        logger.info(
-            "GPU detected and cuml installed. Using cuML for neighborhood estimation."
-        )
+    try:
         from cuml.neighbors import NearestNeighbors
 
+        jax.devices("gpu")
+    except ImportError:
+        logger.info(
+            "cuML is not installed or GPU is not available. Falling back to neighborhood estimation using CPU with pynndescent."
+        )
+    else:
         model = NearestNeighbors(n_neighbors=k)
         model.fit(ref)
         knn = model.kneighbors(query)
@@ -206,6 +204,14 @@ def _build_nn(
     logger.info(
         "Failed to call cuML. Falling back to neighborhood estimation using CPU with pynndescent."
     )
+
+    try:
+        from pynndescent import NNDescent
+    except ImportError:
+        raise ImportError(
+            "pynndescent is not installed. To compute the wknn graph, please install it via `pip install pynndescent`."
+        ) from None
+
     index = NNDescent(ref)
     knn = index.query(query, k=k)
     return _nn2adj_cpu(knn, n1=query.shape[0], n2=ref.shape[0])

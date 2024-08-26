@@ -101,7 +101,7 @@ def get_molecular_fingerprints(
     compound_key: str
         Key in `adata.obs` containing the compound identifiers.
     uns_key: str
-        Key in `adata.uns` to store the fingerprints.
+        Key in `adata.uns` to store the fingerprints. If `None`, uses `f"{compound_key}_fingerprints"`.
     smiles_key: str
         Key in `adata.obs` containing the SMILES representations.
     radius: int

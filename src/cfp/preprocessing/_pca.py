@@ -77,9 +77,9 @@ def reconstruct_pca(
     ref_adata : ad.AnnData
         An :class:`~anndata.AnnData` object with the reference data.
     ref_means : np.ndarray
-        Mean of the reference data.
+        Mean of the reference data. Only used if `ref_adata` is `None`.
     ref_pcs : np.ndarray
-        Principal components of the reference data.
+        Principal components of the reference data. Only used if `ref_adata` is `None`.
     copy : bool
         Return a copy of `adata` instead of updating it in place.
 
@@ -127,9 +127,9 @@ def project_pca(
     ref_adata : ad.AnnData
         An :class:`~anndata.AnnData` object with the reference data containing `adata.varm["X_mean"]` and `adata.varm["PCs"]`.
     ref_means : np.ndarray
-        Mean of the reference data.
+        Mean of the reference data. Only used if `ref_adata` is `None`.
     ref_pcs : np.ndarray
-        Principal components of the reference data.
+        Principal components of the reference data. Only used if `ref_adata` is `None`.
     layer : str
         Layer in `adata.layers` to use for PCA.
 
