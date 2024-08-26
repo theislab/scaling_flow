@@ -75,7 +75,7 @@ def reconstruct_pca(
     use_rep : str
         Representation to use for PCA. If `X`, uses `adata.X`. Otherwise, uses `adata.obsm[use_rep]`.
     ref_adata : ad.AnnData
-        An :class:`~anndata.AnnData` object with the reference data.
+        An :class:`~anndata.AnnData` object with the reference data containing `adata.varm["X_mean"]` and `adata.varm["PCs"]`.
     ref_means : np.ndarray
         Mean of the reference data. Only used if `ref_adata` is `None`.
     ref_pcs : np.ndarray

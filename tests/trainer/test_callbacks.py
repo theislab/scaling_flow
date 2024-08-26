@@ -10,9 +10,7 @@ class TestCallbacks:
 
         decoded_metrics_callback = PCADecodedMetrics(
             metrics=metrics,
-            pca_decoder=PCADecoder(
-                pcs=adata_pca.varm["PCs"], means=adata_pca.varm["X_mean"]
-            ),
+            ref_adata=adata_pca,
         )
 
         reconstruction = decoded_metrics_callback.reconstruct_data(

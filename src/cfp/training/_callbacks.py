@@ -8,7 +8,12 @@ import numpy as np
 from numpy.typing import ArrayLike
 
 from cfp.data._data import ValidationData
-from cfp.metrics._metrics import compute_e_distance, compute_r_squared, compute_scalar_mmd, compute_sinkhorn_div
+from cfp.metrics._metrics import (
+    compute_e_distance,
+    compute_r_squared,
+    compute_scalar_mmd,
+    compute_sinkhorn_div,
+)
 
 __all__ = [
     "BaseCallback",
@@ -65,8 +70,10 @@ class LoggingCallback(BaseCallback, abc.ABC):
     def on_log_iteration(self, dict_to_log: dict[str, Any]) -> Any:
         """Called at each validation/log iteration to log data
 
-        Args:
-            dict_to_log: Dictionary containing data to log
+        Parameters
+        ----------
+        dict_to_log
+            Dictionary containing data to log
         """
         pass
 
@@ -74,8 +81,10 @@ class LoggingCallback(BaseCallback, abc.ABC):
     def on_train_end(self, dict_to_log: dict[str, Any]) -> Any:
         """Called at the end of trainging to log data
 
-        Args:
-            dict_to_log: Dictionary containing data to log
+        Parameters
+        ----------
+        dict_to_log
+            Dictionary containing data to log
         """
         pass
 
@@ -98,10 +107,10 @@ class ComputationCallback(BaseCallback, abc.ABC):
 
         Parameters
         ----------
-            validation_data
-                Validation data in nested dictionary format with same keys as `predicted_data`
-            predicted_data
-                Predicted data in nested dictionary format with same keys as `validation_data`
+        validation_data
+            Validation data in nested dictionary format with same keys as `predicted_data`
+        predicted_data
+            Predicted data in nested dictionary format with same keys as `validation_data`
 
         Returns
         -------
@@ -119,10 +128,10 @@ class ComputationCallback(BaseCallback, abc.ABC):
 
         Parameters
         ----------
-            validation_data
-                Validation data in nested dictionary format with same keys as `predicted_data`
-            predicted_data
-                Predicted data in nested dictionary format with same keys as `validation_data`
+        validation_data
+            Validation data in nested dictionary format with same keys as `predicted_data`
+        predicted_data
+            Predicted data in nested dictionary format with same keys as `validation_data`
 
         Returns
         -------
@@ -198,17 +207,14 @@ class Metrics(ComputationCallback):
     ) -> dict[str, float]:
         """Called at the end of training to compute metrics
 
-        Args:
-            validation_data: Validation data
-            predicted_data: Predicted data
-            training_data: Current batch and predicted data
+        Parameters
+        ----------
+        validation_data : dict
+            Validation data
+        predicted_data : dict
+            Predicted data
         """
         return self.on_log_iteration(validation_data, predicted_data)
-
-
-class PCADecoder(NamedTuple):
-    pcs: ArrayLike
-    means: ArrayLike
 
 
 class PCADecodedMetrics(Metrics):
@@ -216,26 +222,26 @@ class PCADecodedMetrics(Metrics):
 
     Parameters
     ----------
-    pc_decoder
-        Tuple of matrices containing the principal components and means to use for decoding
-    metrics
-        List of metrics to compute
-    metric_aggregation
-        List of aggregation functions to use for each metric
-    means
-        Means to use for decoding
+    ref_adata : ad.AnnData
+        An :class:`~anndata.AnnData` object with the reference data containing `adata.varm["X_mean"]` and `adata.varm["PCs"]`.
+    metrics : list
+        List of metrics to compute. Supported metrics are `r_squared`, `mmd`, `sinkhorn_div`, and `e_distance`.
+    metric_aggregation : list
+        List of aggregation functions to use for each metric. Supported aggregations are `mean` and `median`.
+    log_prefix : str
+        Prefix to add to the log keys.
     """
 
     def __init__(
         self,
-        pca_decoder: PCADecoder,
+        ref_adata: ad.AnnData,
         metrics: list[Literal["r_squared", "mmd", "sinkhorn_div", "e_distance"]],
         metric_aggregations: list[Literal["mean", "median"]] = None,
         log_prefix: str = "pca_decoded_",
     ):
         super().__init__(metrics, metric_aggregations)
-        self.pcs = pca_decoder.pcs
-        self.means = pca_decoder.means
+        self.pcs = ref_adata.varm["PCs"]
+        self.means = ref_adata.varm["X_mean"]
         self.reconstruct_data = lambda x: x @ np.transpose(self.pcs) + np.transpose(
             self.means
         )
@@ -340,10 +346,10 @@ class WandbLogger(LoggingCallback):
 class CallbackRunner:
     """Runs a set of computational and logging callbacks in the CellFlowTrainer
 
-    Args:
-        computation_callbacks: List of computation callbacks
-        logging_callbacks: List of logging callbacks
-        seed: Random seed for subsampling the validation data
+    Parameters
+    ----------
+    callbacks : list
+        List of callbacks to run. Callbacks should be of type `ComputationCallback` or `LoggingCallback`
 
     Returns
     -------
@@ -384,8 +390,10 @@ class CallbackRunner:
 
         Parameters
         ----------
-        valid_data: Validation data
-        pred_data: Predicted data corresponding to validation data
+        valid_data : dict
+            Validation data
+        pred_data : dict
+            Predicted data
 
         Returns
         -------
@@ -405,9 +413,12 @@ class CallbackRunner:
     def on_train_end(self, valid_data, pred_data) -> dict[str, Any]:
         """Called at the end of training to run callbacks. First computes metrics with computation callbacks and then logs data with logging callbacks.
 
-        Args:
-            valid_data: Validation data
-            pred_data: Predicted data
+        Parameters
+        ----------
+        valid_data : dict
+            Validation data
+        pred_data : dict
+            Predicted data
 
         Returns
         -------
