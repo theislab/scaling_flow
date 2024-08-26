@@ -42,3 +42,30 @@ class TestPreprocessing:
             next(iter(adata_with_compounds.uns[uns_key_added].values())).shape[0]
             == n_bits
         )
+
+    @pytest.mark.parametrize("uns_key_added", ["compounds", "compounds_onehot"])
+    @pytest.mark.parametrize("exclude_values", [None, "GW0742"])
+    def test_encode_onehot(
+        self, adata_with_compounds: ad.AnnData, uns_key_added, exclude_values
+    ):
+        import cfp
+
+        cfp.pp.encode_onehot(
+            adata_with_compounds,
+            covariate_keys="compound_name",
+            uns_key_added=uns_key_added,
+            exclude_values=exclude_values,
+            copy=False,
+        )
+
+        if exclude_values is None:
+            expected_compounds = adata_with_compounds.obs["compound_name"].unique()
+        else:
+            expected_compounds = np.setdiff1d(
+                adata_with_compounds.obs["compound_name"].unique(), exclude_values
+            )
+        assert uns_key_added in adata_with_compounds.uns
+        assert len(adata_with_compounds.uns[uns_key_added]) == len(expected_compounds)
+        assert adata_with_compounds.uns[uns_key_added][expected_compounds[0]].shape[
+            0
+        ] == len(expected_compounds)
