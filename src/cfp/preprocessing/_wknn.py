@@ -172,7 +172,7 @@ def _build_nn(
     ref: ArrayLike,
     query: ArrayLike | None = None,
     k: int = 30,
-):
+) -> sparse.csr_matrix:
     ref = np.array(ref)
     query = np.array(query) if query is not None else ref
 
@@ -218,7 +218,7 @@ def _get_wknn(
         Literal["top_n", "jaccard", "jaccard_square"] | None
     ) = "jaccard_square",
     top_n: int | None = None,
-):
+) -> sparse.csr_matrix:
     """
     Compute the weighted k-nearest neighbors graph between the reference and query datasets
 
