@@ -62,6 +62,8 @@ def annotate_compounds(
             "The number of `query_keys` must match the number of values in `obs_key_prefixes`."
         )
 
+    # Annotate compounds in each query column
+    not_found = set()
     c_meta = pt.metadata.Compound()
     for query_key, prefix in zip(query_keys, obs_key_prefixes, strict=False):
         c_meta.annotate_compounds(
@@ -72,12 +74,15 @@ def annotate_compounds(
             copy=False,
         )
 
-        not_found = adata.obs[query_key][adata.obs["smiles"].isna()].unique().tolist()
-        if not_found:
-            logger.warning(
-                f"Could not find annotations for the following compounds: {', '.join(not_found)}"
-            )
+        na_values = (
+            adata.obs[query_key][adata.obs["smiles"].isna()]
+            .astype(str)
+            .unique()
+            .tolist()
+        )
+        not_found.update(na_values)
 
+        # Rename with index to not overwrite existing columns
         adata.obs.rename(
             columns={
                 "pubchem_name": f"{prefix}_pubchem_name",
@@ -85,6 +90,11 @@ def annotate_compounds(
                 "smiles": f"{prefix}_smiles",
             },
             inplace=True,
+        )
+
+    if not_found:
+        logger.warning(
+            f"Could not find annotations for the following compounds: {', '.join(not_found)}"
         )
 
     if copy:
@@ -103,8 +113,9 @@ def _get_fingerprint(
             "rdkit is not installed. To compute fingerprints, please install it via `pip install rdkit`."
         ) from None
 
-    mmol = Chem.MolFromSmiles(smiles, sanitize=True)
+    mmol = Chem.MolFromSmiles(str(smiles), sanitize=True)
 
+    # Check if molecule is valid, MolFromSmiles returns None if error occurs
     if mmol is None:
         return None
 
@@ -114,9 +125,9 @@ def _get_fingerprint(
 
 def get_molecular_fingerprints(
     adata,
-    compound_key: str,
-    uns_key_added: str | None = None,
-    smiles_key: str = "smiles",
+    compound_keys: str,
+    smiles_keys: str | None = None,
+    uns_key_added: str = "fingerprints",
     radius: int = 4,
     n_bits: int = 1024,
     copy: bool = False,
@@ -127,12 +138,12 @@ def get_molecular_fingerprints(
     ----------
     adata: ad.AnnData
         An :class:`~anndata.AnnData` object.
-    compound_key: str
-        Key in `adata.obs` containing the compound identifiers.
+    compound_keys: str
+        Key(s) in `adata.obs` containing the compound identifiers.
+    smiles_keys: str
+        Key(s) in `adata.obs` containing the SMILES strings. If `None`, uses `f"{compound_key}_smiles"`.
     uns_key_added: str
-        Key in `adata.uns` to store the fingerprints. If `None`, uses `f"{compound_key}_fingerprints"`.
-    smiles_key: str
-        Key in `adata.obs` containing the SMILES representations.
+        Key in `adata.uns` to store the fingerprints.
     radius: int
         Radius of the Morgan fingerprints.
     n_bits: int
@@ -149,11 +160,25 @@ def get_molecular_fingerprints(
     """
     adata = adata.copy() if copy else adata
 
-    if uns_key_added is None:
-        uns_key_added = f"{compound_key}_fingerprints"
+    compound_keys = _to_list(compound_keys)
 
-    smiles_dict = adata.obs.set_index(compound_key)[smiles_key].to_dict()
+    if smiles_keys is None:
+        smiles_keys = [f"{key}_smiles" for key in compound_keys]
 
+    smiles_keys = _to_list(smiles_keys)
+
+    # Get dict with SMILES for each compound
+    smiles_dict = {}
+    for compound_key, smiles_key in zip(compound_keys, smiles_keys, strict=False):
+        if compound_key not in adata.obs:
+            raise KeyError(f"Key {compound_key} not found in `adata.obs`.")
+
+        if smiles_key not in adata.obs:
+            raise KeyError(f"Key {smiles_key} not found in `adata.obs`.")
+
+        smiles_dict.update(adata.obs.set_index(compound_key)[smiles_key].to_dict())
+
+    # Compute fingerprints for each compound
     valid_fingerprints = {}
     not_found = []
     for comp, smiles in smiles_dict.items():
@@ -161,7 +186,7 @@ def get_molecular_fingerprints(
         if comp_fp is not None:
             valid_fingerprints[comp] = comp_fp
         else:
-            not_found.append(comp)
+            not_found.append(str(comp))
 
     if not_found:
         logger.warning(
@@ -208,11 +233,13 @@ def encode_onehot(
     covariate_keys = _to_list(covariate_keys)
     exclude_values = _to_list(exclude_values)
 
+    # Get unique values from all columns
     all_values = np.unique(adata.obs[covariate_keys].values.flatten())
     values_encode = np.setdiff1d(all_values, exclude_values).reshape(-1, 1)
     encoder = preprocessing.OneHotEncoder(sparse_output=False)
     encodings = encoder.fit_transform(values_encode)
 
+    # Store encodings in adata.uns
     adata.uns[uns_key_added] = {}
     for value, encoding in zip(values_encode, encodings, strict=False):
         adata.uns[uns_key_added][value[0]] = encoding

@@ -228,5 +228,8 @@ def adata_with_compounds() -> ad.AnnData:
     adata.obs["compound_name"] = compound_names[compound_idcs]
     adata.obs["compound_cid"] = compound_cids[compound_idcs]
     adata.obs["compound_smiles"] = compound_smiles[compound_idcs]
+    adata.obs["compound2_name"] = compound_names[compound_idcs]
+    adata.obs["compound2_cid"] = compound_cids[compound_idcs]
+    adata.obs["compound2_smiles"] = compound_smiles[compound_idcs]
 
     return adata

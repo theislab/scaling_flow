@@ -5,7 +5,12 @@ import pytest
 
 class TestPreprocessing:
     @pytest.mark.parametrize(
-        "query_key_and_type", [("compound_name", "name"), ("compound_cid", "cid")]
+        "query_key_and_type",
+        [
+            (["compound_name"], "name"),
+            (["compound_cid"], "cid"),
+            (["compound_name", "compound2_name"], "name"),
+        ],
     )
     def test_annotate_compounds(
         self, adata_with_compounds: ad.AnnData, query_key_and_type
@@ -18,23 +23,36 @@ class TestPreprocessing:
             adata_with_compounds,
             query_keys=query_key_and_type[0],
             query_id_type=query_key_and_type[1],
-            obs_key_prefixes=[prefix],
             copy=False,
         )
-        assert f"{prefix}_pubchem_name" in adata_with_compounds.obs
-        assert f"{prefix}_pubchem_ID" in adata_with_compounds.obs
-        assert f"{prefix}_smiles" in adata_with_compounds.obs
+
+        for query_key in query_key_and_type[0]:
+            assert f"{query_key}_pubchem_name" in adata_with_compounds.obs
+            assert f"{query_key}_pubchem_ID" in adata_with_compounds.obs
+            assert f"{query_key}_smiles" in adata_with_compounds.obs
 
     @pytest.mark.parametrize("n_bits", [512, 1024])
-    def test_get_molecular_fingerprints(self, adata_with_compounds: ad.AnnData, n_bits):
+    @pytest.mark.parametrize(
+        "compound_and_smiles_keys",
+        [
+            ("compound_name", "compound_smiles"),
+            (
+                ["compound_name", "compound2_name"],
+                ["compound_smiles", "compound2_smiles"],
+            ),
+        ],
+    )
+    def test_get_molecular_fingerprints(
+        self, adata_with_compounds: ad.AnnData, n_bits, compound_and_smiles_keys
+    ):
         import cfp
 
         uns_key_added = "compound_fingerprints"
 
         cfp.pp.get_molecular_fingerprints(
             adata_with_compounds,
-            compound_key="compound_name",
-            smiles_key="compound_smiles",
+            compound_keys=compound_and_smiles_keys[0],
+            smiles_keys=compound_and_smiles_keys[1],
             uns_key_added=uns_key_added,
             n_bits=n_bits,
             copy=False,
@@ -44,6 +62,15 @@ class TestPreprocessing:
         assert (
             next(iter(adata_with_compounds.uns[uns_key_added].values())).shape[0]
             == n_bits
+        )
+        expected_compounds = (
+            adata_with_compounds.obs[compound_and_smiles_keys[0]]
+            .values.flatten()
+            .tolist()
+        )
+
+        assert np.all(
+            [c in adata_with_compounds.uns[uns_key_added] for c in expected_compounds]
         )
 
     @pytest.mark.parametrize("uns_key_added", ["compounds", "compounds_onehot"])
