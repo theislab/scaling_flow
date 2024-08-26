@@ -209,8 +209,6 @@ def adata_pca() -> ad.AnnData:
 
 @pytest.fixture()
 def adata_with_compounds() -> ad.AnnData:
-    import scanpy as sc
-    from scipy.sparse import csr_matrix
 
     n_obs = 10
     n_vars = 50

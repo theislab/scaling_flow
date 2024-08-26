@@ -1,14 +1,13 @@
 import abc
 from collections.abc import Callable, Sequence
-from typing import Any, Literal, NamedTuple
+from typing import Any, Literal
 
+import anndata as ad
 import jax.tree as jt
 import jax.tree_util as jtu
 import numpy as np
-import anndata as ad
 from numpy.typing import ArrayLike
 
-from cfp.data._data import ValidationData
 from cfp.metrics._metrics import (
     compute_e_distance,
     compute_r_squared,
@@ -122,7 +121,7 @@ class ComputationCallback(BaseCallback, abc.ABC):
     @abc.abstractmethod
     def on_train_end(
         self,
-        validation_data: dict[str, ValidationData],
+        validation_data: dict[str, dict[str, ArrayLike]],
         predicted_data: dict[str, dict[str, ArrayLike]],
     ) -> dict[str, float]:
         """Called at the end of training to compute metrics
@@ -203,7 +202,7 @@ class Metrics(ComputationCallback):
 
     def on_train_end(
         self,
-        validation_data: dict[str, ValidationData],
+        validation_data: dict[str, dict[str, ArrayLike]],
         predicted_data: dict[str, dict[str, ArrayLike]],
     ) -> dict[str, float]:
         """Called at the end of training to compute metrics

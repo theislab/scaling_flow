@@ -1,7 +1,8 @@
 from importlib import metadata
 
-from cfp import data, metrics, model, networks, solvers, training
+from cfp import data, metrics, model, networks
 from cfp import preprocessing as pp
+from cfp import solvers, training
 
 __version__ = metadata.version("cell_flow_perturbation")
 try:

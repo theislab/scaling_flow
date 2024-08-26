@@ -1,6 +1,7 @@
-import numpy as np
 import anndata as ad
+import numpy as np
 import scanpy as sc
+from numpy.typing import ArrayLike
 from scipy.sparse import csr_matrix
 
 __all__ = ["centered_pca", "reconstruct_pca", "project_pca"]
@@ -62,8 +63,8 @@ def reconstruct_pca(
     query_adata: ad.AnnData,
     use_rep: str = "X_pca",
     ref_adata: ad.AnnData | None = None,
-    ref_means: np.ndarray | None = None,
-    ref_pcs: np.ndarray | None = None,
+    ref_means: ArrayLike | None = None,
+    ref_pcs: ArrayLike | None = None,
     layers_key_added: str = "X_recon",
     copy: bool = False,
 ):
@@ -77,9 +78,9 @@ def reconstruct_pca(
         Representation to use for PCA. If `X`, uses `adata.X`. Otherwise, uses `adata.obsm[use_rep]`.
     ref_adata : ad.AnnData
         An :class:`~anndata.AnnData` object with the reference data containing `adata.varm["X_mean"]` and `adata.varm["PCs"]`.
-    ref_means : np.ndarray
+    ref_means : ArrayLike
         Mean of the reference data. Only used if `ref_adata` is `None`.
-    ref_pcs : np.ndarray
+    ref_pcs : ArrayLike
         Principal components of the reference data. Only used if `ref_adata` is `None`.
     layers_key_added : str
         Key in `adata.layers` to store the reconstructed data matrix.
@@ -106,7 +107,9 @@ def reconstruct_pca(
         ref_means = ref_adata.varm["X_mean"]
         ref_pcs = ref_adata.varm["PCs"]
 
-    X_recon = np.array(X @ np.transpose(ref_pcs) + np.transpose(ref_means))
+    X_recon = np.array(
+        X @ np.transpose(np.array(ref_pcs)) + np.transpose(np.array(ref_means))
+    )
     query_adata.layers[layers_key_added] = X_recon
 
     if copy:
@@ -116,8 +119,8 @@ def reconstruct_pca(
 def project_pca(
     query_adata: ad.AnnData,
     ref_adata: ad.AnnData | None = None,
-    ref_means: np.ndarray | None = None,
-    ref_pcs: np.ndarray | None = None,
+    ref_means: ArrayLike | None = None,
+    ref_pcs: ArrayLike | None = None,
     layer: str | None = None,
     obsm_key_added: str = "X_pca",
     copy: bool = False,
@@ -130,9 +133,9 @@ def project_pca(
         An :class:`~anndata.AnnData` object with the query data.
     ref_adata : ad.AnnData
         An :class:`~anndata.AnnData` object with the reference data containing `adata.varm["X_mean"]` and `adata.varm["PCs"]`.
-    ref_means : np.ndarray
+    ref_means : ArrayLike
         Mean of the reference data. Only used if `ref_adata` is `None`.
-    ref_pcs : np.ndarray
+    ref_pcs : ArrayLike
         Principal components of the reference data. Only used if `ref_adata` is `None`.
     layer : str
         Layer in `adata.layers` to use for PCA.
@@ -159,7 +162,9 @@ def project_pca(
         ref_means = ref_adata.varm["X_mean"]
         ref_pcs = ref_adata.varm["PCs"]
 
-    query_adata.obsm[obsm_key_added] = np.array((X - np.transpose(ref_means)) @ ref_pcs)
+    query_adata.obsm[obsm_key_added] = np.array(
+        (X - np.transpose(np.array(ref_means))) @ np.array(ref_pcs)
+    )
 
     if copy:
         return query_adata

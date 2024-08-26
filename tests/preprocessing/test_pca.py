@@ -39,7 +39,6 @@ class TestPCA:
         import cfp
 
         cfp.pp.centered_pca(adata_pca, n_comps=50, copy=False)
-        X_pca = adata_pca.obsm["X_pca"]
         cfp.pp.reconstruct_pca(
             adata_pca, ref_means=adata_pca.varm["X_mean"], ref_pcs=adata_pca.varm["PCs"]
         )

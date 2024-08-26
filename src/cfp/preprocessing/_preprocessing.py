@@ -1,9 +1,8 @@
-from collections.abc import Iterable, Sequence
+from collections.abc import Sequence
 from typing import Any, Literal
 
-import numpy as np
-import pandas as pd
 import anndata as ad
+import numpy as np
 import sklearn.preprocessing as preprocessing
 
 from cfp._logging import logger
@@ -67,16 +66,16 @@ def annotate_compounds(
 def _get_fingerprint(smiles: str, radius: int = 4, n_bits: int = 1024):
     """Computes Morgan fingerprints for a given SMILES string."""
     try:
-        from rdkit import Chem
         import rdkit.Chem.rdFingerprintGenerator as rfg
+        from rdkit import Chem
     except ImportError:
         raise ImportError(
             "rdkit is not installed. To compute fingerprints, please install it via `pip install rdkit`."
         ) from None
 
-    try:
-        mmol = Chem.MolFromSmiles(smiles, sanitize=True)
-    except:
+    mmol = Chem.MolFromSmiles(smiles, sanitize=True)
+
+    if mmol is None:
         return None
 
     mfpgen = rfg.GetMorganGenerator(radius=radius, fpSize=n_bits)

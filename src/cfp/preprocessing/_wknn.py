@@ -1,11 +1,11 @@
+from typing import Literal
+
+import anndata as ad
 import jax
-import scanpy as sc
 import numpy as np
 import pandas as pd
-import anndata as ad
-
+from numpy.typing import ArrayLike
 from scipy import sparse
-from typing import Optional, Literal
 
 from cfp._logging import logger
 
@@ -24,7 +24,7 @@ def compute_wknn(
     weighting_scheme: (
         Literal["top_n", "jaccard", "jaccard_square"] | None
     ) = "jaccard_square",
-    top_n: Optional[int] = None,
+    top_n: int | None = None,
     copy: bool = False,
 ):
     """
@@ -182,12 +182,12 @@ def _nn2adj_cpu(nn, n1=None, n2=None):
 
 
 def _build_nn(
-    ref: np.ndarray,
-    query: np.ndarray | None = None,
+    ref: ArrayLike,
+    query: ArrayLike | None = None,
     k: int = 100,
 ):
-    if query is None:
-        query = ref
+    ref = np.array(ref)
+    query = np.array(query) if query is not None else ref
 
     try:
         from cuml.neighbors import NearestNeighbors
@@ -220,24 +220,24 @@ def _build_nn(
 
 
 def _get_wknn(
-    ref: np.ndarray,
-    query: np.ndarray,
+    ref: ArrayLike,
+    query: ArrayLike,
     k: int = 100,
     query2ref: bool = True,
     ref2query: bool = False,
-    weighting_scheme: Literal[
-        "n", "top_n", "jaccard", "jaccard_square", "gaussian", "dist"
-    ] = "jaccard_square",
-    top_n: Optional[int] = None,
+    weighting_scheme: (
+        Literal["top_n", "jaccard", "jaccard_square"] | None
+    ) = "jaccard_square",
+    top_n: int | None = None,
 ):
     """
     Compute the weighted k-nearest neighbors graph between the reference and query datasets
 
     Parameters
     ----------
-    ref : np.ndarray
+    ref : ArrayLike
         The reference representation to build ref-query neighbor graph
-    query : np.ndarray
+    query : ArrayLike
         The query representation to build ref-query neighbor graph
     k : int
         Number of neighbors per cell
