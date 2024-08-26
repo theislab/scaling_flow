@@ -31,7 +31,7 @@ def centered_pca(
 
     Returns
     -------
-        If `copy` is `True`, returns a new `AnnData` object with the PCA results stored in `adata.obsm`. Otherwise, updates `adata` in place.
+        If `copy` is :obj::obj:`True`, returns a new :class:`~anndata.AnnData` object with the PCA results stored in `adata.obsm`. Otherwise, updates `adata` in place.
 
         Sets the following fields:
         `.obsm["X_pca"]`: PCA coordinates.
@@ -89,7 +89,7 @@ def reconstruct_pca(
 
     Returns
     -------
-        If `copy` is `True`, returns a new `AnnData` object with the PCA results stored in `adata.obsm`. Otherwise, updates `adata` in place.
+        If `copy` is :obj:`True`, returns a new :class:`~anndata.AnnData` object with the PCA results stored in `adata.obsm`. Otherwise, updates `adata` in place.
 
         Sets the following fields:
         `.layers["X_recon"]`: Reconstructed data matrix.
@@ -144,7 +144,7 @@ def project_pca(
 
     Returns
     -------
-        If `copy` is `True`, returns a new `AnnData` object with the PCA results stored in `adata.obsm`. Otherwise, updates `adata` in place.
+        If `copy` is :obj:`True`, returns a new :class:`~anndata.AnnData` object with the PCA results stored in `adata.obsm`. Otherwise, updates `adata` in place.
 
         Sets the following fields:
         `.obsm["X_pca"]`: PCA coordinates.

@@ -61,7 +61,7 @@ def compute_wknn(
 
     Returns
     -------
-        If `copy` is `True`, returns a new `AnnData` object with the weighted k-nearest neighbors stored in `adata.uns`. Otherwise, updates `adata` in place.
+        If `copy` is :obj:`True`, returns a new :class:`~anndata.AnnData` object with the weighted k-nearest neighbors stored in `adata.uns`. Otherwise, updates `adata` in place.
 
         Sets the following fields:
         `.uns[uns_key_added]`: Weighted k-nearest neighbors graph
@@ -111,7 +111,7 @@ def transfer_labels(
 
     Returns
     -------
-        If `copy` is `True`, returns a new `AnnData` object with the transferred labels stored in `adata.obs`. Otherwise, updates `adata` in place.
+        If `copy` is :obj:`True`, returns a new :class:`~anndata.AnnData` object with the transferred labels stored in `adata.obs`. Otherwise, updates `adata` in place.
 
         Sets the following fields:
         `.obs[f"{label_key}_transfer"]`: Transferred labels

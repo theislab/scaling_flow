@@ -32,7 +32,7 @@ def annotate_compounds(
 
     Returns
     -------
-        If `copy` is `True`, returns a new `AnnData` object with the compound annotations stored in `adata.obs`. Otherwise, updates `adata` in place.
+        If `copy` is :obj:`True`, returns a new :class:`~anndata.AnnData` object with the compound annotations stored in `adata.obs`. Otherwise, updates `adata` in place.
 
         Sets the following fields:
         `.obs["pubchem_name"]`: Name of the compound.
@@ -168,7 +168,7 @@ def encode_onehot(
 
     Returns
     -------
-        If `copy` is `True`, returns a new `AnnData` object with the one-hot encodings stored in `adata.uns`. Otherwise, updates `adata` in place.
+        If `copy` is :obj:`True`, returns a new :class:`~anndata.AnnData` object with the one-hot encodings stored in `adata.uns`. Otherwise, updates `adata` in place.
 
         Sets the following fields:
         `.uns[uns_key_added]`: Dictionary containing the one-hot encodings for each covariate.
