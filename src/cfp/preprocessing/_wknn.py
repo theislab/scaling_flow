@@ -9,6 +9,8 @@ from typing import Optional, Literal
 
 from cfp._logging import logger
 
+__all__ = ["compute_wknn", "transfer_labels"]
+
 
 def compute_wknn(
     ref_adata: ad.AnnData = None,
