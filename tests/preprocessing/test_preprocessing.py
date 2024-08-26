@@ -21,3 +21,24 @@ class TestPreprocessing:
         assert "pubchem_name" in adata_with_compounds.obs
         assert "pubchem_ID" in adata_with_compounds.obs
         assert "smiles" in adata_with_compounds.obs
+
+    @pytest.mark.parametrize("n_bits", [512, 1024])
+    def test_get_molecular_fingerprints(self, adata_with_compounds: ad.AnnData, n_bits):
+        import cfp
+
+        uns_key_added = "compound_fingerprints"
+
+        cfp.pp.get_molecular_fingerprints(
+            adata_with_compounds,
+            compound_key="compound_name",
+            smiles_key="compound_smiles",
+            uns_key_added=uns_key_added,
+            n_bits=n_bits,
+            copy=False,
+        )
+
+        assert uns_key_added in adata_with_compounds.uns
+        assert (
+            next(iter(adata_with_compounds.uns[uns_key_added].values())).shape[0]
+            == n_bits
+        )
