@@ -15,7 +15,7 @@ __all__ = ["compute_wknn", "transfer_labels"]
 def compute_wknn(
     ref_adata: ad.AnnData = None,
     query_adata: ad.AnnData = None,
-    n_neighbors: int = 100,
+    n_neighbors: int = 30,
     ref_rep_key: str = "X_pca",
     query_rep_key: str = "X_pca",
     uns_key_added: str = "wknn",
@@ -140,40 +140,26 @@ def transfer_labels(
         return query_adata
 
 
-def _nn2adj_gpu(nn, n1=None, n2=None):
+def _nn2adj(
+    distances: ArrayLike,
+    indices: ArrayLike,
+    n1: int | None = None,
+    n2: int | None = None,
+) -> sparse.csr_matrix:
+    """Converts nearest neighbors indices and distances to a sparse adjacency matrix"""
+
     if n1 is None:
-        n1 = nn[1].shape[0]
+        n1 = indices.shape[0]
     if n2 is None:
-        n2 = np.max(nn[1].flatten())
+        n2 = np.max(indices.flatten())
 
     df = pd.DataFrame(
         {
-            "i": np.repeat(range(nn[1].shape[0]), nn[1].shape[1]),
-            "j": nn[1].flatten(),
-            "x": nn[0].flatten(),
+            "i": np.repeat(range(indices.shape[0]), indices.shape[1]),
+            "j": indices.flatten(),
+            "x": distances.flatten(),
         }
     )
-    adj = sparse.csr_matrix(
-        (np.repeat(1, df.shape[0]), (df["i"], df["j"])), shape=(n1, n2)
-    )
-
-    return adj
-
-
-def _nn2adj_cpu(nn, n1=None, n2=None):
-    if n1 is None:
-        n1 = nn[0].shape[0]
-    if n2 is None:
-        n2 = np.max(nn[0].flatten())
-
-    df = pd.DataFrame(
-        {
-            "i": np.repeat(range(nn[0].shape[0]), nn[0].shape[1]),
-            "j": nn[0].flatten(),
-            "x": nn[1].flatten(),
-        }
-    )
-
     adj = sparse.csr_matrix(
         (np.repeat(1, df.shape[0]), (df["i"], df["j"])), shape=(n1, n2)
     )
@@ -184,7 +170,7 @@ def _nn2adj_cpu(nn, n1=None, n2=None):
 def _build_nn(
     ref: ArrayLike,
     query: ArrayLike | None = None,
-    k: int = 100,
+    k: int = 30,
 ):
     ref = np.array(ref)
     query = np.array(query) if query is not None else ref
@@ -200,8 +186,7 @@ def _build_nn(
     else:
         model = NearestNeighbors(n_neighbors=k)
         model.fit(ref)
-        knn = model.kneighbors(query)
-        return _nn2adj_gpu(knn, n1=query.shape[0], n2=ref.shape[0])
+        distances, indices = model.kneighbors(query)
 
     logger.info(
         "Failed to call cuML. Falling back to neighborhood estimation using CPU with pynndescent."
@@ -215,8 +200,11 @@ def _build_nn(
         ) from None
 
     index = NNDescent(ref)
-    knn = index.query(query, k=k)
-    return _nn2adj_cpu(knn, n1=query.shape[0], n2=ref.shape[0])
+    indices, distances = index.query(query, k=k)
+
+    return _nn2adj(
+        distances=distances, indices=indices, n1=query.shape[0], n2=ref.shape[0]
+    )
 
 
 def _get_wknn(
