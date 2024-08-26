@@ -4,3 +4,4 @@ from cfp.preprocessing._preprocessing import (
     get_molecular_fingerprints,
 )
 from cfp.preprocessing._pca import centered_pca, reconstruct_pca, project_pca
+from cfp.preprocessing._wknn import compute_wknn, transfer_labels
