@@ -5,6 +5,7 @@ from typing import Any, Literal, NamedTuple
 import jax.tree as jt
 import jax.tree_util as jtu
 import numpy as np
+import anndata as ad
 from numpy.typing import ArrayLike
 
 from cfp.data._data import ValidationData
@@ -225,9 +226,9 @@ class PCADecodedMetrics(Metrics):
     ref_adata : ad.AnnData
         An :class:`~anndata.AnnData` object with the reference data containing `adata.varm["X_mean"]` and `adata.varm["PCs"]`.
     metrics : list
-        List of metrics to compute. Supported metrics are `r_squared`, `mmd`, `sinkhorn_div`, and `e_distance`.
+        List of metrics to compute. Supported metrics are `"r_squared"`, `"mmd"`, `"sinkhorn_div"`, and `"e_distance"`.
     metric_aggregation : list
-        List of aggregation functions to use for each metric. Supported aggregations are `mean` and `median`.
+        List of aggregation functions to use for each metric. Supported aggregations are `"mean"` and `"median"`.
     log_prefix : str
         Prefix to add to the log keys.
     """
@@ -254,9 +255,12 @@ class PCADecodedMetrics(Metrics):
     ) -> dict[str, float]:
         """Called at each validation/log iteration to reconstruct the data and compute metrics on the reconstruction
 
-        Args:
-            validation_data: Validation data
-            predicted_data: Predicted data
+        Parameters
+        ----------
+        validation_data : dict
+            Validation data
+        predicted_data : dict
+            Predicted data
         """
         validation_data_decoded = jtu.tree_map(self.reconstruct_data, validation_data)
         predicted_data_decoded = jtu.tree_map(self.reconstruct_data, predicted_data)

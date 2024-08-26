@@ -1,12 +1,11 @@
 from cfp.training._callbacks import (
-                                     BaseCallback,
-                                     CallbackRunner,
-                                     ComputationCallback,
-                                     LoggingCallback,
-                                     Metrics,
-                                     PCADecodedMetrics,
-                                     PCADecoder,
-                                     WandbLogger,
+    BaseCallback,
+    CallbackRunner,
+    ComputationCallback,
+    LoggingCallback,
+    Metrics,
+    PCADecodedMetrics,
+    WandbLogger,
 )
 from cfp.training._trainer import CellFlowTrainer
 
