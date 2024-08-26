@@ -18,7 +18,7 @@ def compute_wknn(
     n_neighbors: int = 100,
     ref_rep_key: str = "X_pca",
     query_rep_key: str = "X_pca",
-    key_added: str = "wknn",
+    uns_key_added: str = "wknn",
     query2ref: bool = True,
     ref2query: bool = False,
     weighting_scheme: (
@@ -42,7 +42,7 @@ def compute_wknn(
         Key in `ref_adata.obsm` containing the reference representation
     query_rep_key : str
         Key in `query_adata.obsm` containing the query representation
-    key_added : str
+    uns_key_added : str
         Key to store the weighted k-nearest neighbors graph in `adata.uns`
     query2ref : bool
         Consider query-to-ref neighbors
@@ -64,7 +64,7 @@ def compute_wknn(
         If `copy` is `True`, returns a new `AnnData` object with the weighted k-nearest neighbors stored in `adata.uns`. Otherwise, updates `adata` in place.
 
         Sets the following fields:
-        `.uns[key_added]`: Weighted k-nearest neighbors graph
+        `.uns[uns_key_added]`: Weighted k-nearest neighbors graph
     """
     ref_adata = ref_adata.copy() if copy else ref_adata
 
@@ -81,7 +81,7 @@ def compute_wknn(
         top_n=top_n,
     )
 
-    ref_adata.uns[key_added] = wknn
+    ref_adata.uns[uns_key_added] = wknn
 
     if copy:
         return ref_adata

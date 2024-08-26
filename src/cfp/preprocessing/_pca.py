@@ -64,6 +64,7 @@ def reconstruct_pca(
     ref_adata: ad.AnnData | None = None,
     ref_means: np.ndarray | None = None,
     ref_pcs: np.ndarray | None = None,
+    layers_key_added: str = "X_recon",
     copy: bool = False,
 ):
     """Performs PCA on the data matrix and projects the data to the principal components.
@@ -80,6 +81,8 @@ def reconstruct_pca(
         Mean of the reference data. Only used if `ref_adata` is `None`.
     ref_pcs : np.ndarray
         Principal components of the reference data. Only used if `ref_adata` is `None`.
+    layers_key_added : str
+        Key in `adata.layers` to store the reconstructed data matrix.
     copy : bool
         Return a copy of `adata` instead of updating it in place.
 
@@ -104,7 +107,7 @@ def reconstruct_pca(
         ref_pcs = ref_adata.varm["PCs"]
 
     X_recon = np.array(X @ np.transpose(ref_pcs) + np.transpose(ref_means))
-    query_adata.layers["X_recon"] = X_recon
+    query_adata.layers[layers_key_added] = X_recon
 
     if copy:
         return query_adata
@@ -116,6 +119,7 @@ def project_pca(
     ref_means: np.ndarray | None = None,
     ref_pcs: np.ndarray | None = None,
     layer: str | None = None,
+    obsm_key_added: str = "X_pca",
     copy: bool = False,
 ):
     """Projects the query data to the principal components of the reference data.
@@ -132,6 +136,8 @@ def project_pca(
         Principal components of the reference data. Only used if `ref_adata` is `None`.
     layer : str
         Layer in `adata.layers` to use for PCA.
+    obsm_key_added : str
+        Key in `adata.obsm` to store the PCA coordinates.
 
     Returns
     -------
@@ -153,7 +159,7 @@ def project_pca(
         ref_means = ref_adata.varm["X_mean"]
         ref_pcs = ref_adata.varm["PCs"]
 
-    query_adata.obsm["X_pca"] = np.array((X - np.transpose(ref_means)) @ ref_pcs)
+    query_adata.obsm[obsm_key_added] = np.array((X - np.transpose(ref_means)) @ ref_pcs)
 
     if copy:
         return query_adata

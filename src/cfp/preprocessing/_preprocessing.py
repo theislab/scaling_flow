@@ -86,7 +86,7 @@ def _get_fingerprint(smiles: str, radius: int = 4, n_bits: int = 1024):
 def get_molecular_fingerprints(
     adata,
     compound_key: str,
-    uns_key: str | None = None,
+    uns_key_added: str | None = None,
     smiles_key: str = "smiles",
     radius: int = 4,
     n_bits: int = 1024,
@@ -100,7 +100,7 @@ def get_molecular_fingerprints(
         An :class:`~anndata.AnnData` object.
     compound_key: str
         Key in `adata.obs` containing the compound identifiers.
-    uns_key: str
+    uns_key_added: str
         Key in `adata.uns` to store the fingerprints. If `None`, uses `f"{compound_key}_fingerprints"`.
     smiles_key: str
         Key in `adata.obs` containing the SMILES representations.
@@ -116,12 +116,12 @@ def get_molecular_fingerprints(
         Updates `adata.uns` with the computed fingerprints.
 
         Sets the following fields:
-        `.uns[uns_key]`: Dictionary containing the fingerprints for each compound.
+        `.uns[uns_key_added]`: Dictionary containing the fingerprints for each compound.
     """
     adata = adata.copy() if copy else adata
 
-    if uns_key is None:
-        uns_key = f"{compound_key}_fingerprints"
+    if uns_key_added is None:
+        uns_key_added = f"{compound_key}_fingerprints"
 
     smiles_dict = adata.obs.set_index(compound_key)[smiles_key].to_dict()
 
@@ -139,7 +139,7 @@ def get_molecular_fingerprints(
             f"Could not compute fingerprints for the following compounds: {', '.join(not_found)}"
         )
 
-    adata.uns[uns_key] = valid_fingerprints
+    adata.uns[uns_key_added] = valid_fingerprints
 
     if copy:
         return adata
@@ -148,7 +148,7 @@ def get_molecular_fingerprints(
 def encode_onehot(
     adata: ad.AnnData,
     covariate_keys: str | Sequence[str],
-    uns_key: Sequence[str],
+    uns_key_added: Sequence[str],
     exclude_values: str | Sequence[Any] = None,
     copy: bool = False,
 ) -> None | ad.AnnData:
@@ -160,7 +160,7 @@ def encode_onehot(
         An :class:`~anndata.AnnData` object.
     covariate_keys : str | Sequence[str]
         Key(s) in `adata.obs` containing the covariate(s) to encode.
-    uns_key : str
+    uns_key_added : str
         Key in `adata.uns` to store the one-hot encodings.
     exclude_values : str | Sequence[Any]
         Value(s) to exclude from the one-hot encoding.
@@ -172,7 +172,7 @@ def encode_onehot(
         If `copy` is `True`, returns a new `AnnData` object with the one-hot encodings stored in `adata.uns`. Otherwise, updates `adata` in place.
 
         Sets the following fields:
-        `.uns[uns_key]`: Dictionary containing the one-hot encodings for each covariate.
+        `.uns[uns_key_added]`: Dictionary containing the one-hot encodings for each covariate.
     """
     adata = adata.copy() if copy else adata
 
@@ -184,9 +184,9 @@ def encode_onehot(
     encoder = preprocessing.OneHotEncoder(sparse_output=False)
     encodings = encoder.fit_transform(values_encode)
 
-    adata.uns[uns_key] = {}
+    adata.uns[uns_key_added] = {}
     for value, encoding in zip(values_encode, encodings, strict=False):
-        adata.uns[uns_key][value[0]] = encoding
+        adata.uns[uns_key_added][value[0]] = encoding
 
     if copy:
         return adata
