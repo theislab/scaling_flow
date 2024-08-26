@@ -69,3 +69,6 @@ class TestPreprocessing:
         assert adata_with_compounds.uns[uns_key_added][expected_compounds[0]].shape[
             0
         ] == len(expected_compounds)
+        assert np.all(
+            [c in adata_with_compounds.uns[uns_key_added] for c in expected_compounds]
+        )
