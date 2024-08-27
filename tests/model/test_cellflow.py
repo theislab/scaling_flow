@@ -124,13 +124,14 @@ class TestCellFlow:
         assert out.shape[0] == adata_perturbation.n_obs
         assert out.shape[1] == cf._data_dim
 
+        covs = adata_perturbation.obs.drop_duplicates(subset=["drug1"])
         cond_embed = cf.get_condition_embedding(
-            adata_perturbation.obs, rep_dict=adata_perturbation.uns
+            covariate_data=covs, rep_dict=adata_perturbation.uns
         )
 
         assert isinstance(cond_embed, pd.DataFrame)
-        assert out.shape[0] == 1
-        assert out.shape[1] == condition_embedding_dim
+        assert cond_embed.shape[0] == len(covs)
+        assert cond_embed.shape[1] == condition_embedding_dim
 
     @pytest.mark.parametrize("split_covariates", [[], ["cell_type"]])
     @pytest.mark.parametrize(
