@@ -205,7 +205,7 @@ class CellFlow:
         -------
         :obj:`None`, and updates the following fields:
         - :attr:`cfp.model.CellFlow.validation_data` - a dictionary with the validation data.
-        
+
         """
         if self.train_data is None:
             raise ValueError(
