@@ -40,7 +40,7 @@ class CellFlow:
     Parameters
     ----------
         adata
-            An :class:`~anndata.AnnData` object to extract the training data from.
+            An :class:`anndata.AnnData` object to extract the training data from.
         solver
             Solver to use for training. Either ``'otfm'`` or ``'genot'``.
     """
@@ -73,47 +73,73 @@ class CellFlow:
         Parameters
         ----------
             adata
-                An :class:`~anndata.AnnData` object.
+                An :class:`anndata.AnnData` object.
             sample_rep
-                Key in :attr:`~anndata.AnnData.obsm` where the sample representation is stored or `X` to use
-                :attr:~`anndata.AnnData.X`.
+                Key in :attr:`anndata.AnnData.obsm` where the sample representation is stored or ``'X'`` to use
+                :attr:`anndata.AnnData.X`.
             control_key
-                Key of a boolean column in :attr:`~annndata.AnnData.obs` that defines the control samples.
+                Key of a boolean column in :attr:`anndata.AnnData.obs` that defines the control samples.
             perturbation_covariates
                 A dictionary where the keys indicate the name of the covariate group and the values are
-                keys in :attr:~`anndata.AnnData.obs`. The corresponding columns should be either boolean
+                keys in :attr:`anndata.AnnData.obs`. The corresponding columns should be either boolean
                 (presence/abscence of the perturbation) or numeric (concentration or magnitude of the
                 perturbation). If multiple groups are provided, the first is interpreted as the primary
-                perturbation and the others as covariates corresponding to these perturbations,
-                e.g. `{"drug":("drugA", "drugB"), "time":("drugA_time", "drugB_time")}`.
+                perturbation and the others as covariates corresponding to these perturbations.
             perturbation_covariate_reps
                 A dictionary where the keys indicate the name of the covariate group and the values are
                 keys in :attr:`anndata.AnnData.uns` storing a dictionary with the representation of
-                the covariates. E.g. `{"drug":"drug_embeddings"}` with `adata.uns["drug_embeddings"]
-                = {"drugA": np.array, "drugB": np.array}`.
+                the covariates.
             sample_covariates
-                Keys in :attr:`~anndata.AnnData.obs` indicating sample covatiates to be taken into
-                account for training and prediction, e.g. `["age", "cell_type"]`.
+                Keys in :attr:`anndata.AnnData.obs` indicating sample covariates. Sample covariates are
+                defined such that each cell has only one value for each sample covariate (in constrast to
+                ``'perturbation_covariates'`` which can have multiple values for each cell). If `None`, no sample
             sample_covariate_reps
                 A dictionary where the keys indicate the name of the covariate group and the values
                 are keys in :attr:`anndata.AnnData.uns` storing a dictionary with the representation
-                of the covariates. E.g. `{"cell_type": "cell_type_embeddings"}` with
-                `adata.uns["cell_type_embeddings"] = {"cell_typeA": np.array, "cell_typeB": np.array}`.
+                of the covariates.
             split_covariates
-                Covariates in :attr:`~anndata.AnnData.obs` to split all control cells into different
+                Covariates in :attr:`anndata.AnnData.obs` to split all control cells into different
                 control populations. The perturbed cells are also split according to these columns,
-                but if these covariates should also be encoded in the model, the corresponding column
-                should also be used in `perturbation_covariates` or `sample_covariates`.
+                but if any of the ``'split_covariates'`` has a representation which should be incorporated by
+                the model, the corresponding column should also be used in `perturbation_covariates`.
             max_combination_length
-                Maximum number of combinations of primary `perturbation_covariates`. If `None`, the value is inferred from the provided `perturbation_covariates`.
+                Maximum number of combinations of primary ``'perturbation_covariates'``. If :obj:`None`, the
+                value is inferred from the provided ``'perturbation_covariates'`` as the maximal number of elements
+                observed for one cell.
             null_value
-                Value to use for padding to `max_combination_length`.
+                Value to use for padding to ``'max_combination_length'``.
 
         Returns
         -------
             Updates the following fields:
-            - :attr:`dm` - the :class:`~cfp.data.datamanager.DataManager` object.
+            - :attr:`dm` - the :class:`cfp.data.datamanager.DataManager` object.
             - :attr:`train_data` - the training data.
+
+        Example
+        -------
+            For instance, consider the case where you have combinations of drugs, save in :attr:`anndata.AnnData.obs` as
+            columns `drugA` and `drugB`. Assume we store their embeddings in :attr:`anndata.AnnData.uns` under the key
+            `drug_embeddings`. Then, the following setup is required:
+
+            .. code-block:: python
+
+                perturbation_covariate_reps = {
+                        {"drug": ("drugA", "drugB"), "time": ("drugA_time", "drugB_time")}
+                    }
+                perturbation_covariate_reps = {"drug": "drug_embeddings"}
+                adata.uns["drug_embeddings"] = {
+                    "drugA": np.array([0.1, 0.2, 0.3]),
+                    "drugB": np.array([0.4, 0.5, 0.6])
+                }
+
+                sample_covariates = {"cell_type": "cell_type_embeddings"}
+                adata.uns["cell_type_embeddings"] = {"cell_typeA": np.array([0.0, 1.0]), "cell_typeB": np.array([0.0, 2.0])}.
+
+
+
+
+
+
 
         """
         self.dm = DataManager(
@@ -141,16 +167,16 @@ class CellFlow:
         n_conditions_on_log_iteration: int | None = None,
         n_conditions_on_train_end: int | None = None,
     ) -> None:
-        """Prepare validation data.
+        """Prepare the validation data.
 
         Parameters
         ----------
             adata
-                An :class:`~anndata.AnnData` object.
+                An :class:`anndata.AnnData` object.
             name
                 Name of the validation data defining the key in :attr:`validation_data`.
             condition_id_key
-                Key in :attr:`~anndata.AnnData.obs` or `covariate_data` indicating the condition name.
+                Key in :attr:`anndata.AnnData.obs` or `covariate_data` indicating the condition name.
             n_conditions_on_log_iterations
                 Number of conditions to use for computation callbacks at each logged iteration.
                 If :obj:`None`, use all conditions.
@@ -208,7 +234,7 @@ class CellFlow:
         """Prepare the model for training.
 
         This function sets up the neural network architecture and specificities of the :attr:`solver`.
-        When :attr:`solver` is an instance of :class:`~cfp.solvers._genot.GENOT`, the following arguments have
+        When :attr:`solver` is an instance of :class:`cfp.solvers._genot.GENOT`, the following arguments have
         to be passed to ``'condition_encoder_kwargs'``:
         - ``'genot_source_layers'``: Layers processing the cell data serving as an additional condition to the model (see :cite:`klein:23`).
         - ``'genot_source_dim'``: Dimension of the source data.
@@ -229,44 +255,63 @@ class CellFlow:
                 - ``'attention_seed'``: Aggregates combinations of covariates by an attention mechanism with a seed.
             pooling_kwargs
                 Keyword arguments for the pooling method corresponding to:
-                - :class:`~cfp.networks.TokenAttentionPooling` if ``'pooling'`` is ``'attention_token'``.
-                - :class:`~cfp.networks.SeedAttentionPooling` if ``'pooling'`` is ``'attention_seed'``.
+                - :class:`cfp.networks.TokenAttentionPooling` if ``'pooling'`` is ``'attention_token'``.
+                - :class:`cfp.networks.SeedAttentionPooling` if ``'pooling'`` is ``'attention_seed'``.
             condition_embedding_dim
-                Dimensions of the condition embedding, i.e. the last layer of the :class:`~cfp.networks.ConditionEncoder`.
+                Dimensions of the condition embedding, i.e. the last layer of the
+                :class:`cfp.networks.ConditionEncoder`.
             condition_encoder_kwargs
-                Keyword arguments for the condition encoder.
+                Keyword arguments for the :class:`cfp.networks.ConditionEncoder`.
             time_encoder_dims
-                Dimensions of the time embedding.
+                Dimensions of the layers processing the time embedding in
+                :attr:`cfp.networks.ConditionalVelocityField.time_encoder`.
             time_encoder_dropout
-                Dropout rate for the time embedding.
+                Dropout rate for the :attr:`cfp.networks.ConditionalVelocityField.time_encoder`.
             hidden_dims
-                Dimensions of the hidden layers.
+                Dimensions of the layers processing the input to the velocity field
+                via :attr:`cfp.networks.ConditionalVelocityField.x_encoder`.
             hidden_dropout
-                Dropout rate for the hidden layers.
+                Dropout rate for :attr:`cfp.networks.ConditionalVelocityField.x_encoder`.
             decoder_dims
-                Dimensions of the output layers.
+                Dimensions of the output layers in :attr:`cfp.networks.ConditionalVelocityField.decoder`.
             layers_before_pool
-                Layers before pooling. Either a sequence of tuples with layer type and parameters or a dictionary with input-specific layers.
+                Layers applied to the condition embeddings before pooling. Can be of type
+                - :class:`Tuple` with elements corresponding to dictionaries with keys
+                    - ``'layer_type'`` of type :class:`str` indicating the type of the layer, can be
+                      ``'mlp'`` or ``'self_attention'``.
+                    - Further keys depend on the layer type, either for :class:`cfp.networks.MLPBlock` or for
+                    :class:`cfp.networks.SelfAttentionBlock` .
+                - :class:`dict` with keys corresponding to perturbation covariate keys, and values correspondinng to
+                  the above mentioned tuples.
             layers_after_pool
-                Layers after pooling.
+                Layers applied to the condition embeddings after pooling, and before applying the last layer of
+                size ``'condition_embedding_dim'``. Should be of type :class:`Tuple` with elements corresponding to
+                dictionaries with keys
+                    - ``'layer_type'`` of type :class:`str` indicating the type of the layer, can be
+                      ``'mlp'`` or ``'self_attention'``.
+                    - Further keys depend on the layer type, either for :class:`cfp.networks.MLPBlock` or for
+                    :class:`cfp.networks.SelfAttentionBlock`.
             cond_output_dropout
-                Dropout rate for the last layer of the condition encoder.
+                Dropout rate for the last layer of the :class:`cfp.networks.ConditionEncoder`.
             condition_encoder_kwargs
-                Keyword arguments for the condition encoder.
+                Keyword arguments for the :class:`cfp.networks.ConditionEncoder`.
             pool_sample_covariates
                 Whether to include sample covariates in the pooling.
             vf_act_fn
-                Activation function of the velocity field.
+                Activation function of the :class:`cfp.networks.ConditionalVelocityField`.
             time_freqs
-                Frequency of the cyclical time encoding.
+                Frequency of the time encoding (:func:`ott.neural.networks.layers.cyclical_time_encoder`).
             solver_kwargs
-                Keyword arguments for the solver.
+                Keyword arguments for the solver :class:`cfp.solvers.OTFlowMatching` or :class:`cfp.solvers.GENOT`.
             decoder_dropout
-                Dropout rate for the output layers.
+                Dropout rate for the output layer :attr:`cfp.networks.ConditionalVelocityField.decoder`.
             flow
-                Flow to use for training. Should be a dict of the form `{"constant_noise": noise_val}` or `{"bridge": noise_val}`. If :obj:`None`, defaults to `{"constant_noise": 0.0}`.
+                Flow to use for training. Should be a :class:`dict` of the form
+                - `{"constant_noise": noise_val}` or
+                - `{"bridge": noise_val}`.
+                If :obj:`None`, defaults to `{"constant_noise": 0.0}`.
             match_fn
-                Matching function.
+                Matching function between unperturbed and perturbed cells.
             optimizer
                 Optimizer for training.
             seed
@@ -352,12 +397,15 @@ class CellFlow:
     def train(
         self,
         num_iterations: int,
-        batch_size: int = 64,
+        batch_size: int = 1024,
         valid_freq: int = 1000,
         callbacks: Sequence[BaseCallback] = [],
         monitor_metrics: Sequence[str] = [],
     ) -> None:
         """Train the model.
+
+        Note that a low value of ``'valid_freq'`` results in long training
+        because predictions are time-consuming compared to training steps.
 
         Parameters
         ----------
@@ -368,7 +416,7 @@ class CellFlow:
             valid_freq
                 Frequency of validation.
             callbacks
-                Callback functions.
+                Callbacks to perform at each validation step.
             monitor_metrics
                 Metrics to monitor.
 
@@ -405,19 +453,19 @@ class CellFlow:
         covariate_data: pd.DataFrame,
         condition_id_key: str | None = None,
     ) -> dict[str, dict[str, ArrayLike]] | dict[str, ArrayLike]:
-        """Predict perturbation.
+        """Predict perturbation responses.
 
         Parameters
         ----------
             adata
-                An :class:`~anndata.AnnData` object with the source representation.
+                An :class:`anndata.AnnData` object with the source representation.
             sample_rep
-                Key in :attr:`~anndata.AnnData.obsm` where the sample representation is stored or `X` to use
-                :attr:`anndata.AnnData.X`.
+                Key in :attr:`anndata.AnnData.obsm` where the sample representation is stored or
+                ``'X'`` to use :attr:`anndata.AnnData.X`.
             covariate_data
-                Covariate data defining the condition to predict. If not provided, :attr:`~anndata.AnnData.obs` is used.
+                Covariate data defining the condition to predict. If not provided, :attr:`anndata.AnnData.obs` is used.
             condition_id_key
-                Key in :attr:`~anndata.AnnData.obs` or `covariate_data` indicating the condition name.
+                Key in :attr:`anndata.AnnData.obs` or ``'covariate_data'`` indicating the condition name.
 
         Returns
         -------
@@ -464,18 +512,20 @@ class CellFlow:
         ----------
             covariate_data
                 Can be one of
-                - a :class:~`pandas.DataFrame` defining the conditions with the same columns as the
-                :class:`anndata.AnnData` used :meth:~`cfp.model.CellFlow.__init__`.
-                - an instance of :class:`~cfp.data.ConditionData`.
+                - a :class:`pandas.DataFrame` defining the conditions with the same columns as the
+                :class:`anndata.AnnData` used :meth:`cfp.model.CellFlow.__init__`.
+                - an instance of :class:`cfp.data.ConditionData`.
+            rep_dict:
+                Dictionary containing the representations of the perturbation covaraiates.
             condition_id_key
                 Key in :attr:`anndata.AnnData.obs` or defining the name of the condition. Only available
-                if ``'covariate_data'`` is a :class:~`pandas.DataFrame`.
+                if ``'covariate_data'`` is a :class:`pandas.DataFrame`.
             key_added
                 Key to store the condition embedding in :attr:`anndata.AnnData.uns`.
 
         Returns
         -------
-            A :class:`~pandas.DataFrame` with the condition embeddings.
+            A :class:`pandas.DataFrame` with the condition embeddings.
         """
         if self.solver is None:
             raise ValueError("Model not trained. Please call `train` first.")
@@ -571,7 +621,7 @@ class CellFlow:
         filename: str,
     ):
         """
-        Load a CellFlow model from a saved output.
+        Load a :class:`cfp.model.CellFlow` model from a saved instance.
 
         Parameters
         ----------
