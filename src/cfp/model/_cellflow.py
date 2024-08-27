@@ -592,13 +592,13 @@ class CellFlow:
             )
 
         condition_embeddings: dict[str, ArrayLike] = {}
-        n_conditions = len(next(iter(cond_data.condition_data.values())))  # type: ignore[union-attr]
+        n_conditions = len(next(iter(cond_data.condition_data.values())))
         for i in range(n_conditions):
-            condition = {k: v[[i], :] for k, v in cond_data.condition_data.items()}  # type: ignore[union-attr]
-            if len(cond_data.perturbation_idx_to_id):  # type: ignore[union-attr]
-                c_key = cond_data.perturbation_idx_to_id[i]  # type: ignore[union-attr]
+            condition = {k: v[[i], :] for k, v in cond_data.condition_data.items()}
+            if len(cond_data.perturbation_idx_to_id):
+                c_key = cond_data.perturbation_idx_to_id[i]
             else:
-                cov_combination = cond_data.perturbation_idx_to_covariates[i]  # type: ignore[union-attr]
+                cov_combination = cond_data.perturbation_idx_to_covariates[i]
                 c_key = tuple(cov_combination[i] for i in range(len(cov_combination)))
             condition_embeddings[c_key] = self.solver.get_condition_embedding(condition)
 

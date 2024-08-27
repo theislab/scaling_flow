@@ -47,7 +47,7 @@ class MLPBlock(BaseModule):
         Activation function.
     """
 
-    dims: Sequence[int] = (128, 128, 128)
+    dims: Sequence[int] = (1024, 1024, 1024)
     dropout_rate: float = 0.0
     act_last_layer: bool = True
     act_fn: Callable[[jnp.ndarray], jnp.ndarray] = nn.silu
@@ -61,13 +61,15 @@ class MLPBlock(BaseModule):
         ----------
         x
             Input tensor of shape ``(batch_size, input_dim)``.
-        training : bool
+        training
             Whether the model is in training mode.
 
         Returns
         -------
         Output tensor of shape ``(batch_size, output_dim)``.
         """
+        if len(self.dims) == 0:
+            return x
         z = x
         for i in range(len(self.dims) - 1):
             z = self.act_fn(nn.Dense(self.dims[i])(z))
