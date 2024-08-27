@@ -98,7 +98,7 @@ class DataManager:
         self._sample_covariate_reps = self._verify_sample_covariate_reps(
             adata, sample_covariate_reps, self._sample_covariates
         )
-        self._split_covariates = self._verify_split_covariates(split_covariates)
+        self._split_covariates = self._verify_split_covariates(adata, split_covariates, control_key)
         self._max_combination_length = self._get_max_combination_length(
             self._perturbation_covariates, max_combination_length
         )
@@ -610,7 +610,12 @@ class DataManager:
         return list(sample_covariates)
 
     @staticmethod
-    def _verify_split_covariates(data: Sequence[str] | None) -> Sequence[str]:
+    def _verify_split_covariates(
+        adata: anndata.AnnData,
+        data: Sequence[str] | None,
+        control_key: str,
+    ) -> Sequence[str]:
+
         if data is None:
             return []
         if not isinstance(data, tuple | list):
@@ -622,6 +627,15 @@ class DataManager:
                 raise ValueError(
                     f"Key should be a string, found {covar} to be of type {type(covar)}."
                 )
+        source_splits = adata.obs[adata.obs[control_key] == True][data].drop_duplicates()
+        source_splits = map(tuple, source_splits.values)
+        target_splits = adata.obs[adata.obs[control_key] == False][data].drop_duplicates()
+        target_splits = map(tuple, target_splits.values)
+        source_without_targets = set(source_splits) - set(target_splits)
+        if len(source_without_targets) > 0:
+            raise ValueError(
+                f"Source distribution with split covariate values {source_without_targets} do not have a corresponding target distribution."
+            )
         return data
 
     @staticmethod
