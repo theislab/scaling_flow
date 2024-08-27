@@ -148,7 +148,6 @@ class TestDataManager:
     @pytest.mark.parametrize("perturbation_covariates", perturbation_covariates_args)
     @pytest.mark.parametrize("perturbation_covariate_reps", [{}, {"drug": "drug"}])
     @pytest.mark.parametrize("sample_covariates", [[], ["dosage_c"]])
-    @pytest.mark.skip('because')
     def test_get_train_data(
         self,
         adata_perturbation: ad.AnnData,
@@ -213,7 +212,6 @@ class TestDataManager:
         "perturbation_covariates", perturbation_covariate_comb_args
     )
     @pytest.mark.parametrize("perturbation_covariate_reps", [{}, {"drug": "drug"}])
-    @pytest.mark.skip('because')
     def test_get_train_data_with_combinations(
         self,
         adata_perturbation: ad.AnnData,
@@ -286,7 +284,6 @@ class TestDataManager:
         assert isinstance(train_data.control_to_perturbation, dict)
 
     @pytest.mark.parametrize("max_combination_length", [0, 4])
-    @pytest.mark.skip('because')
     def test_max_combination_length(self, adata_perturbation, max_combination_length):
 
         sample_rep = "X"
@@ -329,7 +326,6 @@ class TestValidationData:
         "perturbation_covariates", perturbation_covariate_comb_args
     )
     @pytest.mark.parametrize("perturbation_covariate_reps", [{}, {"drug": "drug"}])
-    @pytest.mark.skip('because')
     def test_get_validation_data(
         self,
         adata_perturbation: ad.AnnData,
@@ -376,7 +372,6 @@ class TestValidationData:
             )
 
     @pytest.mark.skip(reason="To discuss: why should it raise an error?")
-    @pytest.mark.skip('because')
     def test_raises_wrong_max_combination_length(self, adata_perturbation):
         from cfp.data._datamanager import DataManager
 
@@ -412,7 +407,6 @@ class TestPredictionData:
         "perturbation_covariates", perturbation_covariate_comb_args
     )
     @pytest.mark.parametrize("perturbation_covariate_reps", [{}, {"drug": "drug"}])
-    @pytest.mark.skip('because')
     def test_get_prediction_data(
         self,
         adata_perturbation: ad.AnnData,
