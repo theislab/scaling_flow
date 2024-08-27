@@ -169,7 +169,7 @@ def get_molecular_fingerprints(
 
     # Get dict with SMILES for each compound
     smiles_dict = {}
-    for compound_key, smiles_key in zip(compound_keys, smiles_keys, strict=False):
+    for compound_key, smiles_key in zip(compound_keys, smiles_keys, strict=False):  # type: ignore[arg-type]
         if compound_key not in adata.obs:
             raise KeyError(f"Key {compound_key} not found in `adata.obs`.")
 

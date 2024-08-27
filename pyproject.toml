@@ -35,6 +35,7 @@ dependencies = [
     "cloudpickle",
     "diffrax",
     "session-info",
+    "adjustText",
 ]
 
 [project.optional-dependencies]
