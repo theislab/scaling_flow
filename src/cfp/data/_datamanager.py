@@ -133,7 +133,7 @@ class DataManager:
         Parameters
         ----------
         adata
-            An :class:`~anndata.Anndata` object.
+            An :class:`anndata.AnnData` object.
 
         Returns
         -------
@@ -210,7 +210,7 @@ class DataManager:
         Parameters
         ----------
         adata
-            An :class:`~anndata.Anndata` object to extract control cells from.
+            An :class:`anndata.AnnData` object to extract control cells from.
         sample_rep
             Key in :attr:`~anndata.AnnData.obsm` where the sample representation of the control
             is stored or `X` to use :attr:`~anndata.AnnData.X`.
@@ -938,7 +938,7 @@ class DataManager:
 
     @property
     def adata(self) -> anndata.AnnData:
-        """An :class:`~anndata.Anndata` object used for instantiating the DataManager."""
+        """An :class:`anndata.AnnData` object used for instantiating the DataManager."""
         return self._adata
 
     @property
