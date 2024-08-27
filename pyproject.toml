@@ -35,7 +35,6 @@ dependencies = [
     "cloudpickle",
     "diffrax",
     "session-info",
-    "diffrax",
     "adjustText",
 ]
 
@@ -70,6 +69,12 @@ doc = [
 test = [
     "pytest",
     "coverage",
+]
+pp = [
+    "pertpy",
+    "rdkit",
+    "pynndescent",
+    "cuml",
 ]
 
 [tool.hatch.build.targets.wheel]

@@ -468,7 +468,9 @@ class CellFlow:
         ).T
         indices = list(self.dm.sample_covariates)
         for pert_cov in self.dm.perturbation_covariates:
-            indices += [f"{pert_cov}_{i}" for i in range(self.dm.max_combination_length)]
+            indices += [
+                f"{pert_cov}_{i}" for i in range(self.dm.max_combination_length)
+            ]
         df.index.set_names(indices, inplace=True)
         df.drop_duplicates(inplace=True)
 
