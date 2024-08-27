@@ -17,8 +17,6 @@ class TestPreprocessing:
     ):
         import cfp
 
-        prefix = "compound"
-
         cfp.pp.annotate_compounds(
             adata_with_compounds,
             compound_keys=compound_key_and_type[0],

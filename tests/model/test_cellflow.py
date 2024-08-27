@@ -1,4 +1,5 @@
 import jax
+import pandas as pd
 import pytest
 
 import cfp
@@ -64,13 +65,11 @@ class TestCellFlow:
         assert out.shape[0] == adata_perturbation.n_obs
         assert out.shape[1] == cf._data_dim
 
-        cond_embed = cf.get_condition_embedding(
-            adata_perturbation.obs, rep_dict=adata_perturbation.uns
-        )
-        assert isinstance(cond_embed, dict)
-        out = next(iter(cond_embed.values()))
-        assert out.shape[0] == 1
-        assert out.shape[1] == condition_embedding_dim
+        conds = adata_perturbation.obs.drop_duplicates(subset=["drug1", "drug2"])
+        cond_embed = cf.get_condition_embedding(conds, rep_dict=adata_perturbation.uns)
+        assert isinstance(cond_embed, pd.DataFrame)
+        assert cond_embed.shape[0] == conds.shape[0]
+        assert cond_embed.shape[1] == condition_embedding_dim
 
     @pytest.mark.parametrize("solver", ["otfm", "genot"])
     @pytest.mark.parametrize("perturbation_covariate_reps", [{}, {"drug": "drug"}])
@@ -128,8 +127,8 @@ class TestCellFlow:
         cond_embed = cf.get_condition_embedding(
             adata_perturbation.obs, rep_dict=adata_perturbation.uns
         )
-        out = next(iter(cond_embed.values()))
-        assert isinstance(cond_embed, dict)
+
+        assert isinstance(cond_embed, pd.DataFrame)
         assert out.shape[0] == 1
         assert out.shape[1] == condition_embedding_dim
 
