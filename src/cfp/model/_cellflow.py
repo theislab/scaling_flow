@@ -233,7 +233,6 @@ class CellFlow:
         -------
             None
         """
-        flow = flow or {"constant_noise": 0.0}
         if self.train_data is None:
             raise ValueError(
                 "Dataloader not initialized. Please call `prepare_data` first."
