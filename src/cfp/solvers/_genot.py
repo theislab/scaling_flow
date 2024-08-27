@@ -24,7 +24,7 @@ DataMatchFn = Callable[[LinTerm], jnp.ndarray] | Callable[[QuadTerm], jnp.ndarra
 
 
 class GENOT:
-    """Generative Entropic Neural Optimal Transport :cite:`klein_uscidda:23`.
+    """Generative Entropic Neural Optimal Transport :cite:`klein:23`.
 
     GENOT is a framework for learning neural optimal transport plans between
     two distributions. It allows for learning linear and quadratic

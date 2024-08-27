@@ -398,7 +398,10 @@ class ConditionEncoder(BaseModule):
     output_dim
         Dimensionality of the output.
     pooling
-        Pooling method.
+        Pooling method, should be one of:
+        - ``'mean'``: Aggregates combinations of covariates by the mean of their learned embeddings.
+        - ``'attention_token'``: Aggregates combinations of covariates by an attention mechanism with a token.
+        - ``'attention_seed'``: Aggregates combinations of covariates by an attention mechanism with a seed.
     pooling_kwargs
         Keyword arguments for the pooling method.
     covariates_not_pooled

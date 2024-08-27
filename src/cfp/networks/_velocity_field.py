@@ -12,8 +12,7 @@ from ott.neural.networks.layers import time_encoder
 from cfp._constants import GENOT_CELL_KEY
 from cfp._logging import logger
 from cfp._types import Layers_separate_input_t, Layers_t
-from cfp.networks._modules import MLPBlock
-from cfp.networks._set_encoders import ConditionEncoder
+from cfp.networks._set_encoders import ConditionEncoder, MLPBlock
 
 __all__ = ["ConditionalVelocityField"]
 
@@ -28,7 +27,11 @@ class ConditionalVelocityField(nn.Module):
         max_combination_length
             Maximum number of covariates in a combination.
         encode_conditions
-            Whether to encode the conditions.
+                Processes the embedding of the perturbation conditions if :obj:`True`. If :obj:`False`,
+                directly inputs the embedding of the perturbation conditions to the generative velocity field.
+                In the latter case, ``'condition_embedding_dim'``, ``'condition_encoder_kwargs'``, ``'pooling'``,
+                ``'pooling_kwargs'``, ``'layers_before_pool'``, ``'layers_after_pool'``, ``'cond_output_dropout'``
+                are ignored.
         condition_embedding_dim
             Dimensions of the condition embedding.
         covariates_not_pooled
