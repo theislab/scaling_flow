@@ -49,7 +49,7 @@ def centered_pca(
     X = adata.X if layer in [None, "X"] else adata.layers[layer]
 
     adata.varm["X_mean"] = X.mean(axis=0).T
-    adata.layers["X_centered"] = csr_matrix(adata.X - adata.varm["X_mean"].T)
+    adata.layers["X_centered"] = adata.X - adata.varm["X_mean"].T
 
     if method == "rapids":
         try:
@@ -80,6 +80,8 @@ def centered_pca(
         raise ValueError(
             f"Invalid method: {method}. Valid options are 'scanpy' and 'rapids'."
         )
+
+    adata.layers["X_centered"] = csr_matrix(adata.layers["X_centered"])
 
     if copy:
         return adata
