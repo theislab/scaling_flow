@@ -59,7 +59,7 @@ class TestDataManager:
     @pytest.mark.parametrize("el_to_delete", ["drug", "cell_type"])
     def test_raise_false_uns_dict(self, adata_perturbation: ad.AnnData, el_to_delete):
         from cfp.data._datamanager import DataManager
-        
+
         sample_rep = "X"
         split_covariates = ["cell_type"]
         control_key = "control"
@@ -125,14 +125,16 @@ class TestDataManager:
             "drug": ["drug_a", "drug_b"],
             "dosage": ["dosage_a", "dosage_b"],
         }
-        
+
         adata_perturbation.obs.loc[
-            (adata_perturbation.obs['control'] == False) 
-            & (adata_perturbation.obs['cell_type'] == 'cell_line_a'), 
-            'cell_type'] = 'cell_line_b'
+            (~adata_perturbation.obs["control"])
+            & (adata_perturbation.obs["cell_type"] == "cell_line_a"),
+            "cell_type",
+        ] = "cell_line_b"
 
         with pytest.raises(
-            ValueError, match=r"Source distribution with split covariate values \{\('cell_line_a',\)\} do not have a corresponding target distribution."
+            ValueError,
+            match=r"Source distribution with split covariate values \{\('cell_line_a',\)\} do not have a corresponding target distribution.",
         ):
             _ = DataManager(
                 adata_perturbation,
