@@ -644,7 +644,7 @@ class DataManager:
                 )
         source_splits = adata.obs[adata.obs[control_key]][data].drop_duplicates()
         source_splits = map(tuple, source_splits.values)
-        target_splits = adata.obs[not adata.obs[control_key]][data].drop_duplicates()
+        target_splits = adata.obs[~adata.obs[control_key]][data].drop_duplicates()
         target_splits = map(tuple, target_splits.values)
         source_without_targets = set(source_splits) - set(target_splits)
         if len(source_without_targets) > 0:
