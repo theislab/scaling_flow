@@ -24,46 +24,37 @@ DataMatchFn = Callable[[LinTerm], jnp.ndarray] | Callable[[QuadTerm], jnp.ndarra
 
 
 class GENOT:
-    """Generative Entropic Neural Optimal Transport :cite:`klein_uscidda:23`.
-
-    GENOT is a framework for learning neural optimal transport plans between
-    two distributions. It allows for learning linear and quadratic
-    (Fused) Gromov-Wasserstein couplings, in both the balanced and
-    the unbalanced setting.
+    """GENOT :cite:`klein:23` extended to the conditional setting.
 
     Parameters
     ----------
-        vf
-            Vector field parameterized by a neural network.
-        flow
-            Flow between the latent and the target distributions.
-        data_match_fn
-            Function to match samples from the source and the target
-            distributions. Depending on the data passed :meth:`step_fn`, it has
-            the following signature:
+    vf
+        Vector field parameterized by a neural network.
+    flow
+        Flow between the latent and the target distributions.
+    data_match_fn
+        Function to match samples from the source and the target
+        distributions. Depending on the data passed :meth:`step_fn`, it has
+        the following signature:
 
-            - ``(src_lin, tgt_lin) -> matching`` - linear matching.
-            - ``(src_quad, tgt_quad, src_lin, tgt_lin) -> matching`` -
-            quadratic (fused) GW matching. In the pure GW setting, both ``src_lin``
-            and ``tgt_lin`` will be set to :obj:`None`.
+        - ``(src_lin, tgt_lin) -> matching`` - linear matching.
+        - ``(src_quad, tgt_quad, src_lin, tgt_lin) -> matching`` -
+        quadratic (fused) GW matching. In the pure GW setting, both ``src_lin``
+        and ``tgt_lin`` will be set to :obj:`None`.
 
-        source_dim
-            Dimensionality of the source distribution.
-        target_dim
-            Dimensionality of the target distribution.
-        condition_dim
-            Dimension of the conditions. If :obj:`None`, the underlying
-            velocity field has no conditions.
-        time_sampler
-            Time sampler with a ``(rng, n_samples) -> time`` signature.
-        latent_noise_fn
-            Function to sample from the latent distribution in the
-            target space with a ``(rng, shape) -> noise`` signature.
-            If :obj:`None`, multivariate normal distribution is used.
-        n_samples_per_src: Number of samples drawn from the conditional distribution
-            per one source sample.
-        kwargs
-            Keyword arguments for TODO
+    source_dim
+        Dimensionality of the source distribution.
+    target_dim
+        Dimensionality of the target distribution.
+    time_sampler
+        Time sampler with a ``(rng, n_samples) -> time`` signature, see e.g.
+        :func:`ott.solvers.utils.uniform_sampler`.
+    latent_noise_fn
+        Function to sample from the latent distribution in the
+        target space with a ``(rng, shape) -> noise`` signature.
+        If :obj:`None`, multivariate normal distribution is used.
+    kwargs
+        Keyword arguments for TODO
     """
 
     def __init__(
@@ -74,7 +65,6 @@ class GENOT:
         *,
         source_dim: int,
         target_dim: int,
-        condition_dim: int | None = None,
         time_sampler: Callable[
             [jax.Array, int], jnp.ndarray
         ] = solver_utils.uniform_sampler,
@@ -179,7 +169,20 @@ class GENOT:
         rng: jnp.ndarray,
         batch: dict[str, ArrayLike],
     ):
-        """Step function for GENOT solver."""
+        """Single step function of the solver.
+
+        Parameters
+        ----------
+        rng
+            Random number generator.
+        batch
+            Data batch with keys `src_cell_data`, `tgt_cell_data`, and
+            optionally `condition`.
+
+        Returns
+        -------
+        Loss value.
+        """
         rng = jax.random.split(rng, 5)
         rng, rng_resample, rng_noise, rng_time, rng_step_fn = rng
 
@@ -206,16 +209,16 @@ class GENOT:
         return loss
 
     def get_condition_embedding(self, condition: dict[str, ArrayLike]) -> ArrayLike:
-        """Encode conditions
+        """Get learnt embeddings of the conditions.
 
         Parameters
         ----------
-            condition
-                Conditions to encode
+        condition
+            Conditions to encode
 
         Returns
         -------
-            Encoded conditions
+        Encoded conditions.
         """
         dummy_source = jnp.zeros((1, self.source_dim))
         condition.update({GENOT_CELL_KEY: dummy_source})
@@ -232,26 +235,26 @@ class GENOT:
         condition: dict[str, ArrayLike] | None = None,
         rng: ArrayLike | None = None,
         **kwargs: Any,
-    ) -> ArrayLike:
-        """Transport data with the learned plan.
+    ) -> ArrayLike | tuple[ArrayLike, diffrax.Solution]:
+        """Generate the push-forward of ``'source'`` under condition ``'condition'``.
 
-        This function pushes forward the source distribution to its conditional
-        distribution by solving the neural ODE.
+        This function solves the ODE learnt with
+        the :class:`~cfp.networks.ConditionalVelocityField`.
 
         Parameters
         ----------
-            source
-                Data to transport.
-            condition
-                Condition of the input data.
-            rng
-                Random generate used to sample from the latent distribution.
-            kwargs
-                Keyword arguments for :func:`~diffrax.odesolve`.
+        source
+            Input data of shape [batch_size, ...].
+        condition
+            Condition of the input data of shape [batch_size, ...].
+        rng
+            Random generate used to sample from the latent distribution.
+        kwargs
+            Keyword arguments for :func:`~diffrax.odesolve`.
 
         Returns
         -------
-            The push-forward defined by the learned transport plan.
+        The push-forward distribution of ``'x'`` under condition ``'condition'``.
         """
         kwargs.setdefault("dt0", None)
         kwargs.setdefault("solver", diffrax.Tsit5())

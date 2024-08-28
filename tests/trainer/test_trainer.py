@@ -3,10 +3,10 @@ import jax.numpy as jnp
 import optax
 import pytest
 from ott.neural.methods.flows import dynamics
-from ott.solvers import utils as solver_utils
 
 import cfp
 from cfp.solvers import _otfm
+from cfp.utils import match_linear
 
 x_test = jnp.ones((10, 5)) * 10
 t_test = jnp.ones((10, 1))
@@ -27,7 +27,7 @@ class TestTrainer:
         )
         model = _otfm.OTFlowMatching(
             vf=vf,
-            match_fn=solver_utils.match_linear,
+            match_fn=match_linear,
             flow=dynamics.ConstantNoiseFlow(0.0),
             optimizer=opt,
             conditions=cond,
@@ -60,7 +60,7 @@ class TestTrainer:
         )
         model = _otfm.OTFlowMatching(
             vf=vf,
-            match_fn=solver_utils.match_linear,
+            match_fn=match_linear,
             flow=dynamics.ConstantNoiseFlow(0.0),
             optimizer=opt,
             conditions=cond,
