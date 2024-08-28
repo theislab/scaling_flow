@@ -56,24 +56,24 @@ class TestDataManager:
         assert dm._perturbation_covariates == perturbation_covariates
         assert dm._sample_covariates == sample_covariates
 
-    @pytest.mark.parametrize("el_to_delete", ["drug1", "cell_line_a"])
-    def raise_false_uns_dict(self, adata_perturbation: ad.AnnData, el_to_delete):
+    @pytest.mark.parametrize("el_to_delete", ["drug", "cell_type"])
+    def test_raise_false_uns_dict(self, adata_perturbation: ad.AnnData, el_to_delete):
+        from cfp.data._datamanager import DataManager
+        
         sample_rep = "X"
         split_covariates = ["cell_type"]
-        control_key = ("drug1", "control")
-        perturbation_covariates = {"drug": ("drug1", "drug2")}
+        control_key = "control"
+        perturbation_covariates = {"drug": ("drug_a", "drug_b")}
         perturbation_covariate_reps = {"drug": "drug"}
         sample_covariates = ["cell_type"]
         sample_covariate_reps = {"cell_type": "cell_type"}
 
-        if el_to_delete == "drug1":
-            del adata_perturbation.uns["drug"]["drug1"]
-        if el_to_delete == "cell_line_a":
-            del adata_perturbation.uns["cell_type"]["cell_line_a"]
+        if el_to_delete == "drug":
+            del adata_perturbation.uns["drug"]
+        if el_to_delete == "cell_type":
+            del adata_perturbation.uns["cell_type"]
 
-        from cfp.data._datamanager import DataManager
-
-        with pytest.raises(KeyError, match=r"Representation.*not found.*"):
+        with pytest.raises(ValueError, match=r".*representation.*not found.*"):
             _ = DataManager(
                 adata_perturbation,
                 sample_rep=sample_rep,
@@ -85,8 +85,8 @@ class TestDataManager:
                 sample_covariate_reps=sample_covariate_reps,
             )
 
-    @pytest.mark.parametrize("el_to_delete", ["drug1", "dosage_a"])
-    def raise_covar_mismatch(self, adata_perturbation: ad.AnnData, el_to_delete):
+    @pytest.mark.parametrize("el_to_delete", ["drug_b", "dosage_a"])
+    def test_raise_covar_mismatch(self, adata_perturbation: ad.AnnData, el_to_delete):
         from cfp.data._datamanager import DataManager
 
         sample_rep = "X"
@@ -97,13 +97,42 @@ class TestDataManager:
             "drug": ["drug_a", "drug_b"],
             "dosage": ["dosage_a", "dosage_b"],
         }
-        if el_to_delete == "drug1":
+        if el_to_delete == "drug_b":
             perturbation_covariates["drug"] = ["drug_b"]
-        if el_to_delete == "cell_line_a":
+        if el_to_delete == "dosage_a":
             perturbation_covariates["dosage"] = ["dosage_b"]
 
         with pytest.raises(
             ValueError, match=r".*perturbation covariate groups must match.*"
+        ):
+            _ = DataManager(
+                adata_perturbation,
+                sample_rep=sample_rep,
+                split_covariates=split_covariates,
+                control_key=control_key,
+                perturbation_covariates=perturbation_covariates,
+                perturbation_covariate_reps=perturbation_covariate_reps,
+            )
+
+    def test_raise_target_without_source(self, adata_perturbation: ad.AnnData):
+        from cfp.data._datamanager import DataManager
+
+        sample_rep = "X"
+        split_covariates = ["cell_type"]
+        control_key = "control"
+        perturbation_covariate_reps = {"drug": "drug"}
+        perturbation_covariates = {
+            "drug": ["drug_a", "drug_b"],
+            "dosage": ["dosage_a", "dosage_b"],
+        }
+        
+        adata_perturbation.obs.loc[
+            (adata_perturbation.obs['control'] == False) 
+            & (adata_perturbation.obs['cell_type'] == 'cell_line_a'), 
+            'cell_type'] = 'cell_line_b'
+
+        with pytest.raises(
+            ValueError, match=r"Source distribution with split covariate values \{\('cell_line_a',\)\} do not have a corresponding target distribution."
         ):
             _ = DataManager(
                 adata_perturbation,
