@@ -16,7 +16,7 @@ def match_linear(
     scale_cost: ScaleCost_t = "mean",
     tau_a: float = 1.0,
     tau_b: float = 1.0,
-    threshold: float = 1e-3,
+    threshold: float | None = None,
     **kwargs: Any,
 ) -> jnp.ndarray:
     """Compute solution to a linear OT problem.
@@ -48,6 +48,8 @@ def match_linear(
     -------
     Optimal transport matrix between ``'source_batch'`` and ``'target_batch'``.
     """
+    if threshold is None:
+        threshold = 1e-3 if (tau_a == 1.0 and tau_b == 1.0) else 1e-2
     geom = pointcloud.PointCloud(
         source_batch,
         target_batch,
