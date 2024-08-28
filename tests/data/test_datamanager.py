@@ -127,7 +127,7 @@ class TestDataManager:
         }
 
         adata_perturbation.obs.loc[
-            (adata_perturbation.obs["control"] == False)
+            (~adata_perturbation.obs["control"])
             & (adata_perturbation.obs["cell_type"] == "cell_line_a"),
             "cell_type",
         ] = "cell_line_b"

@@ -642,13 +642,9 @@ class DataManager:
                 raise ValueError(
                     f"Key should be a string, found {covar} to be of type {type(covar)}."
                 )
-        source_splits = adata.obs[adata.obs[control_key] == True][
-            data
-        ].drop_duplicates()
+        source_splits = adata.obs[adata.obs[control_key]][data].drop_duplicates()
         source_splits = map(tuple, source_splits.values)
-        target_splits = adata.obs[adata.obs[control_key] == False][
-            data
-        ].drop_duplicates()
+        target_splits = adata.obs[~adata.obs[control_key]][data].drop_duplicates()
         target_splits = map(tuple, target_splits.values)
         source_without_targets = set(source_splits) - set(target_splits)
         if len(source_without_targets) > 0:
