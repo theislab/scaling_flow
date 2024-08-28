@@ -35,3 +35,13 @@ Networks
     SelfAttention
     SeedAttentionPooling
     TokenAttentionPooling
+
+
+Utils
+~~~~~
+.. module:: cfp.utils
+.. currentmodule:: cfp.utils
+.. autosummary::
+    :toctree: genapi
+
+    match_linear

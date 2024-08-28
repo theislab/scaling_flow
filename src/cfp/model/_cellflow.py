@@ -2,7 +2,6 @@ import os
 import types
 from collections.abc import Callable, Sequence
 from dataclasses import field as dc_field
-from functools import partial
 from typing import Any, Literal
 
 import anndata as ad
@@ -14,7 +13,6 @@ import optax
 import pandas as pd
 from numpy.typing import ArrayLike
 from ott.neural.methods.flows import dynamics
-from ott.solvers import utils as solver_utils
 
 from cfp import _constants
 from cfp._types import Layers_separate_input_t, Layers_t
@@ -26,6 +24,7 @@ from cfp.plotting import _utils
 from cfp.solvers import _genot, _otfm
 from cfp.training._callbacks import BaseCallback
 from cfp.training._trainer import CellFlowTrainer
+from cfp.utils import match_linear
 
 __all__ = ["CellFlow"]
 
@@ -73,16 +72,16 @@ class CellFlow:
         Parameters
         ----------
         sample_rep
-            Key in :attr:`anndata.AnnData.obsm` where the sample representation is stored or ``'X'`` to use
-            :attr:`anndata.AnnData.X`.
+            Key in :attr:`~anndata.AnnData.obsm` of :attr:`cfp.model.CellFlow.adata` where the sample representation is stored or ``'X'`` to use
+            :attr:`~anndata.AnnData.X`.
         control_key
-            Key of a boolean column in :attr:`anndata.AnnData.obs` that defines the control samples.
+            Key of a boolean column in :attr:`~anndata.AnnData.obs` of :attr:`cfp.model.CellFlow.adata` that defines the control samples.
         perturbation_covariates
             A dictionary where the keys indicate the name of the covariate group and the values are
-            keys in :attr:`anndata.AnnData.obs`. The corresponding columns can be of the following types:
+            keys in :attr:`~anndata.AnnData.obs` of :attr:`cfp.model.CellFlow.adata`. The corresponding columns can be of the following types:
 
             - categorial: The column contains categories whose representation is stored in
-              :attr:`anndata.AnnData.uns`, see ``'perturbation_covariate_reps'``.
+              :attr:`~anndata.AnnData.uns`, see ``'perturbation_covariate_reps'``.
             - boolean: The perturbation is present or absent.
             - numeric: The perturbation is given as a numeric value, possibly linked to a categorical
               perturbation, e.g. dosages for a drug.
@@ -91,18 +90,18 @@ class CellFlow:
             perturbation and the others as covariates corresponding to these perturbations.
         perturbation_covariate_reps
             A :class:`dict` where the keys indicate the name of the covariate group and the values are
-            keys in :attr:`anndata.AnnData.uns` storing a dictionary with the representation of
+            keys in :attr:`~anndata.AnnData.uns` storing a dictionary with the representation of
             the covariates.
         sample_covariates
-            Keys in :attr:`anndata.AnnData.obs` indicating sample covariates. Sample covariates are
+            Keys in :attr:`~anndata.AnnData.obs` indicating sample covariates. Sample covariates are
             defined such that each cell has only one value for each sample covariate (in constrast to
             ``'perturbation_covariates'`` which can have multiple values for each cell). If :obj:`None`, no sample
         sample_covariate_reps
             A dictionary where the keys indicate the name of the covariate group and the values
-            are keys in :attr:`anndata.AnnData.uns` storing a dictionary with the representation
+            are keys in :attr:`~anndata.AnnData.uns` storing a dictionary with the representation
             of the covariates.
         split_covariates
-            Covariates in :attr:`anndata.AnnData.obs` to split all control cells into different
+            Covariates in :attr:`~anndata.AnnData.obs` to split all control cells into different
             control populations. The perturbed cells are also split according to these columns,
             but if any of the ``'split_covariates'`` has a representation which should be incorporated by
             the model, the corresponding column should also be used in ``'perturbation_covariates'``.
@@ -159,7 +158,7 @@ class CellFlow:
                     split_covariates=split_covariates,
                 )
         """
-        self.dm = DataManager(
+        self._dm = DataManager(
             self.adata,
             sample_rep=sample_rep,
             control_key=control_key,
@@ -173,7 +172,7 @@ class CellFlow:
         )
 
         # TODO: rename to self.train_data
-        self.train_data = self.dm.get_train_data(self.adata)
+        self.train_data = self._dm.get_train_data(self.adata)
 
         self._data_dim = self.train_data.cell_data.shape[-1]
 
@@ -192,8 +191,6 @@ class CellFlow:
             An :class:`anndata.AnnData` object.
         name
             Name of the validation data defining the key in :attr:`validation_data`.
-        condition_id_key
-            Key in :attr:`anndata.AnnData.obs` or `covariate_data` indicating the condition name.
         n_conditions_on_log_iterations
             Number of conditions to use for computation callbacks at each logged iteration.
             If :obj:`None`, use all conditions.
@@ -204,6 +201,7 @@ class CellFlow:
         Returns
         -------
         :obj:`None`, and updates the following fields:
+
         - :attr:`cfp.model.CellFlow.validation_data` - a dictionary with the validation data.
 
         """
@@ -211,7 +209,7 @@ class CellFlow:
             raise ValueError(
                 "Dataloader not initialized. Training data needs to be set up before preparing validation data. Please call prepare_data first."
             )
-        val_data = self.dm.get_validation_data(
+        val_data = self._dm.get_validation_data(
             adata,
             n_conditions_on_log_iteration=n_conditions_on_log_iteration,
             n_conditions_on_train_end=n_conditions_on_train_end,
@@ -243,9 +241,7 @@ class CellFlow:
         time_freqs: int = 1024,
         solver_kwargs: dict[str, Any] | None = None,
         flow: dict[Literal["constant_noise", "bridge"], float] | None = None,
-        match_fn: Callable[[ArrayLike, ArrayLike], ArrayLike] = partial(
-            solver_utils.match_linear, epsilon=0.1, scale_cost="mean"
-        ),
+        match_fn: Callable[[ArrayLike, ArrayLike], ArrayLike] = match_linear,
         optimizer: optax.GradientTransformation = optax.adam(1e-4),
         seed=0,
     ) -> None:
@@ -305,8 +301,8 @@ class CellFlow:
 
                 - ``'layer_type'`` of type :class:`str` indicating the type of the layer, can be
                   ``'mlp'`` or ``'self_attention'``.
-                - Further keys depend on the layer type, either for :class:`cfp.networks.MLPBlock` or for
-                  :class:`cfp.networks.SelfAttentionBlock` .
+                - Further keyword arguments for the layer type :class:`cfp.networks.MLPBlock` or
+                  :class:`cfp.networks.SelfAttentionBlock`.
 
             - :class:`dict` with keys corresponding to perturbation covariate keys, and values correspondinng to
               the above mentioned tuples.
@@ -343,9 +339,10 @@ class CellFlow:
 
             If :obj:`None`, defaults to ``'{"constant_noise": 0.0}'``.
         match_fn
-            Matching function between unperturbed and perturbed cells.
+            Matching function between unperturbed and perturbed cells. Should take as input source and target
+            data and return the optimal transport matrix, see e.g. :func:`cfp.utils.match_linear`.
         optimizer
-            Optimizer for training.
+            Optimizer used for training.
         seed
             Random seed.
 
@@ -365,7 +362,7 @@ class CellFlow:
 
         condition_encoder_kwargs = condition_encoder_kwargs or {}
         covariates_not_pooled = (
-            [] if pool_sample_covariates else self.dm.sample_covariates
+            [] if pool_sample_covariates else self._dm.sample_covariates
         )
         solver_kwargs = solver_kwargs or {}
         flow = flow or {"constant_noise": 0.0}
@@ -454,7 +451,11 @@ class CellFlow:
         valid_freq
             Frequency of validation.
         callbacks
-            Callbacks to perform at each validation step.
+            Callbacks to perform at each validation step. There are two types of callbacks:
+            - Callbacks for computations should inherit from :class:`cfp.training.ComputationCallback:` see e.g.
+              :class:`cfp.training.Metrics`.
+            - Callbacks for logging should inherit from :class:`~cfp.training.LoggingCallback` see e.g.
+              :class:`~cfp.training.WandbLogger`.
         monitor_metrics
             Metrics to monitor.
 
@@ -499,12 +500,14 @@ class CellFlow:
         Parameters
         ----------
         adata
-            An :class:`anndata.AnnData` object with the source representation.
+            An :class:`~anndata.AnnData` object with the source representation.
         sample_rep
-            Key in :attr:`anndata.AnnData.obsm` where the sample representation is stored or
-            ``'X'`` to use :attr:`anndata.AnnData.X`.
+            Key in :attr:`~anndata.AnnData.obsm` where the sample representation is stored or
+            ``'X'`` to use :attr:`~anndata.AnnData.X`.
         covariate_data
-            Covariate data defining the condition to predict.
+            Covariate data defining the condition to predict. This :class:`~pandas.DataFrame` should have the same
+            columns as :attr:`~anndata.AnnData.obs` of :attr:`cfp.model.CellFlow.adata`, and
+            as registered in :attr:`cfp.model.CellFlow.dm`.
         condition_id_key
             Key in ``'covariate_data'`` defining the condition name.
 
@@ -516,15 +519,15 @@ class CellFlow:
             raise ValueError("Model not trained. Please call `train` first.")
 
         if adata is not None and covariate_data is not None:
-            if self.dm.control_key not in adata.obs.columns:
+            if self._dm.control_key not in adata.obs.columns:
                 raise ValueError(
-                    f"If both `adata` and `covariate_data` are given, the control key `{self.dm.control_key}` must be in `adata.obs`."
+                    f"If both `adata` and `covariate_data` are given, the control key `{self._dm.control_key}` must be in `adata.obs`."
                 )
-            if not adata.obs[self.dm.control_key].all():
+            if not adata.obs[self._dm.control_key].all():
                 raise ValueError(
-                    f"If both `adata` and `covariate_data` are given, all samples in `adata` must be control samples, and thus `adata.obs[`{self.dm.control_key}`] must be set to `True` everywhere."
+                    f"If both `adata` and `covariate_data` are given, all samples in `adata` must be control samples, and thus `adata.obs[`{self._dm.control_key}`] must be set to `True` everywhere."
                 )
-        pred_data = self.dm.get_prediction_data(
+        pred_data = self._dm.get_prediction_data(
             adata,
             sample_rep=sample_rep,
             covariate_data=covariate_data,
@@ -555,16 +558,16 @@ class CellFlow:
             Can be one of
 
             - a :class:`pandas.DataFrame` defining the conditions with the same columns as the
-                :class:`anndata.AnnData` used for the initialisation of :class:`cfp.model.CellFlow`.
+              :class:`anndata.AnnData` used for the initialisation of :class:`cfp.model.CellFlow`.
             - an instance of :class:`cfp.data.ConditionData`.
 
-        rep_dict:
+        rep_dict
             Dictionary containing the representations of the perturbation covaraiates.
         condition_id_key
-            Key in :attr:`anndata.AnnData.obs` or defining the name of the condition. Only available
+            Key defining the name of the condition. Only available
             if ``'covariate_data'`` is a :class:`pandas.DataFrame`.
         key_added
-            Key to store the condition embedding in :attr:`anndata.AnnData.uns`.
+            Key to store the condition embedding in :attr:`~anndata.AnnData.uns`.
 
         Returns
         -------
@@ -573,7 +576,7 @@ class CellFlow:
         if self.solver is None:
             raise ValueError("Model not trained. Please call `train` first.")
 
-        if not self.dm.is_conditional:
+        if not self._dm.is_conditional:
             raise ValueError(
                 "Model is not conditional. Condition embeddings are not available."
             )
@@ -581,7 +584,7 @@ class CellFlow:
         if hasattr(covariate_data, "condition_data"):
             cond_data = covariate_data
         elif isinstance(covariate_data, pd.DataFrame):
-            cond_data = self.dm.get_condition_data(
+            cond_data = self._dm.get_condition_data(
                 covariate_data=covariate_data,
                 rep_dict=rep_dict,
                 condition_id_key=condition_id_key,
@@ -605,10 +608,10 @@ class CellFlow:
         df = pd.DataFrame.from_dict(
             {k: v[0] for k, v in condition_embeddings.items()}  # type: ignore[index]
         ).T
-        indices = list(self.dm.sample_covariates)
-        for pert_cov in self.dm.perturbation_covariates:
+        indices = list(self._dm.sample_covariates)
+        for pert_cov in self._dm.perturbation_covariates:
             indices += [
-                f"{pert_cov}_{i}" for i in range(self.dm.max_combination_length)
+                f"{pert_cov}_{i}" for i in range(self._dm.max_combination_length)
             ]
         df.index.set_names(indices, inplace=True)
         df.drop_duplicates(inplace=True)
@@ -662,7 +665,7 @@ class CellFlow:
     def load(
         cls,
         filename: str,
-    ):
+    ) -> "CellFlow":
         """
         Load a :class:`cfp.model.CellFlow` model from a saved instance.
 
@@ -693,12 +696,12 @@ class CellFlow:
 
     @property
     def adata(self) -> ad.AnnData:
-        """The :class:`anndata.AnnData` object used for training."""
+        """The :class:`~anndata.AnnData` object used for training."""
         return self._adata
 
     @property
     def solver(self) -> _otfm.OTFlowMatching | _genot.GENOT | None:
-        """The trained solver."""
+        """The solver."""
         return self._solver
 
     @property
@@ -717,8 +720,13 @@ class CellFlow:
         return self._validation_data
 
     @property
+    def data_manager(self) -> DataManager:
+        """The data manager, initialised with :attr:`cfp.model.CellFlow.adata`."""
+        return self._dm
+
+    @property
     def velocity_field(self) -> ConditionalVelocityField | None:
-        """The velocity field."""
+        """The conditional velocity field."""
         return self._vf
 
     @velocity_field.setter
