@@ -19,6 +19,7 @@ from cfp._types import Layers_separate_input_t, Layers_t
 from cfp.data._data import ConditionData, ValidationData
 from cfp.data._dataloader import PredictionSampler, TrainSampler, ValidationSampler
 from cfp.data._datamanager import DataManager
+from cfp.model._utils import _write_predictions
 from cfp.networks._velocity_field import ConditionalVelocityField
 from cfp.plotting import _utils
 from cfp.solvers import _genot, _otfm
@@ -494,6 +495,7 @@ class CellFlow:
         sample_rep: str,
         covariate_data: pd.DataFrame,
         condition_id_key: str | None = None,
+        prefix_to_store: str | None = _constants.PREDICTION_PREFIX,
     ) -> dict[str, dict[str, ArrayLike]] | dict[str, ArrayLike]:
         """Predict perturbation responses.
 
@@ -510,6 +512,8 @@ class CellFlow:
             as registered in :attr:`cfp.model.CellFlow.dm`.
         condition_id_key
             Key in ``'covariate_data'`` defining the condition name.
+        prefix_to_store
+            Prefix to store the prediction in :attr:`~anndata.AnnData.obsm`.
 
         Returns
         -------
@@ -538,7 +542,13 @@ class CellFlow:
         src = batch["source"]
         condition = batch.get("condition", None)
         out = jax.tree.map(self.solver.predict, src, condition)  # type: ignore[union-attr]
-
+        if prefix_to_store is not None:
+            _write_predictions(
+                adata=adata,
+                predictions=out,
+                pred_data=pred_data,
+                prefix_to_store=prefix_to_store,
+            )
         return out
 
     def get_condition_embedding(
