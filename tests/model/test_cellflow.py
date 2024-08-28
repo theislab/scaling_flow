@@ -59,11 +59,13 @@ class TestCellFlow:
             adata_perturbation_pred,
             sample_rep=sample_rep,
             covariate_data=adata_perturbation_pred.obs,
+            key_added="MY_PREDICTION_",
         )
         assert isinstance(pred, dict)
-        out = next(iter(pred.values()))
+        key, out = next(iter(pred.items()))
         assert out.shape[0] == adata_perturbation.n_obs
         assert out.shape[1] == cf._data_dim
+        assert "MY_PREDICTION_" + key in adata_perturbation_pred.obsm
 
         if solver == "genot":
             pred2 = cf.predict(

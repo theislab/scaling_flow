@@ -292,9 +292,7 @@ class GENOT:
         x_pred = jax.jit(
             jax.vmap(jax.vmap(solve_ode, in_axes=[0, None, 0]), in_axes=[1, None, None])
         )(latent, condition, source)
-        x_pred = np.transpose(np.array(x_pred), (1, 2, 0))
-        print(x_pred.shape)
-        return x_pred
+        return np.transpose(np.array(x_pred), (1, 2, 0))
 
     @property
     def is_trained(self) -> bool:

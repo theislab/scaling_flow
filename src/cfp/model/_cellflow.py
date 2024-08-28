@@ -499,7 +499,7 @@ class CellFlow:
         key_added_prefix: str | None = _constants.PREDICTION_PREFIX,
         n_samples: int = 1,
         **kwargs: Any,
-    ) -> dict[str, dict[str, ArrayLike]] | dict[str, ArrayLike]:
+    ) -> dict[str, ArrayLike]:
         """Predict perturbation responses.
 
         Parameters
@@ -516,7 +516,8 @@ class CellFlow:
         condition_id_key
             Key in ``'covariate_data'`` defining the condition name.
         key_added_prefix
-            Prefix to store the prediction in :attr:`~anndata.AnnData.obsm`.
+            Prefix to store the prediction in :attr:`~anndata.AnnData.obsm`. If :obj:`None`, the predictions are
+            not stored.
         n_samples
             Number of perturbed cells to generate for each single cell in the control population.
             Only available if :attr:`cfp.model.CellFlow.solver` is an instance of :class:`cfp.solvers.GENOT`.

@@ -232,8 +232,6 @@ class PredictionSampler(BaseValidSampler):
         return {
             "source": cell_rep_dict,
             "condition": cond_dict,
-            "source_cells_mask": source_cells_mask,
-            "source_idcs": source_idcs,
         }
 
     @property
