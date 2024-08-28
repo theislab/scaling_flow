@@ -65,6 +65,19 @@ class TestCellFlow:
         assert out.shape[0] == adata_perturbation.n_obs
         assert out.shape[1] == cf._data_dim
 
+        if solver == "genot":
+            pred2 = cf.predict(
+                adata_perturbation_pred,
+                sample_rep=sample_rep,
+                covariate_data=adata_perturbation_pred.obs,
+                n_samples=2,
+            )
+            assert isinstance(pred2, dict)
+            out = next(iter(pred2.values()))
+            assert out.shape[0] == adata_perturbation.n_obs
+            assert out.shape[1] == cf._data_dim
+            assert out.shape[2] == 2
+
         conds = adata_perturbation.obs.drop_duplicates(subset=["drug1", "drug2"])
         cond_embed = cf.get_condition_embedding(conds, rep_dict=adata_perturbation.uns)
         assert isinstance(cond_embed, pd.DataFrame)

@@ -1,3 +1,4 @@
+import functools
 import os
 import types
 from collections.abc import Callable, Sequence
@@ -495,7 +496,9 @@ class CellFlow:
         sample_rep: str,
         covariate_data: pd.DataFrame,
         condition_id_key: str | None = None,
-        prefix_to_store: str | None = _constants.PREDICTION_PREFIX,
+        key_added_prefix: str | None = _constants.PREDICTION_PREFIX,
+        n_samples: int = 1,
+        **kwargs: Any,
     ) -> dict[str, dict[str, ArrayLike]] | dict[str, ArrayLike]:
         """Predict perturbation responses.
 
@@ -512,16 +515,28 @@ class CellFlow:
             as registered in :attr:`cfp.model.CellFlow.dm`.
         condition_id_key
             Key in ``'covariate_data'`` defining the condition name.
-        prefix_to_store
+        key_added_prefix
             Prefix to store the prediction in :attr:`~anndata.AnnData.obsm`.
+        n_samples
+            Number of perturbed cells to generate for each single cell in the control population.
+            Only available if :attr:`cfp.model.CellFlow.solver` is an instance of :class:`cfp.solvers.GENOT`.
+        kwargs
+            Keyword arguments for the predict function, i.e. :meth:`cfp.solvers.OTFlowMatching.predict` or
+            :meth:`cfp.solvers.GENOT.predict`.
 
         Returns
         -------
-        A :class:`dict` with the predicted sample representation for each source distribution and condition.
+        A :class:`dict` with the predicted sample representation for each perturbation.
         """
         if not self.solver.is_trained:  # type: ignore[union-attr]
             raise ValueError("Model not trained. Please call `train` first.")
 
+        if n_samples > 1:
+            if not isinstance(self.solver, _genot.GENOT):
+                raise ValueError(
+                    "Multiple samples can only be generated if the solver is `genot`."
+                )
+            kwargs["n_samples"] = n_samples
         if adata is not None and covariate_data is not None:
             if self._dm.control_key not in adata.obs.columns:
                 raise ValueError(
@@ -541,13 +556,17 @@ class CellFlow:
         batch = pred_loader.sample()
         src = batch["source"]
         condition = batch.get("condition", None)
-        out = jax.tree.map(self.solver.predict, src, condition)  # type: ignore[union-attr]
-        if prefix_to_store is not None:
+        out = jax.tree.map(functools.partial(self.solver.predict, **kwargs), src, condition)  # type: ignore[union-attr]
+        if key_added_prefix is not None:
+            if len(pred_data.control_to_perturbation) > 1:
+                raise ValueError(
+                    f"When saving predictions to `adata`, all control cells must be from the same control \
+                                  population, but found {len(pred_data.control_to_perturbation)} control populations."
+                )
             _write_predictions(
                 adata=adata,
                 predictions=out,
-                pred_data=pred_data,
-                prefix_to_store=prefix_to_store,
+                key_added_prefix=key_added_prefix,
             )
         return out
 

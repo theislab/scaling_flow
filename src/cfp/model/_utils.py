@@ -4,7 +4,6 @@ import jax.numpy as jnp
 
 from cfp import _constants
 from cfp._types import ArrayLike
-from cfp.data.dataloader import PredictionData
 
 
 def _multivariate_normal(
@@ -21,9 +20,17 @@ def _multivariate_normal(
 
 def _write_predictions(
     adata: ad.AnnData,
-    predictions: dict[str, dict[str, ArrayLike]] | dict[str, ArrayLike],
-    pred_data: PredictionData,
-    prefix_to_store: str = _constants.PREDICTION_PREFIX,
+    predictions: dict[str, ArrayLike],
+    key_added_prefix: str = _constants.PREDICTION_PREFIX,
 ) -> None:
 
-    pass
+    for pred_key, pred_value in predictions.items():
+        if pred_value.ndim == 2:
+            adata.obsm[f"{key_added_prefix}{pred_key}"] = pred_value
+        elif pred_value.ndim == 3:
+            for i in range(pred_value.shape[2]):
+                adata.obsm[f"{key_added_prefix}{pred_key}_{i}"] = pred_value[i]
+        else:
+            raise ValueError(
+                f"Predictions for '{pred_key}' have an invalid shape: {pred_value.shape}"
+            )
