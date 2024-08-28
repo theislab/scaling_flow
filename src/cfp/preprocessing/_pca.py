@@ -48,8 +48,8 @@ def centered_pca(
     adata = adata.copy() if copy else adata
     X = adata.X if layer in [None, "X"] else adata.layers[layer]
 
-    adata.varm["X_mean"] = X.mean(axis=0).T
-    adata.layers["X_centered"] = adata.X - adata.varm["X_mean"].T
+    adata.varm["X_mean"] = np.array(X.mean(axis=0).T)
+    adata.layers["X_centered"] = np.array(adata.X - adata.varm["X_mean"].T)
 
     if method == "rapids":
         try:
