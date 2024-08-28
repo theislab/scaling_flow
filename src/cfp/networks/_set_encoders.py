@@ -47,7 +47,7 @@ class MLPBlock(BaseModule):
         Activation function.
     """
 
-    dims: Sequence[int] = (128, 128, 128)
+    dims: Sequence[int] = (1024, 1024, 1024)
     dropout_rate: float = 0.0
     act_last_layer: bool = True
     act_fn: Callable[[jnp.ndarray], jnp.ndarray] = nn.silu
@@ -61,13 +61,15 @@ class MLPBlock(BaseModule):
         ----------
         x
             Input tensor of shape ``(batch_size, input_dim)``.
-        training : bool
+        training
             Whether the model is in training mode.
 
         Returns
         -------
         Output tensor of shape ``(batch_size, output_dim)``.
         """
+        if len(self.dims) == 0:
+            return x
         z = x
         for i in range(len(self.dims) - 1):
             z = self.act_fn(nn.Dense(self.dims[i])(z))
@@ -398,7 +400,10 @@ class ConditionEncoder(BaseModule):
     output_dim
         Dimensionality of the output.
     pooling
-        Pooling method.
+        Pooling method, should be one of:
+        - ``'mean'``: Aggregates combinations of covariates by the mean of their learned embeddings.
+        - ``'attention_token'``: Aggregates combinations of covariates by an attention mechanism with a token.
+        - ``'attention_seed'``: Aggregates combinations of covariates by an attention mechanism with a seed.
     pooling_kwargs
         Keyword arguments for the pooling method.
     covariates_not_pooled

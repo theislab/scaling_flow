@@ -133,7 +133,7 @@ class DataManager:
         Parameters
         ----------
         adata
-            An :class:`~anndata.Anndata` object.
+            An :class:`anndata.AnnData` object.
 
         Returns
         -------
@@ -202,12 +202,25 @@ class DataManager:
         rep_dict: dict[str, Any] | None = None,
         condition_id_key: str | None = None,
     ) -> Any:
-        """Get training data for the model.
+        """Get predictions for control cells.
+
+        Extracts source distributions from  ``'adata'`` and simulates cells perturbed
+        with covariates defined in ``'covariate_data'``.
 
         Parameters
         ----------
         adata
-            An :class:`~anndata.Anndata` object.
+            An :class:`anndata.AnnData` object to extract control cells from.
+        sample_rep
+            Key in :attr:`~anndata.AnnData.obsm` where the sample representation of the control
+            is stored or `X` to use :attr:`~anndata.AnnData.X`.
+        covariate_data
+            A :class:`~pandas.DataFrame` with columns defining the covariates as in :meth:`cfp.model.CellFlow.prepare_data`
+            and stored in :attr:`dm`.
+        rep_dict
+            Dictionary with representations of the covariates. If not provided, :attr:`~anndata.AnnData.uns` is used.
+        condition_id_key
+            Key in :attr:`~pandas.DataFrame` that defines the condition names.
 
         Returns
         -------
@@ -939,7 +952,7 @@ class DataManager:
 
     @property
     def adata(self) -> anndata.AnnData:
-        """An :class:`~anndata.Anndata` object used for instantiating the DataManager."""
+        """An :class:`anndata.AnnData` object used for instantiating the DataManager."""
         return self._adata
 
     @property
