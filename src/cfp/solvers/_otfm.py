@@ -16,9 +16,10 @@ __all__ = ["OTFlowMatching"]
 
 
 class OTFlowMatching:
-    """(Optimal transport) flow matching :cite:`lipman:22`.
+    """(OT) flow matching :cite:`lipman:22` extended to the conditional setting.
 
-    With an extension to OT-FM :cite:`tong:23,pooladian:23`.
+    With an extension to OT-CFM :cite:`tong:23,pooladian:23`, and its
+    unbalanced version :cite:`eyring:24`.
 
     Parameters
     ----------
@@ -28,9 +29,15 @@ class OTFlowMatching:
             Flow between the source and the target distributions.
         match_fn
             Function to match samples from the source and the target
-            distributions. It has a ``(src, tgt) -> matching`` signature.
+            distributions. It has a ``(src, tgt) -> matching`` signature,
+            see e.g. :func:`cfp.utils.match_linear`. If :obj:`None`, no
+            matching is performed, and pure flow matching :cite:`lipman:22`
+            is applied.
         time_sampler
-            Time sampler with a ``(rng, n_samples) -> time`` signature.
+            Time sampler with a ``(rng, n_samples) -> time`` signature, see e.g.
+            :func:`ott.solvers.utils.uniform_sampler`.
+        kwargs
+            Keyword arguments for :meth:`cfp.networks.ConditionalVelocityField.create_train_state`.
     """
 
     def __init__(
@@ -101,8 +108,21 @@ class OTFlowMatching:
         self,
         rng: jnp.ndarray,
         batch: dict[str, ArrayLike],
-    ):
-        """Outer step function for OTFM solver."""
+    ) -> float:
+        """Single step function of the solver.
+
+        Parameters
+        ----------
+        rng
+            Random number generator.
+        batch
+            Data batch with keys `src_cell_data`, `tgt_cell_data`, and
+            optionally `condition`.
+
+        Returns
+        -------
+        Loss value.
+        """
         src, tgt = batch["src_cell_data"], batch["tgt_cell_data"]
         condition = batch.get("condition")
         rng_resample, rng_step_fn = jax.random.split(rng, 2)
@@ -121,16 +141,16 @@ class OTFlowMatching:
         return loss
 
     def get_condition_embedding(self, condition: dict[str, ArrayLike]) -> ArrayLike:
-        """Encode conditions
+        """Get learnt embeddings of the conditions.
 
         Parameters
         ----------
-            condition
-                Conditions to encode
+        condition
+            Conditions to encode
 
         Returns
         -------
-            Encoded conditions
+        Encoded conditions.
         """
         cond_embed = self.vf.apply(
             {"params": self.vf_state.params},
@@ -142,9 +162,10 @@ class OTFlowMatching:
     def predict(
         self, x: ArrayLike, condition: dict[str, ArrayLike], **kwargs: Any
     ) -> ArrayLike:
-        """Predict the push-forward of the data.
+        """Predict the translated source ``'x'`` under condition ``'condition'``.
 
-        TODO: add the option to return the ODE solution
+        This function solves the ODE learnt with
+        the :class:`~cfp.networks.ConditionalVelocityField`.
 
         Parameters
         ----------
@@ -153,11 +174,11 @@ class OTFlowMatching:
         condition
             Condition of the input data of shape [batch_size, ...].
         kwargs
-            Keyword arguments for the ODE solver.
+            Keyword arguments for :func:`~diffrax.odesolve`.
 
         Returns
         -------
-        The generated single cells.
+        The push-forward distribution of ``'x'`` under condition ``'condition'``.
         """
         kwargs.setdefault("dt0", None)
         kwargs.setdefault("solver", diffrax.Tsit5())
