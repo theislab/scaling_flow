@@ -29,7 +29,7 @@ def _write_predictions(
             adata.obsm[f"{key_added_prefix}{pred_key}"] = pred_value
         elif pred_value.ndim == 3:
             for i in range(pred_value.shape[2]):
-                adata.obsm[f"{key_added_prefix}{pred_key}_{i}"] = pred_value[i]
+                adata.obsm[f"{key_added_prefix}{pred_key}_{i}"] = pred_value[..., i]
         else:
             raise ValueError(
                 f"Predictions for '{pred_key}' have an invalid shape: {pred_value.shape}"

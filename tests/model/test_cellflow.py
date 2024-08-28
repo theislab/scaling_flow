@@ -65,9 +65,12 @@ class TestCellFlow:
         key, out = next(iter(pred.items()))
         assert out.shape[0] == adata_perturbation.n_obs
         assert out.shape[1] == cf._data_dim
-        assert "MY_PREDICTION_" + key in adata_perturbation_pred.obsm
+
+        if solver == "otfm":
+            assert "MY_PREDICTION_" + str(key) in adata_perturbation_pred.obsm
 
         if solver == "genot":
+            assert "MY_PREDICTION_" + str(key) + "_0" in adata_perturbation_pred.obsm
             pred2 = cf.predict(
                 adata_perturbation_pred,
                 sample_rep=sample_rep,
