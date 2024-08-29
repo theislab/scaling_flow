@@ -362,7 +362,7 @@ class CellFlow:
         -------
         Updates the following fields:
 
-        - :attr:`cfp.model.CellFlow.vf` - an instance of the :class:`cfp.networks.ConditionalVelocityField`.
+        - :attr:`cfp.model.CellFlow.velocity_field` - an instance of the :class:`cfp.networks.ConditionalVelocityField`.
         - :attr:`cfp.model.CellFlow.solver` - an instance of :class:`cfp.solvers.OTFlowMatching` or :class:`cfp.solvers.GENOT`.
         - :attr:`cfp.model.CellFlow.trainer` - an instance of the :class:`cfp.training.CellFlowTrainer`.
         """
