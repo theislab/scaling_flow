@@ -386,8 +386,8 @@ class CellFlow:
                 condition_encoder_kwargs["genot_source_layers"] = (
                     {
                         "layer_type": "mlp",
-                        "hidden_dims": [1024, 1024, 1024],
-                        "dropout": 0.0,
+                        "dims": [1024, 1024, 1024],
+                        "dropout_rate": 0.0,
                     },
                 )
             else:
