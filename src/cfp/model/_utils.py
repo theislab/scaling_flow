@@ -2,7 +2,6 @@ import anndata as ad
 import jax
 import jax.numpy as jnp
 
-from cfp import _constants
 from cfp._types import ArrayLike
 
 
@@ -21,7 +20,7 @@ def _multivariate_normal(
 def _write_predictions(
     adata: ad.AnnData,
     predictions: dict[str, ArrayLike],
-    key_added_prefix: str = _constants.PREDICTION_PREFIX,
+    key_added_prefix: str,
 ) -> None:
 
     for pred_key, pred_value in predictions.items():

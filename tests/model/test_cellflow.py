@@ -59,13 +59,20 @@ class TestCellFlow:
             adata_perturbation_pred,
             sample_rep=sample_rep,
             covariate_data=adata_perturbation_pred.obs,
-            key_added_prefix="MY_PREDICTION_",
         )
         assert isinstance(pred, dict)
         key, out = next(iter(pred.items()))
         assert out.shape[0] == adata_perturbation.n_obs
         assert out.shape[1] == cf._data_dim
 
+        pred_stored = cf.predict(
+            adata_perturbation_pred,
+            sample_rep=sample_rep,
+            covariate_data=adata_perturbation_pred.obs,
+            key_added_prefix="MY_PREDICTION_",
+        )
+
+        assert pred_stored is None
         if solver == "otfm":
             assert "MY_PREDICTION_" + str(key) in adata_perturbation_pred.obsm
 
