@@ -628,7 +628,7 @@ class CellFlow:
         n_conditions = len(next(iter(cond_data.condition_data.values())))
         for i in range(n_conditions):
             condition = {k: v[[i], :] for k, v in cond_data.condition_data.items()}
-            if len(cond_data.perturbation_idx_to_id):
+            if condition_id_key:
                 c_key = cond_data.perturbation_idx_to_id[i]
             else:
                 cov_combination = cond_data.perturbation_idx_to_covariates[i]
@@ -638,12 +638,11 @@ class CellFlow:
         df = pd.DataFrame.from_dict(
             {k: v[0] for k, v in condition_embeddings.items()}  # type: ignore[index]
         ).T
-        indices = list(self._dm.sample_covariates)
-        for pert_cov in self._dm.perturbation_covariates:
-            indices += [
-                f"{pert_cov}_{i}" for i in range(self._dm.max_combination_length)
-            ]
-        df.index.set_names(indices, inplace=True)
+
+        if condition_id_key:
+            df.index.set_names([condition_id_key], inplace=True)
+        else:
+            df.index.set_names(list(self._dm.perturb_covar_keys), inplace=True)
 
         if key_added is not None:
             _utils.set_plotting_vars(self.adata, key=key_added, value=df)
