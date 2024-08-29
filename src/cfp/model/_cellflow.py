@@ -644,7 +644,6 @@ class CellFlow:
                 f"{pert_cov}_{i}" for i in range(self._dm.max_combination_length)
             ]
         df.index.set_names(indices, inplace=True)
-        df.drop_duplicates(inplace=True)
 
         if key_added is not None:
             _utils.set_plotting_vars(self.adata, key=key_added, value=df)
