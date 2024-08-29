@@ -302,3 +302,22 @@ class TestCellFlow:
             match=r".*If both `adata` and `covariate_data` are given, all samples in `adata` must be control samples*",
         ):
             cf.predict(adata_pred, sample_rep="X", covariate_data=covariate_data)
+
+    def test_raise_genot_no_layers_passed(self, adata_perturbation):
+        cf = cfp.model.CellFlow(adata_perturbation, solver="genot")
+        cf.prepare_data(
+            sample_rep="X",
+            control_key="control",
+            perturbation_covariates={"drug": ["drug1"]},
+            perturbation_covariate_reps={"drug": "drug"},
+        )
+        with pytest.raises(
+            ValueError,
+            match=r".*For GENOT, 'genot_source_layers' must be provided in 'condition_encoder_kwargs'*",
+        ):
+            cf.prepare_model(
+                condition_embedding_dim=32,
+                hidden_dims=(32, 32),
+                decoder_dims=(32, 32),
+                condition_encoder_kwargs={},
+            )
