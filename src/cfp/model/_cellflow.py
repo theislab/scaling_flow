@@ -251,7 +251,14 @@ class CellFlow:
         When :attr:`solver` is an instance of :class:`cfp.solvers._genot.GENOT`, the following arguments have
         to be passed to ``'condition_encoder_kwargs'``:
 
-        - ``'genot_source_layers'``: Layers processing the cell data serving as an additional condition to the model (see :cite:`klein:23`).
+        - ``'genot_source_layers'``: Layers processing the cell data serving as an additional condition to the
+        model (see :cite:`klein:23`). Should be of the same form as ``'layers_after_pool'``, i.e. a :class:`Tuple`
+        with each element a :class:`dict` with keys:
+
+                - ``'layer_type'`` of type :class:`str` indicating the type of the layer, can be
+                  ``'mlp'`` or ``'self_attention'``.
+                - Further keyword arguments for the layer type :class:`cfp.networks.MLPBlock` or
+                  :class:`cfp.networks.SelfAttentionBlock`.
 
         Parameters
         ----------
