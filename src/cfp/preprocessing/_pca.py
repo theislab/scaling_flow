@@ -3,6 +3,7 @@ import numpy as np
 import scanpy as sc
 from numpy.typing import ArrayLike
 from scipy.sparse import csr_matrix
+from functools import partial
 
 __all__ = ["centered_pca", "reconstruct_pca", "project_pca"]
 
@@ -11,6 +12,7 @@ def centered_pca(
     adata: ad.AnnData,
     n_comps: int = 50,
     layer: str | None = None,
+    method: str = "scanpy",
     copy: bool = False,
     **kwargs,
 ) -> ad.AnnData | None:
@@ -24,6 +26,8 @@ def centered_pca(
         Number of principal components to compute.
     layer : str
         Layer in `adata.layers` to use for PCA.
+    method : str
+        Method to use for PCA. If `rapids`, uses `rapids_singlecell` with GPU acceleration. Otherwise, uses `scanpy`.
     copy : bool
         Return a copy of `adata` instead of updating it in place.
     kwargs : dict
@@ -31,7 +35,7 @@ def centered_pca(
 
     Returns
     -------
-        If `copy` is :obj::obj:`True`, returns a new :class:`~anndata.AnnData` object with the PCA results stored in `adata.obsm`. Otherwise, updates `adata` in place.
+        If `copy` is :obj:`True`, returns a new :class:`~anndata.AnnData` object with the PCA results stored in `adata.obsm`. Otherwise, updates `adata` in place.
 
         Sets the following fields:
         `.obsm["X_pca"]`: PCA coordinates.
@@ -44,16 +48,40 @@ def centered_pca(
     adata = adata.copy() if copy else adata
     X = adata.X if layer in [None, "X"] else adata.layers[layer]
 
-    adata.varm["X_mean"] = X.mean(axis=0).T
-    adata.layers["X_centered"] = csr_matrix(adata.X - adata.varm["X_mean"].T)
-    sc.pp.pca(
-        adata,
-        n_comps=n_comps,
-        layer="X_centered",
-        zero_center=False,
-        copy=False,
-        **kwargs,
-    )
+    adata.varm["X_mean"] = np.array(X.mean(axis=0).T)
+    adata.layers["X_centered"] = np.array(adata.X - adata.varm["X_mean"].T)
+
+    if method == "rapids":
+        try:
+            import rapids_singlecell as rsc
+        except ImportError:
+            raise ImportError(
+                "rapids_singlecell is not installed. To use GPU acceleration for pca computation, please install it via `pip install rapids-singlecell`."
+            ) from None
+        else:
+            rsc.pp.pca(
+                adata,
+                n_comps=n_comps,
+                layer="X_centered",
+                zero_center=False,
+                copy=False,
+                **kwargs,
+            )
+    elif method == "scanpy" or method is None:
+        sc.pp.pca(
+            adata,
+            n_comps=n_comps,
+            layer="X_centered",
+            zero_center=False,
+            copy=False,
+            **kwargs,
+        )
+    else:
+        raise ValueError(
+            f"Invalid method: {method}. Valid options are 'scanpy' and 'rapids'."
+        )
+
+    adata.layers["X_centered"] = csr_matrix(adata.layers["X_centered"])
 
     if copy:
         return adata

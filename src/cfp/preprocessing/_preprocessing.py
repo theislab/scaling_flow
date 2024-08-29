@@ -45,10 +45,10 @@ def annotate_compounds(
     """
     try:
         import pertpy as pt
-    except ImportError:
+    except ImportError as e:
         raise ImportError(
             "pertpy is not installed. To annotate compounds, please install it via `pip install pertpy`."
-        ) from None
+        ) from e
 
     adata = adata.copy() if copy else adata
 
@@ -81,6 +81,17 @@ def annotate_compounds(
             .tolist()
         )
         not_found.update(na_values)
+
+        # Drop columns with new annotations
+        adata.obs.drop(
+            columns=[
+                f"{prefix}_pubchem_name",
+                f"{prefix}_pubchem_ID",
+                f"{prefix}_smiles",
+            ],
+            errors="ignore",
+            inplace=True,
+        )
 
         # Rename with index to not overwrite existing columns
         adata.obs.rename(

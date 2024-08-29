@@ -5,6 +5,7 @@ import pytest
 import cfp
 
 perturbation_covariate_comb_args = [
+    {"drug": ["drug1"]},
     {"drug": ["drug1", "drug2"], "dosage": ["dosage_a", "dosage_b"]},
     {
         "drug": ["drug_a", "drug_b", "drug_c"],
@@ -346,3 +347,68 @@ class TestCellFlow:
                 decoder_dims=(32, 32),
                 genot_source_layers=({"layer_type": "mlp", "dims": (32, 32)},),
             )
+
+    @pytest.mark.parametrize(
+        "sample_covariate_and_reps",
+        [(None, None), (["cell_type"], {"cell_type": "cell_type"})],
+    )
+    @pytest.mark.parametrize("split_covariates", [None, ["cell_type"]])
+    @pytest.mark.parametrize(
+        "perturbation_covariates", perturbation_covariate_comb_args
+    )
+    def test_cellflow_get_condition_embedding(
+        self,
+        adata_perturbation,
+        sample_covariate_and_reps,
+        split_covariates,
+        perturbation_covariates,
+    ):
+        sample_rep = "X"
+        control_key = "control"
+        perturbation_covariate_reps = {"drug": "drug"}
+        sample_covariates = sample_covariate_and_reps[0]
+        sample_covariate_reps = sample_covariate_and_reps[1]
+        condition_embedding_dim = 32
+        solver = "otfm"
+
+        cf = cfp.model.CellFlow(adata_perturbation, solver=solver)
+        cf.prepare_data(
+            sample_rep=sample_rep,
+            control_key=control_key,
+            perturbation_covariates=perturbation_covariates,
+            perturbation_covariate_reps=perturbation_covariate_reps,
+            sample_covariates=sample_covariates,
+            sample_covariate_reps=sample_covariate_reps,
+        )
+        assert cf.train_data is not None
+        assert isinstance(cf._dm.perturb_covar_keys, list)
+        assert hasattr(cf, "_data_dim")
+
+        cf.prepare_model(
+            condition_embedding_dim=condition_embedding_dim,
+            hidden_dims=(32, 32),
+            decoder_dims=(32, 32),
+        )
+        assert cf._trainer is not None
+
+        cf.train(num_iterations=3)
+        assert cf._dataloader is not None
+
+        conds = adata_perturbation.obs.drop_duplicates(subset=cf._dm.perturb_covar_keys)
+        cond_embed = cf.get_condition_embedding(conds, rep_dict=adata_perturbation.uns)
+        assert isinstance(cond_embed, pd.DataFrame)
+        assert cond_embed.shape[0] == conds.shape[0]
+        assert cond_embed.shape[1] == condition_embedding_dim
+
+        # Test if condition_id_key works
+        condition_id_key = "condition_id"
+        conds[condition_id_key] = range(len(conds))
+        conds[condition_id_key] = "cond_" + conds[condition_id_key].astype(str)
+        cond_embed = cf.get_condition_embedding(
+            conds, rep_dict=adata_perturbation.uns, condition_id_key=condition_id_key
+        )
+        assert isinstance(cond_embed, pd.DataFrame)
+        assert cond_embed.shape[0] == conds.shape[0]
+        assert cond_embed.index.name == condition_id_key
+        cond_id_vals = conds[condition_id_key].values
+        assert cond_embed.index.isin(cond_id_vals).all()

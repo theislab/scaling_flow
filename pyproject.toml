@@ -75,6 +75,7 @@ pp = [
     "rdkit",
     "pynndescent",
     "cuml",
+    "rapids_singlecell",
 ]
 
 [tool.hatch.build.targets.wheel]

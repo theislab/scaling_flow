@@ -459,11 +459,11 @@ class DataManager:
             and condition_id_key not in covariate_data.columns
         ):
             raise ValueError(
-                f"Condition id key '{condition_id_key}' is required for prediction but was not found in provided data."
+                f"The `condition_id_key` column ('{condition_id_key}') was not found in `adata.obs`."
             )
-        if not covariate_data[condition_id_key].value_counts().eq(1).all():
+        if not len(covariate_data[condition_id_key].unique()) == len(covariate_data):
             raise ValueError(
-                f"The column `condition_id_key` '{condition_id_key}' must contain unique values."
+                f"The `condition_id_key` column ('{condition_id_key}') must contain unique values."
             )
 
     @staticmethod
