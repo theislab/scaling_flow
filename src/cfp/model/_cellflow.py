@@ -252,8 +252,6 @@ class CellFlow:
         to be passed to ``'condition_encoder_kwargs'``:
 
         - ``'genot_source_layers'``: Layers processing the cell data serving as an additional condition to the model (see :cite:`klein:23`).
-        - ``'genot_source_dim'``: Dimension of the source data.
-
 
         Parameters
         ----------
@@ -361,6 +359,12 @@ class CellFlow:
             )
 
         condition_encoder_kwargs = condition_encoder_kwargs or {}
+        if self._solver_class == _genot.GENOT:
+            condition_encoder_kwargs["genot_source_dim"] = self._data_dim
+            if "genot_source_layers" not in condition_encoder_kwargs:
+                raise ValueError(
+                    "For GENOT, 'genot_source_layers' must be provided in 'condition_encoder_kwargs'."
+                )
         covariates_not_pooled = (
             [] if pool_sample_covariates else self._dm.sample_covariates
         )
