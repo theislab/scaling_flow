@@ -229,7 +229,10 @@ class PredictionSampler(BaseValidSampler):
             cell_rep_dict[k] = source_cells[i]
             cond_dict[k] = conditions[i]
 
-        return {"source": cell_rep_dict, "condition": cond_dict}
+        return {
+            "source": cell_rep_dict,
+            "condition": cond_dict,
+        }
 
     @property
     def data(self) -> PredictionData:

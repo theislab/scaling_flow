@@ -61,9 +61,34 @@ class TestCellFlow:
             covariate_data=adata_perturbation_pred.obs,
         )
         assert isinstance(pred, dict)
-        out = next(iter(pred.values()))
+        key, out = next(iter(pred.items()))
         assert out.shape[0] == adata_perturbation.n_obs
         assert out.shape[1] == cf._data_dim
+
+        pred_stored = cf.predict(
+            adata_perturbation_pred,
+            sample_rep=sample_rep,
+            covariate_data=adata_perturbation_pred.obs,
+            key_added_prefix="MY_PREDICTION_",
+        )
+
+        assert pred_stored is None
+        if solver == "otfm":
+            assert "MY_PREDICTION_" + str(key) in adata_perturbation_pred.obsm
+
+        if solver == "genot":
+            assert "MY_PREDICTION_" + str(key) + "_0" in adata_perturbation_pred.obsm
+            pred2 = cf.predict(
+                adata_perturbation_pred,
+                sample_rep=sample_rep,
+                covariate_data=adata_perturbation_pred.obs,
+                n_samples=2,
+            )
+            assert isinstance(pred2, dict)
+            out = next(iter(pred2.values()))
+            assert out.shape[0] == adata_perturbation.n_obs
+            assert out.shape[1] == cf._data_dim
+            assert out.shape[2] == 2
 
         conds = adata_perturbation.obs.drop_duplicates(subset=["drug1", "drug2"])
         cond_embed = cf.get_condition_embedding(conds, rep_dict=adata_perturbation.uns)

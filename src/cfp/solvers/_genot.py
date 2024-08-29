@@ -233,6 +233,7 @@ class GENOT:
         self,
         source: ArrayLike,
         condition: dict[str, ArrayLike] | None = None,
+        n_samples: int = 1,
         rng: ArrayLike | None = None,
         **kwargs: Any,
     ) -> ArrayLike | tuple[ArrayLike, diffrax.Solution]:
@@ -247,6 +248,8 @@ class GENOT:
             Input data of shape [batch_size, ...].
         condition
             Condition of the input data of shape [batch_size, ...].
+        n_samples
+            Number of conditional samples to generate.
         rng
             Random generate used to sample from the latent distribution.
         kwargs
@@ -284,12 +287,12 @@ class GENOT:
             return result.ys[0]
 
         rng = utils.default_prng_key(rng)
-        latent = self.latent_noise_fn(rng, (len(source),))
+        latent = self.latent_noise_fn(rng, (len(source), n_samples))
 
-        x_pred = jax.jit(jax.vmap(solve_ode, in_axes=[0, None, 0]))(
-            latent, condition, source
-        )
-        return np.array(x_pred)
+        x_pred = jax.jit(
+            jax.vmap(jax.vmap(solve_ode, in_axes=[0, None, 0]), in_axes=[1, None, None])
+        )(latent, condition, source)
+        return np.transpose(np.array(x_pred), (1, 2, 0))
 
     @property
     def is_trained(self) -> bool:
