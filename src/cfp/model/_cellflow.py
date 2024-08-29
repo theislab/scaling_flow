@@ -16,6 +16,7 @@ from numpy.typing import ArrayLike
 from ott.neural.methods.flows import dynamics
 
 from cfp import _constants
+from cfp._logging import logger
 from cfp._types import Layers_separate_input_t, Layers_t
 from cfp.data._data import ConditionData, ValidationData
 from cfp.data._dataloader import PredictionSampler, TrainSampler, ValidationSampler
@@ -527,10 +528,10 @@ class CellFlow:
         sample_rep: str,
         covariate_data: pd.DataFrame,
         condition_id_key: str | None = None,
-        key_added_prefix: str | None = _constants.PREDICTION_PREFIX,
+        key_added_prefix: str | None = None,
         n_samples: int = 1,
         **kwargs: Any,
-    ) -> dict[str, ArrayLike]:
+    ) -> dict[str, ArrayLike] | None:
         """Predict perturbation responses.
 
         Parameters
@@ -547,27 +548,29 @@ class CellFlow:
         condition_id_key
             Key in ``'covariate_data'`` defining the condition name.
         key_added_prefix
-            Prefix to store the prediction in :attr:`~anndata.AnnData.obsm`. If :obj:`None`, the predictions are
-            not stored.
+            If not :obj:`None`, prefix to store the prediction in :attr:`~anndata.AnnData.obsm`. If :obj:`None`, the predictions are
+            not stored, and the predictions are returned as a :class:`dict`.
         n_samples
             Number of perturbed cells to generate for each single cell in the control population.
-            Only available if :attr:`cfp.model.CellFlow.solver` is an instance of :class:`cfp.solvers.GENOT`.
+            Only possible to get multiple samples if ``'solver'`` is ``'genot'``.
         kwargs
             Keyword arguments for the predict function, i.e. :meth:`cfp.solvers.OTFlowMatching.predict` or
             :meth:`cfp.solvers.GENOT.predict`.
 
         Returns
         -------
-        A :class:`dict` with the predicted sample representation for each perturbation.
+        If ``'key_added_prefix'`` is :obj:`None`, a :class:`dict` with the predicted sample representation for each perturbation,
+        otherwise stores the predictions in :attr:`~anndata.AnnData.obsm` and returns :obj:`None`.
         """
         if not self.solver.is_trained:  # type: ignore[union-attr]
             raise ValueError("Model not trained. Please call `train` first.")
 
         if n_samples > 1:
             if not isinstance(self.solver, _genot.GENOT):
-                raise ValueError(
-                    "Multiple samples can only be generated if the solver is `genot`."
+                logger.warning(
+                    "Multiple samples can only be generated if the solver is `genot`, setting `n_samples` to 1."
                 )
+                n_samples = 1
             kwargs["n_samples"] = n_samples
         if adata is not None and covariate_data is not None:
             if self._dm.control_key not in adata.obs.columns:
@@ -589,18 +592,18 @@ class CellFlow:
         src = batch["source"]
         condition = batch.get("condition", None)
         out = jax.tree.map(functools.partial(self.solver.predict, **kwargs), src, condition)  # type: ignore[union-attr]
-        if key_added_prefix is not None:
-            if len(pred_data.control_to_perturbation) > 1:
-                raise ValueError(
-                    f"When saving predictions to `adata`, all control cells must be from the same control \
-                                  population, but found {len(pred_data.control_to_perturbation)} control populations."
-                )
-            _write_predictions(
-                adata=adata,
-                predictions=out,
-                key_added_prefix=key_added_prefix,
+        if key_added_prefix is None:
+            return out
+        if len(pred_data.control_to_perturbation) > 1:
+            raise ValueError(
+                f"When saving predictions to `adata`, all control cells must be from the same control \
+                                population, but found {len(pred_data.control_to_perturbation)} control populations."
             )
-        return out
+        _write_predictions(
+            adata=adata,
+            predictions=out,
+            key_added_prefix=key_added_prefix,
+        )
 
     def get_condition_embedding(
         self,
