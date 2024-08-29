@@ -243,6 +243,7 @@ class CellFlow:
         flow: dict[Literal["constant_noise", "bridge"], float] | None = None,
         match_fn: Callable[[ArrayLike, ArrayLike], ArrayLike] = match_linear,
         optimizer: optax.GradientTransformation = optax.adam(1e-4),
+        genot_source_layers: Layers_t | None = None,
         seed=0,
     ) -> None:
         """Prepare the model for training.
@@ -250,9 +251,6 @@ class CellFlow:
         This function sets up the neural network architecture and specificities of the :attr:`solver`.
         When :attr:`solver` is an instance of :class:`cfp.solvers._genot.GENOT`, the following arguments have
         to be passed to ``'condition_encoder_kwargs'``:
-
-        - ``'genot_source_layers'``: Layers processing the cell data serving as an additional condition to the model (see :cite:`klein:23`).
-        - ``'genot_source_dim'``: Dimension of the source data.
 
 
         Parameters
@@ -343,6 +341,20 @@ class CellFlow:
             data and return the optimal transport matrix, see e.g. :func:`cfp.utils.match_linear`.
         optimizer
             Optimizer used for training.
+        genot_source_layers
+            Only relevant if ``'solver'`` is ``'genot'``, otherwise ignored.
+            Layers processing the cell data serving as an additional condition to the
+            model (see :cite:`klein:23`). Should be of the same form as ``'layers_after_pool'``, i.e. a :class:`Tuple`
+            with each element a :class:`dict` with keys:
+
+                - ``'layer_type'`` of type :class:`str` indicating the type of the layer, can be
+                  ``'mlp'`` or ``'self_attention'``.
+                - Further keyword arguments for the layer type :class:`cfp.networks.MLPBlock` or
+                  :class:`cfp.networks.SelfAttentionBlock`.
+
+            If :obj:`None`, defaults to an :class:`cfp.networks.MLPBlock` with 3 layers of :math:`1024` hidden units and a dropout
+            rate of :math:`0.0`.
+
         seed
             Random seed.
 
@@ -350,7 +362,7 @@ class CellFlow:
         -------
         Updates the following fields:
 
-        - :attr:`cfp.model.CellFlow.vf` - an instance of the :class:`cfp.networks.ConditionalVelocityField`.
+        - :attr:`cfp.model.CellFlow.velocity_field` - an instance of the :class:`cfp.networks.ConditionalVelocityField`.
         - :attr:`cfp.model.CellFlow.solver` - an instance of :class:`cfp.solvers.OTFlowMatching` or :class:`cfp.solvers.GENOT`.
         - :attr:`cfp.model.CellFlow.trainer` - an instance of the :class:`cfp.training.CellFlowTrainer`.
         """
@@ -360,6 +372,25 @@ class CellFlow:
             )
 
         condition_encoder_kwargs = condition_encoder_kwargs or {}
+        if (
+            self._solver_class == _otfm.OTFlowMatching
+            and genot_source_layers is not None
+        ):
+            raise ValueError(
+                "For OTFlowMatching, 'genot_source_layers' must be `None`."
+            )
+        if self._solver_class == _genot.GENOT:
+            condition_encoder_kwargs["genot_source_dim"] = self._data_dim
+            if genot_source_layers is None:
+                condition_encoder_kwargs["genot_source_layers"] = (
+                    {
+                        "layer_type": "mlp",
+                        "dims": [1024, 1024, 1024],
+                        "dropout_rate": 0.0,
+                    },
+                )
+            else:
+                condition_encoder_kwargs["genot_source_layers"] = genot_source_layers
         covariates_not_pooled = (
             [] if pool_sample_covariates else self._dm.sample_covariates
         )
