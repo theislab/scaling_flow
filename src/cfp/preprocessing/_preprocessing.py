@@ -45,10 +45,10 @@ def annotate_compounds(
     """
     try:
         import pertpy as pt
-    except ImportError:
+    except ImportError as e:
         raise ImportError(
             "pertpy is not installed. To annotate compounds, please install it via `pip install pertpy`."
-        ) from None
+        ) from e
 
     adata = adata.copy() if copy else adata
 
