@@ -186,11 +186,7 @@ class GENOT:
         rng = jax.random.split(rng, 5)
         rng, rng_resample, rng_noise, rng_time, rng_step_fn = rng
 
-        src, tgt = batch["src_cell_data"], batch["tgt_cell_data"]
         condition = batch.get("condition")
-
-        matching_data = (src, tgt)
-
         (src, tgt), matching_data = self._prepare_data(batch)
         n = src.shape[0]
         time = self.time_sampler(rng_time, n)
