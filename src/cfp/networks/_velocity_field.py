@@ -107,12 +107,16 @@ class ConditionalVelocityField(nn.Module):
                 mask_value=self.mask_value,
                 **self.condition_encoder_kwargs,
             )
+
+            self.layer_norm_condition = nn.LayerNorm()
+
         self.time_encoder = MLPBlock(
             dims=self.time_encoder_dims,
             act_fn=self.act_fn,
             dropout_rate=self.time_encoder_dropout,
             act_last_layer=False,
         )
+        self.layer_norm_time = nn.LayerNorm()
 
         self.x_encoder = MLPBlock(
             dims=self.hidden_dims,
@@ -120,6 +124,7 @@ class ConditionalVelocityField(nn.Module):
             dropout_rate=self.hidden_dropout,
             act_last_layer=False,
         )
+        self.layer_norm_x = nn.LayerNorm()
 
         self.decoder = MLPBlock(
             dims=self.decoder_dims,
@@ -167,9 +172,9 @@ class ConditionalVelocityField(nn.Module):
         elif cond.shape[0] != x.shape[0]:  # type: ignore[attr-defined]
             cond = jnp.tile(cond, (x.shape[0], 1))
 
-        t = nn.LayerNorm()(t)
-        x = nn.LayerNorm()(x)
-        cond = nn.LayerNorm()(cond)
+        t = self.layer_norm_time(t)
+        x = self.layer_norm_x(x)
+        cond = self.layer_norm_condition(cond)
 
         concatenated = jnp.concatenate((t, x, cond), axis=-1)
         out = self.decoder(concatenated, training=train)
