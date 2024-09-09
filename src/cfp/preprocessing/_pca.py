@@ -1,9 +1,9 @@
+
 import anndata as ad
 import numpy as np
 import scanpy as sc
 from numpy.typing import ArrayLike
 from scipy.sparse import csr_matrix
-from functools import partial
 
 __all__ = ["centered_pca", "reconstruct_pca", "project_pca"]
 

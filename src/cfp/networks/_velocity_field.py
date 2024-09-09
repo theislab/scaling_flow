@@ -111,18 +111,21 @@ class ConditionalVelocityField(nn.Module):
             dims=self.time_encoder_dims,
             act_fn=self.act_fn,
             dropout_rate=self.time_encoder_dropout,
+            act_last_layer=False,
         )
 
         self.x_encoder = MLPBlock(
             dims=self.hidden_dims,
             act_fn=self.act_fn,
             dropout_rate=self.hidden_dropout,
+            act_last_layer=False,
         )
 
         self.decoder = MLPBlock(
             dims=self.decoder_dims,
             act_fn=self.act_fn,
             dropout_rate=self.decoder_dropout,
+            act_last_layer=False,
         )
 
         self.output_layer = nn.Dense(self.output_dim)
@@ -163,6 +166,11 @@ class ConditionalVelocityField(nn.Module):
             cond = jnp.squeeze(cond)  # , 0)
         elif cond.shape[0] != x.shape[0]:  # type: ignore[attr-defined]
             cond = jnp.tile(cond, (x.shape[0], 1))
+
+        t = nn.LayerNorm()(t)
+        x = nn.LayerNorm()(x)
+        cond = nn.LayerNorm()(cond)
+
         concatenated = jnp.concatenate((t, x, cond), axis=-1)
         out = self.decoder(concatenated, training=train)
         return self.output_layer(out)
