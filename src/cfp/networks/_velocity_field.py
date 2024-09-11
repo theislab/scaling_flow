@@ -64,6 +64,12 @@ class ConditionalVelocityField(nn.Module):
             Dimensions of the output layers.
         decoder_dropout
             Dropout rate for the output layers.
+        layer_norm_before_concatenation
+            If :obj:`True`, applies layer normalization before concatenating
+            the embedded time, embedded data, and condition embeddings.
+        linear_projection_before_concatenation
+            If :obj:`True`, applies a linear projection before concatenating
+            the embedded time, embedded data.
 
     Returns
     -------
@@ -92,6 +98,8 @@ class ConditionalVelocityField(nn.Module):
     hidden_dropout: float = 0.0
     decoder_dims: Sequence[int] = (1024, 1024, 1024)
     decoder_dropout: float = 0.0
+    layer_norm_before_concatenation: bool = False
+    linear_projection_before_concatenation: bool = False
 
     def setup(self):
         """Initialize the network."""
@@ -107,22 +115,40 @@ class ConditionalVelocityField(nn.Module):
                 mask_value=self.mask_value,
                 **self.condition_encoder_kwargs,
             )
+
+        self.layer_norm_condition = (
+            nn.LayerNorm() if self.layer_norm_before_concatenation else lambda x: x
+        )
+
         self.time_encoder = MLPBlock(
             dims=self.time_encoder_dims,
             act_fn=self.act_fn,
             dropout_rate=self.time_encoder_dropout,
+            act_last_layer=False,
+        )
+        self.layer_norm_time = (
+            nn.LayerNorm() if self.layer_norm_before_concatenation else lambda x: x
         )
 
         self.x_encoder = MLPBlock(
             dims=self.hidden_dims,
             act_fn=self.act_fn,
             dropout_rate=self.hidden_dropout,
+            act_last_layer=(
+                False if self.linear_projection_before_concatenation else True
+            ),
+        )
+        self.layer_norm_x = (
+            nn.LayerNorm() if self.layer_norm_before_concatenation else lambda x: x
         )
 
         self.decoder = MLPBlock(
             dims=self.decoder_dims,
             act_fn=self.act_fn,
             dropout_rate=self.decoder_dropout,
+            act_last_layer=(
+                False if self.linear_projection_before_concatenation else True
+            ),
         )
 
         self.output_layer = nn.Dense(self.output_dim)
@@ -163,6 +189,11 @@ class ConditionalVelocityField(nn.Module):
             cond = jnp.squeeze(cond)  # , 0)
         elif cond.shape[0] != x.shape[0]:  # type: ignore[attr-defined]
             cond = jnp.tile(cond, (x.shape[0], 1))
+
+        t = self.layer_norm_time(t)
+        x = self.layer_norm_x(x)
+        cond = self.layer_norm_condition(cond)
+
         concatenated = jnp.concatenate((t, x, cond), axis=-1)
         out = self.decoder(concatenated, training=train)
         return self.output_layer(out)
