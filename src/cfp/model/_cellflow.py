@@ -570,7 +570,7 @@ class CellFlow:
         If ``'key_added_prefix'`` is :obj:`None`, a :class:`dict` with the predicted sample representation for each perturbation,
         otherwise stores the predictions in :attr:`~anndata.AnnData.obsm` and returns :obj:`None`.
         """
-        if not self.solver.is_trained:  # type: ignore[union-attr]
+        if self.solver is None or not self.solver.is_trained:
             raise ValueError("Model not trained. Please call `train` first.")
 
         if n_samples > 1:
