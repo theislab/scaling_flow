@@ -246,6 +246,8 @@ class CellFlow:
         flow: dict[Literal["constant_noise", "bridge"], float] | None = None,
         match_fn: Callable[[ArrayLike, ArrayLike], ArrayLike] = match_linear,
         optimizer: optax.GradientTransformation = optax.adam(1e-4),
+        layer_norm_before_concatenation: bool = False,
+        linear_projection_before_concatenation: bool = False,
         genot_source_layers: Layers_t | None = None,
         seed=0,
     ) -> None:
@@ -344,6 +346,12 @@ class CellFlow:
             data and return the optimal transport matrix, see e.g. :func:`cfp.utils.match_linear`.
         optimizer
             Optimizer used for training.
+        layer_norm_before_concatenation
+            If :obj:`True`, applies layer normalization before concatenating
+            the embedded time, embedded data, and condition embeddings.
+        linear_projection_before_concatenation
+            If :obj:`True`, applies a linear projection before concatenating
+            the embedded time, embedded data.
         genot_source_layers
             Only relevant if ``'solver'`` is ``'genot'``, otherwise ignored.
             Layers processing the cell data serving as an additional condition to the
@@ -357,7 +365,6 @@ class CellFlow:
 
             If :obj:`None`, defaults to an :class:`cfp.networks.MLPBlock` with 3 layers of :math:`1024` hidden units and a dropout
             rate of :math:`0.0`.
-
         seed
             Random seed.
 
@@ -420,6 +427,8 @@ class CellFlow:
             hidden_dropout=hidden_dropout,
             decoder_dims=decoder_dims,
             decoder_dropout=decoder_dropout,
+            layer_norm_before_concatenation=layer_norm_before_concatenation,
+            linear_projection_before_concatenation=linear_projection_before_concatenation,
         )
 
         flow, noise = next(iter(flow.items()))
