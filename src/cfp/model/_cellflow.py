@@ -645,7 +645,7 @@ class CellFlow:
         -------
         A :class:`pandas.DataFrame` with the condition embeddings.
         """
-        if self.solver is None:
+        if self.solver is None or not self.solver.is_trained:
             raise ValueError("Model not trained. Please call `train` first.")
 
         if not self._dm.is_conditional:
