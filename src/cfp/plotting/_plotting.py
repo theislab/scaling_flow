@@ -1,10 +1,9 @@
 import types
 from typing import Any, Literal
 
-import anndata as ad
 import matplotlib as mpl
 import matplotlib.pyplot as plt
-import numpy as np
+import pandas as pd
 import seaborn as sns
 from adjustText import adjust_text
 
@@ -14,12 +13,12 @@ from cfp.plotting._utils import (
     _compute_pca_from_df,
     _compute_umap_from_df,
     _get_colors,
-    get_plotting_vars,
+    _split_df,
 )
 
 
 def plot_condition_embedding(
-    adata: ad.AnnData,
+    df: pd.DataFrame,
     embedding: Literal["raw_embedding", "UMAP", "PCA", "Kernel_PCA"],
     dimensions: tuple[int, int] = (0, 1),
     hue: str | None = None,
@@ -28,7 +27,6 @@ def plot_condition_embedding(
     col_dict: dict[str, str] | None = None,
     title: str | None = None,
     show_lines: bool = False,
-    show_text: bool = False,
     return_fig: bool = True,
     embedding_kwargs: dict[str, Any] = types.MappingProxyType({}),
     **kwargs: Any,
@@ -37,8 +35,11 @@ def plot_condition_embedding(
 
     Parameters
     ----------
-        adata
-            :class:`anndata.AnnData` object from a CellFlow model.
+        df
+            A :class:`pandas.DataFrame` with embedding and metadata. Column names of
+            embedding dimensions should be consecutive integers starting from 0,
+            e.g. as output from :meth:`~cfp.model.CellFlow.get_condition_embedding`, and
+            metadata should be in columns with strings.
         embedding
             Embedding to plot. Options are "raw_embedding", "UMAP", "PCA", "Kernel_PCA".
         dimensions
@@ -48,15 +49,13 @@ def plot_condition_embedding(
         key
             Key in `adata.uns` where the embedding is stored. #TODO: correct
         labels
-            TODO
+            Column in ``'df'`` with labels to plot. If :obj:`None`, doesn't plot labels.
         col_dict
             TODO
         title
             Title of the plot.
         show_lines
             Whether to show lines connecting points.
-        show_text
-            Whether to show text labels.
         return_fig
             Whether to return the figure.
         embedding_kwargs
@@ -68,15 +67,15 @@ def plot_condition_embedding(
     -------
         :obj:`None` or :class:`matplotlib.figure.Figure`, depending on `return_fig`.
     """
-    df = get_plotting_vars(adata, key=key)
+    df_embedding, df_metadata = _split_df(df)
     if embedding == "raw_embedding":
-        emb = df[list(dimensions)]
+        emb = df_embedding[list(dimensions)]
     elif embedding == "UMAP":
-        emb = _compute_umap_from_df(df, **embedding_kwargs)
+        emb = _compute_umap_from_df(df_embedding, **embedding_kwargs)
     elif embedding == "PCA":
-        emb = _compute_pca_from_df(df)
+        emb = _compute_pca_from_df(df_embedding)
     elif embedding == "Kernel_PCA":
-        emb = _compute_kernel_pca_from_df(df)
+        emb = _compute_kernel_pca_from_df(df_embedding)
     else:
         raise ValueError(f"Embedding {embedding} not supported.")
 
@@ -105,13 +104,10 @@ def plot_condition_embedding(
     if (col_dict is None) and labels is not None:
         col_dict = _get_colors(labels)
 
-    if hue is not None and hue not in df.index.names:
-        raise ValueError(
-            f"{hue} not found in index names. Valid values for `hue` are {df.index.names}."
-        )
+    df_processed = pd.concat((emb, df_metadata), axis=1)
 
     sns.scatterplot(
-        data=emb,
+        data=df_processed,
         x=dimensions[0],
         y=dimensions[1],
         hue=hue,
@@ -141,17 +137,15 @@ def plot_condition_embedding(
                     c=col_dict[labels[i]],
                 )
 
-    if show_text and labels is not None:
+    if labels is not None:
+        labels = df[labels].values
         texts = []
-        labels = np.array(labels)
-        unique_labels = np.unique(labels)
-        for label in unique_labels:
-            idx_label = np.where(labels == label)[0]
+        for i in range(len(df)):
             texts.append(
                 ax.text(
-                    np.mean(emb[idx_label, 0]),
-                    np.mean(emb[idx_label, 1]),
-                    label,
+                    emb.iloc[i, 0],
+                    emb.iloc[i, 1],
+                    labels[i],
                     fontsize=fontsize,
                 )
             )
@@ -167,11 +161,12 @@ def plot_condition_embedding(
         ax.axis("square")
 
     title = title if title else embedding
-    ax.set_title(title, fontsize=fontsize, fontweight="bold")
+    ax.set_title(title, fontsize=fontsize)
 
     ax.set_xlabel(f"dim {dimensions[0]}", fontsize=fontsize)
     ax.set_ylabel(f"dim {dimensions[1]}", fontsize=fontsize)
     ax.xaxis.set_tick_params(labelsize=fontsize)
     ax.yaxis.set_tick_params(labelsize=fontsize)
+    ax.legend(loc="center left", bbox_to_anchor=(1, 0.5))
 
     return fig if return_fig else None

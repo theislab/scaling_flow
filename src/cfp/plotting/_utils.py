@@ -43,6 +43,14 @@ def _get_palette(
     return palette
 
 
+def _split_df(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
+    emb_cols = [col for col in df.columns if isinstance(col, int)]
+    metadata_cols = [col for col in df.columns if isinstance(col, str)]
+    if set(emb_cols).union(set(metadata_cols)) != set(df.columns):
+        raise ValueError("Not all columns are of type `int` or `str`.")
+    return df[emb_cols], df[metadata_cols]
+
+
 def _get_colors(
     labels: Sequence[str],
     palette: str | None = None,
@@ -53,14 +61,6 @@ def _get_colors(
         palette = _get_palette(n_colors, palette_name)
     col_dict = dict(zip(labels, palette[:n_colors], strict=False))
     return col_dict
-
-
-def get_plotting_vars(adata: ad.AnnData, *, key: str) -> Any:
-    uns_key = _constants.CFP_KEY
-    try:
-        return adata.uns[uns_key][key]
-    except KeyError:
-        raise KeyError(f"No data found in `adata.uns[{uns_key!r}][{key!r}]`.") from None
 
 
 def _compute_umap_from_df(
