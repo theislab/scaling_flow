@@ -1,9 +1,7 @@
-<img src="docs/_static/images/cellflow_light.png" width="10%" alt="logo">
-
 [![Python version](https://img.shields.io/badge/python-3.10%20%7C%203.11%20%7C%203.12-blue)]()
 [![Black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
 
-# CellFlow
+# CellFlow <img src="docs/_static/images/cellflow_light.png" align="right" width="180"/>
 
 Modeling complex perturbations with flow matching and optimal transport
 
