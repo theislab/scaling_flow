@@ -325,8 +325,6 @@ class DataManager:
         else:
             perturb_covar_df = perturb_covar_df.reset_index()
 
-        print(perturb_covar_df)
-
         # get indices of cells belonging to each unique condition
         _perturb_covar_df, _covariate_data = (
             perturb_covar_df[self._perturb_covar_keys],
