@@ -325,6 +325,8 @@ class DataManager:
         else:
             perturb_covar_df = perturb_covar_df.reset_index()
 
+        print(perturb_covar_df)
+
         # get indices of cells belonging to each unique condition
         _perturb_covar_df, _covariate_data = (
             perturb_covar_df[self._perturb_covar_keys],
@@ -386,7 +388,10 @@ class DataManager:
             conditional_distributions = []
 
             # iterate over target conditions
-            pbar = tqdm(perturb_covar_df.iterrows(), total=perturb_covar_df.shape[0])
+            filter_dict = dict(zip(self.split_covariates, split_combination, strict=False))
+            pc_df = perturb_covar_df[(perturb_covar_df[list(filter_dict.keys())] == list(filter_dict.values())).all(axis=1)]
+            pbar = tqdm(pc_df.iterrows(), total=pc_df.shape[0])
+    
             for i, tgt_cond in pbar:
                 tgt_cond = tgt_cond[self._perturb_covar_keys]
 
