@@ -159,7 +159,7 @@ class CFJaxSCVI(JaxSCVI):
             # Make dummy dict to conform with scVI functions
             inference_outputs = {"z": z_batch}
             out = jit_generative_fn(self.module.rngs, array_dict, inference_outputs)
-            if give_mean and self.gene_likelihood != "normal":
+            if give_mean and self.module.gene_likelihood != "normal":
                 x = out["px"].mean
             else:
                 x = out["rho"]

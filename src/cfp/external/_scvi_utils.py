@@ -1,4 +1,5 @@
 from typing import Any
+
 import jax
 import jax.numpy as jnp
 import numpyro.distributions as dist
@@ -12,6 +13,7 @@ def _get_dict_if_none(param):
     param = {} if not isinstance(param, dict) else param
 
     return param
+
 
 @flax_configure
 class CFJaxVAE(JaxBaseModuleClass):
@@ -126,7 +128,7 @@ class CFJaxVAE(JaxBaseModuleClass):
         return LossOutput(
             loss=loss, reconstruction_loss=reconst_loss, kl_local=kl_divergence_z
         )
-    
+
     def get_jit_generative_fn(
         self,
         get_generative_input_kwargs: dict[str, Any] | None = None,
