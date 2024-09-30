@@ -1,3 +1,4 @@
+from typing import Any
 import jax
 import jax.numpy as jnp
 import numpyro.distributions as dist
@@ -6,6 +7,11 @@ from scvi.distributions import JaxNegativeBinomialMeanDisp as NegativeBinomial
 from scvi.module._jaxvae import FlaxDecoder, FlaxEncoder
 from scvi.module.base import JaxBaseModuleClass, LossOutput, flax_configure
 
+
+def _get_dict_if_none(param):
+    param = {} if not isinstance(param, dict) else param
+
+    return param
 
 @flax_configure
 class CFJaxVAE(JaxBaseModuleClass):
@@ -75,7 +81,7 @@ class CFJaxVAE(JaxBaseModuleClass):
             "batch_index": batch_index,
         }
         return input_dict
-    
+
     def generative(self, x, z, batch_index) -> dict:
         """Run generative model."""
         # one hot adds an extra dimension
@@ -120,7 +126,31 @@ class CFJaxVAE(JaxBaseModuleClass):
         return LossOutput(
             loss=loss, reconstruction_loss=reconst_loss, kl_local=kl_divergence_z
         )
-
-
-
     
+    def get_jit_generative_fn(
+        self,
+        get_generative_input_kwargs: dict[str, Any] | None = None,
+        generative_kwargs: dict[str, Any] | None = None,
+    ):
+
+        vars_in = {"params": self.params, **self.state}
+        get_generative_input_kwargs = _get_dict_if_none(get_generative_input_kwargs)
+        generative_kwargs = _get_dict_if_none(generative_kwargs)
+
+        # @jax.jit
+        def _run_generative(rngs, array_dict, inference_outputs):
+            module = self.clone()
+            generative_input = module._get_generative_input(
+                array_dict, inference_outputs
+            )
+            out = module.apply(
+                vars_in,
+                rngs=rngs,
+                method=module.generative,
+                mutable=False,
+                **generative_input,
+                **generative_kwargs,
+            )
+            return out
+
+        return _run_generative
