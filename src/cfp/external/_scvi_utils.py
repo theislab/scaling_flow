@@ -99,6 +99,7 @@ class CFJaxVAE(JaxBaseModuleClass):
             px = NegativeBinomial(mean=mu, inverse_dispersion=disp_)
         elif self.gene_likelihood == "normal":
             px = rho_unnorm
+            rho = rho_unnorm
         else:
             px = dist.Poisson(mu)
 
