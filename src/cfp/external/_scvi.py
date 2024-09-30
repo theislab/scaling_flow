@@ -51,9 +51,63 @@ class CFJaxSCVI(JaxSCVI):
         self._model_summary_string = ""
         self.init_params_ = self._get_init_params(locals())
 
+    def get_latent_representation(
+        self,
+        adata: AnnData | None = None,
+        indices: Sequence[int] | None = None,
+        give_mean: bool = True,
+        n_samples: int = 1,
+        batch_size: int | None = None,
+    ) -> np.ndarray:
+        r"""Return the latent representation for each cell.
+
+        This is denoted as :math:`z_n` in our manuscripts.
+
+        Parameters
+        ----------
+        adata
+            AnnData object with equivalent structure to initial AnnData. If `None`, defaults to the
+            AnnData object used to initialize the model.
+        indices
+            Indices of cells in adata to use. If `None`, all cells are used.
+        give_mean
+            Whether to return the mean of the posterior distribution or a sample.
+        n_samples
+            Number of samples to use for computing the latent representation.
+        batch_size
+            Minibatch size for data loading into model. Defaults to `scvi.settings.batch_size`.
+
+        Returns
+        -------
+        latent_representation : np.ndarray
+            Low-dimensional representation for each cell
+        """
+        self._check_if_trained(warn=False)
+
+        adata = self._validate_anndata(adata)
+        scdl = self._make_data_loader(
+            adata=adata, indices=indices, batch_size=batch_size, iter_ndarray=True
+        )
+
+        jit_inference_fn = self.module.get_jit_inference_fn(
+            inference_kwargs={"n_samples": n_samples}
+        )
+        latent = []
+        for array_dict in scdl:
+            out = jit_inference_fn(self.module.rngs, array_dict)
+            if give_mean:
+                z = out["qz"].mean
+            else:
+                z = out["z"]
+            latent.append(z)
+        concat_axis = 0 if ((n_samples == 1) or give_mean) else 1
+        latent = jnp.concatenate(latent, axis=concat_axis)
+
+        return self.module.as_numpy_array(latent)
+
     def get_reconstructed_expression(
         self,
-        adata: AnnData,
+        data: ArrayLike | AnnData,
         use_rep: str = "X_scVI",
         indices: Sequence[int] | None = None,
         give_mean: bool = False,
@@ -66,9 +120,8 @@ class CFJaxSCVI(JaxSCVI):
 
         Parameters
         ----------
-        adata
-            AnnData object with equivalent structure to initial AnnData. If `None`, defaults to the
-            AnnData object used to initialize the model.
+        data
+            TODO
         use_rep
             Key for `.obsm` that contains the latent representation to use.
         indices
@@ -86,27 +139,27 @@ class CFJaxSCVI(JaxSCVI):
         reconstructed_expression : np.ndarray
         """
         if batch_size is None:
-            batch_size = adata.obsm[use_rep].shape[0]
+            batch_size = data.obsm[use_rep].shape[0]
 
         self._check_if_trained(warn=False)
 
-        adata = self._validate_anndata(adata)
+        data = self._validate_anndata(data)
         scdl = self._make_data_loader(
-            adata=adata, indices=indices, batch_size=batch_size, iter_ndarray=True
+            adata=data, indices=indices, batch_size=batch_size, iter_ndarray=True
         )
 
         jit_generative_fn = self.module.get_jit_generative_fn()
         # Make dummy dict to conform with scVI functions
         # inference_outputs = {"z": adata.obsm[use_rep]}
         # We also have to batch over z here, so we split it in batches
-        split_indixes = np.arange(0, adata.obsm[use_rep].shape[0], batch_size)
+        split_indixes = np.arange(0, data.obsm[use_rep].shape[0], batch_size)
         recon = []
         for array_dict, z_idx in zip(scdl, split_indixes, strict=False):
-            z_batch = adata.obsm[use_rep][z_idx : z_idx + batch_size, :]
+            z_batch = data.obsm[use_rep][z_idx : z_idx + batch_size, :]
             # Make dummy dict to conform with scVI functions
             inference_outputs = {"z": z_batch}
             out = jit_generative_fn(self.module.rngs, array_dict, inference_outputs)
-            if give_mean and self.module.gene_likelihood != "normal":
+            if give_mean and self.gene_likelihood != "normal":
                 x = out["px"].mean
             else:
                 x = out["rho"]

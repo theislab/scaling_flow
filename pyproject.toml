@@ -78,6 +78,10 @@ pp = [
     "rapids_singlecell",
 ]
 
+external = [
+    "scvi-tools",
+]
+
 [tool.hatch.build.targets.wheel]
 packages = ['src/cfp']
 

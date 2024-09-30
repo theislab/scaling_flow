@@ -18,6 +18,7 @@ __all__ = [
     "WandbLogger",
     "CallbackRunner",
     "PCADecodedMetrics",
+    "VAEDecodedMetrics",
 ]
 
 
@@ -240,6 +241,58 @@ class PCADecodedMetrics(Metrics):
         self.reconstruct_data = lambda x: x @ np.transpose(self.pcs) + np.transpose(
             self.means
         )
+        self.log_prefix = log_prefix
+
+    def on_log_iteration(
+        self,
+        validation_data: dict[str, dict[str, ArrayLike]],
+        predicted_data: dict[str, dict[str, ArrayLike]],
+    ) -> dict[str, float]:
+        """Called at each validation/log iteration to reconstruct the data and compute metrics on the reconstruction
+
+        Parameters
+        ----------
+        validation_data : dict
+            Validation data
+        predicted_data : dict
+            Predicted data
+        """
+        validation_data_decoded = jtu.tree_map(self.reconstruct_data, validation_data)
+        predicted_data_decoded = jtu.tree_map(self.reconstruct_data, predicted_data)
+
+        metrics = super().on_log_iteration(
+            validation_data_decoded, predicted_data_decoded
+        )
+        metrics = {f"{self.log_prefix}{k}": v for k, v in metrics.items()}
+        return metrics
+
+
+class VAEDecodedMetrics(Metrics):
+    """Callback to compute metrics on decoded validation data during training
+
+    Parameters
+    ----------
+    vae
+        A VAE model object with a ``'get_reconstruction'`` method, can be an instance
+        of :class:`cfp.external.CFJaxSCVI`.
+    metrics : list
+        List of metrics to compute. Supported metrics are `"r_squared"`, `"mmd"`, `"sinkhorn_div"`, and `"e_distance"`.
+    metric_aggregation : list
+        List of aggregation functions to use for each metric. Supported aggregations are `"mean"` and `"median"`.
+    log_prefix : str
+        Prefix to add to the log keys.
+    """
+
+    def __init__(
+        self,
+        vae: Callable[[ArrayLike], ArrayLike],
+        metrics: list[Literal["r_squared", "mmd", "sinkhorn_div", "e_distance"]],
+        metric_aggregations: list[Literal["mean", "median"]] = None,
+        log_prefix: str = "vae_decoded_",
+    ):
+        super().__init__(metrics, metric_aggregations)
+        self.vae = vae
+        self.reconstruct_data = self.vae.get_reconstructed_expression
         self.log_prefix = log_prefix
 
     def on_log_iteration(
