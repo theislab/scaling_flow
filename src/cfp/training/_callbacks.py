@@ -314,8 +314,8 @@ class VAEDecodedMetrics(Metrics):
         predicted_data : dict
             Predicted data
         """
-        validation_data_in_anndata = self._create_anndata(validation_data)
-        predicted_data_in_anndata = self._create_anndata(predicted_data)
+        validation_data_in_anndata = jtu.tree_map(self._create_anndata, validation_data)
+        predicted_data_in_anndata = jtu.tree_map(self._create_anndata, predicted_data)
 
         validation_data_decoded = jtu.tree_map(
             self.reconstruct_data, validation_data_in_anndata
@@ -331,7 +331,7 @@ class VAEDecodedMetrics(Metrics):
         return metrics
 
     def _create_anndata(self, data: ArrayLike) -> ad.AnnData:
-
+    
         adata = ad.AnnData(
             X=np.empty((len(data), self._adata_n_vars)), obs=self._adata_obs[:len(data)]
         )
