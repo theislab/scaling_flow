@@ -2,6 +2,7 @@ import anndata as ad
 import jax.numpy as jnp
 import pytest
 
+import jax.tree_util as jtu
 
 class TestCallbacks:
     @pytest.mark.parametrize("metrics", [["r_squared"]])
@@ -37,9 +38,16 @@ class TestCallbacks:
 
         vae_decoded_metrics_callback = VAEDecodedMetrics(
             vae=model,
+            adata=adata,
             metrics=metrics,
         )
 
-        reconstruction = vae_decoded_metrics_callback.reconstruct_data(out)
-
-        assert reconstruction.shape == adata.X.shape
+        dict_to_reconstruct = {"dummy": out}
+        dict_adatas = jtu.tree_map(vae_decoded_metrics_callback._create_anndata, dict_to_reconstruct)
+        reconstructed_arrs = jtu.tree_map(
+            vae_decoded_metrics_callback.reconstruct_data, dict_adatas
+        )
+        print(dict_adatas)
+        print(reconstructed_arrs.keys())
+        print(reconstructed_arrs["dummy"].shape)
+        assert reconstructed_arrs["dummy"].shape == adata.X.shape
