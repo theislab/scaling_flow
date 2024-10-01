@@ -3,7 +3,6 @@ from collections.abc import Callable, Sequence
 from typing import Any, Literal
 
 import anndata as ad
-import pandas as pd
 import jax.tree as jt
 import jax.tree_util as jtu
 import numpy as np
@@ -318,21 +317,27 @@ class VAEDecodedMetrics(Metrics):
         validation_data_in_anndata = self._create_anndata(validation_data)
         predicted_data_in_anndata = self._create_anndata(predicted_data)
 
-        validation_data_decoded = jtu.tree_map(self.reconstruct_data, validation_data_in_anndata)
-        predicted_data_decoded = jtu.tree_map(self.reconstruct_data, predicted_data_in_anndata)
+        validation_data_decoded = jtu.tree_map(
+            self.reconstruct_data, validation_data_in_anndata
+        )
+        predicted_data_decoded = jtu.tree_map(
+            self.reconstruct_data, predicted_data_in_anndata
+        )
 
         metrics = super().on_log_iteration(
             validation_data_decoded, predicted_data_decoded
         )
         metrics = {f"{self.log_prefix}{k}": v for k, v in metrics.items()}
         return metrics
-    
+
     def _create_anndata(self, data: ArrayLike) -> ad.AnnData:
-            
-        adata = ad.AnnData(X=np.empty((len(data), self._adata_n_vars)), obs=self._adata_obs)
-        adata.obsm["X_scVI"] = data # TODO: make package constant
+
+        adata = ad.AnnData(
+            X=np.empty((len(data), self._adata_n_vars)), obs=self._adata_obs[:len(data)]
+        )
+        adata.obsm["X_scVI"] = data  # TODO: make package constant
         return adata
-        
+
 
 class WandbLogger(LoggingCallback):
     """Callback to log data to Weights and Biases

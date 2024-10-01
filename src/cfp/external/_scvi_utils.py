@@ -140,7 +140,7 @@ class CFJaxVAE(JaxBaseModuleClass):
         get_generative_input_kwargs = _get_dict_if_none(get_generative_input_kwargs)
         generative_kwargs = _get_dict_if_none(generative_kwargs)
 
-        #@jax.jit
+        # @jax.jit
         def _run_generative(rngs, array_dict, inference_outputs):
             module = self.clone()
             generative_input = module._get_generative_input(
