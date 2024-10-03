@@ -386,10 +386,17 @@ class DataManager:
             conditional_distributions = []
 
             # iterate over target conditions
-            filter_dict = dict(zip(self.split_covariates, split_combination, strict=False))
-            pc_df = perturb_covar_df[(perturb_covar_df[list(filter_dict.keys())] == list(filter_dict.values())).all(axis=1)]
+            filter_dict = dict(
+                zip(self.split_covariates, split_combination, strict=False)
+            )
+            pc_df = perturb_covar_df[
+                (
+                    perturb_covar_df[list(filter_dict.keys())]
+                    == list(filter_dict.values())
+                ).all(axis=1)
+            ]
             pbar = tqdm(pc_df.iterrows(), total=pc_df.shape[0])
-    
+
             for i, tgt_cond in pbar:
                 tgt_cond = tgt_cond[self._perturb_covar_keys]
 
