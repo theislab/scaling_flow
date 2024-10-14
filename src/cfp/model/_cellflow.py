@@ -551,8 +551,7 @@ class CellFlow:
             columns as :attr:`~anndata.AnnData.obs` of :attr:`cfp.model.CellFlow.adata`, and
             as registered in :attr:`cfp.model.CellFlow.dm`.
         sample_rep
-            Key in :attr:`~anndata.AnnData.obsm` where the sample representation is stored or
-            ``'X'`` to use :attr:`~anndata.AnnData.X`.
+            Key in :attr:`~anndata.AnnData.obsm` where the sample representation is stored or ``'X'`` to use :attr:`~anndata.AnnData.X`. If :obj:`None`, the key is assumed to be the same as for the training data.
         condition_id_key
             Key in ``'covariate_data'`` defining the condition name.
         key_added_prefix
