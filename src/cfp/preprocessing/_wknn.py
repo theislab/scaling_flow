@@ -188,7 +188,9 @@ def _build_nn(
         model = NearestNeighbors(n_neighbors=k)
         model.fit(ref)
         distances, indices = model.kneighbors(query)
-        return _nn2adj(distances=distances, indices=indices, n1=query.shape[0])
+        return _nn2adj(
+            distances=distances, indices=indices, n1=query.shape[0], n2=ref.shape[0]
+        )
 
     try:
         from pynndescent import NNDescent
