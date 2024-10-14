@@ -533,8 +533,8 @@ class CellFlow:
     def predict(
         self,
         adata: ad.AnnData,
-        sample_rep: str,
         covariate_data: pd.DataFrame,
+        sample_rep: str | None = None,
         condition_id_key: str | None = None,
         key_added_prefix: str | None = None,
         n_samples: int = 1,
@@ -546,13 +546,12 @@ class CellFlow:
         ----------
         adata
             An :class:`~anndata.AnnData` object with the source representation.
-        sample_rep
-            Key in :attr:`~anndata.AnnData.obsm` where the sample representation is stored or
-            ``'X'`` to use :attr:`~anndata.AnnData.X`.
         covariate_data
             Covariate data defining the condition to predict. This :class:`~pandas.DataFrame` should have the same
             columns as :attr:`~anndata.AnnData.obs` of :attr:`cfp.model.CellFlow.adata`, and
             as registered in :attr:`cfp.model.CellFlow.dm`.
+        sample_rep
+            Key in :attr:`~anndata.AnnData.obsm` where the sample representation is stored or ``'X'`` to use :attr:`~anndata.AnnData.X`. If :obj:`None`, the key is assumed to be the same as for the training data.
         condition_id_key
             Key in ``'covariate_data'`` defining the condition name.
         key_added_prefix
@@ -570,8 +569,11 @@ class CellFlow:
         If ``'key_added_prefix'`` is :obj:`None`, a :class:`dict` with the predicted sample representation for each perturbation,
         otherwise stores the predictions in :attr:`~anndata.AnnData.obsm` and returns :obj:`None`.
         """
-        if not self.solver.is_trained:  # type: ignore[union-attr]
+        if self.solver is None or not self.solver.is_trained:
             raise ValueError("Model not trained. Please call `train` first.")
+
+        if sample_rep is None:
+            sample_rep = self._dm.sample_rep
 
         if n_samples > 1:
             if not isinstance(self.solver, _genot.GENOT):
@@ -645,7 +647,7 @@ class CellFlow:
         -------
         A :class:`pandas.DataFrame` with the condition embeddings.
         """
-        if self.solver is None:
+        if self.solver is None or not self.solver.is_trained:
             raise ValueError("Model not trained. Please call `train` first.")
 
         if not self._dm.is_conditional:

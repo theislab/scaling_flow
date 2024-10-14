@@ -13,7 +13,13 @@ from tqdm import tqdm
 
 from cfp._logging import logger
 from cfp._types import ArrayLike
-from cfp.data._data import ConditionData, PredictionData, ReturnData, TrainingData, ValidationData
+from cfp.data._data import (
+    ConditionData,
+    PredictionData,
+    ReturnData,
+    TrainingData,
+    ValidationData,
+)
 
 from ._utils import _flatten_list, _to_list
 
@@ -1031,3 +1037,8 @@ class DataManager:
     def perturb_covar_keys(self) -> list[str]:
         """List of all perturbation covariates."""
         return self._perturb_covar_keys
+
+    @property
+    def sample_rep(self) -> str | dict[str, str]:
+        """Key of the sample representation."""
+        return self._sample_rep
