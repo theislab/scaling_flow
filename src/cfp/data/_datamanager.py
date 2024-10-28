@@ -132,7 +132,7 @@ class DataManager:
         self._covar_to_idx = self._get_covar_to_idx(covariate_groups)  # type: ignore[arg-type]
         perturb_covar_keys = _flatten_list(
             self._perturbation_covariates.values()
-        ) + list(self._sample_covariates)
+        ) + list(self._sample_covariates) + list(self._split_covariates)
         self._perturb_covar_keys = [k for k in perturb_covar_keys if k is not None]
 
     def get_train_data(self, adata: anndata.AnnData) -> Any:
