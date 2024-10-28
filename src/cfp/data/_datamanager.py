@@ -132,7 +132,8 @@ class DataManager:
         self._covar_to_idx = self._get_covar_to_idx(covariate_groups)  # type: ignore[arg-type]
         perturb_covar_keys = _flatten_list(
             self._perturbation_covariates.values()
-        ) + list(self._sample_covariates) + list(self._split_covariates)
+        ) + list(self._sample_covariates)
+        perturb_covar_keys += [col for col in self._split_covariates if col not in perturb_covar_keys]
         self._perturb_covar_keys = [k for k in perturb_covar_keys if k is not None]
 
     def get_train_data(self, adata: anndata.AnnData) -> Any:
@@ -338,6 +339,9 @@ class DataManager:
         )
         _perturb_covar_df["row_id"] = range(len(perturb_covar_df))
         _covariate_data["cell_index"] = _covariate_data.index
+        print("_perturb_covar_df", _perturb_covar_df)
+        print("_covariate_data", _covariate_data)
+        print("perturb_covar_keuys", self._perturb_covar_keys)
         _perturb_covar_merged = _perturb_covar_df.merge(
             _covariate_data, on=self._perturb_covar_keys, how="inner"
         )
