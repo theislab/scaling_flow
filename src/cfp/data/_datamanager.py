@@ -339,9 +339,6 @@ class DataManager:
         )
         _perturb_covar_df["row_id"] = range(len(perturb_covar_df))
         _covariate_data["cell_index"] = _covariate_data.index
-        print("_perturb_covar_df", _perturb_covar_df)
-        print("_covariate_data", _covariate_data)
-        print("perturb_covar_keuys", self._perturb_covar_keys)
         _perturb_covar_merged = _perturb_covar_df.merge(
             _covariate_data, on=self._perturb_covar_keys, how="inner"
         )
