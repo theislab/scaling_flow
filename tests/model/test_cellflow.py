@@ -313,7 +313,6 @@ class TestCellFlow:
         cf.train(num_iterations=3)
 
         adata_pred = adata_perturbation
-        print(adata_pred.obs["cell_type"].value_counts())
         adata_pred.obs["control"] = True
         covariate_data = adata_perturbation.obs.iloc[:3]
 
@@ -338,6 +337,7 @@ class TestCellFlow:
             adata_pred_cell_type_2 = adata_pred[
                 adata_pred.obs["cell_type"] == "cell_line_b"
             ]
+            adata_pred_cell_type_2.obs["control"] = True
             cf.predict(
                 adata_pred_cell_type_2, sample_rep="X", covariate_data=cov_data_ct_1
             )

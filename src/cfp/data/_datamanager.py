@@ -250,7 +250,6 @@ class DataManager:
         )
 
         cell_data = self._get_cell_data(adata, sample_rep)
-        print("split_cov_combsa re ", split_cov_combs)
         split_covariates_mask, split_idx_to_covariates = (
             self._get_split_covariates_mask(
                 adata=adata, split_cov_combs=split_cov_combs
@@ -589,8 +588,6 @@ class DataManager:
         split_idx_to_covariates: dict[int, Any] = {}
         src_counter = 0
         for split_combination in split_cov_combs:
-            print("current split_combination ", split_combination)
-            print("before split_covariates_mask.sum()", split_covariates_mask.sum())
             split_covariates_mask_previous = split_covariates_mask.copy()
             split_covariates_mask, split_idx_to_covariates, _ = (
                 self._get_split_combination_mask(
@@ -602,7 +599,6 @@ class DataManager:
                     src_counter=src_counter,
                 )
             )
-            print("after split_covariates_mask.sum()", split_covariates_mask.sum())
 
             if (split_covariates_mask == split_covariates_mask_previous).all():
                 raise ValueError(
