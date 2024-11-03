@@ -238,7 +238,7 @@ class DataManager:
         Training data for the model.
         """
         self._verify_prediction_data(adata)
-        split_cov_combs = self._get_split_cov_combs(adata.obs)
+        split_cov_combs = self._get_split_cov_combs(covariate_data=covariate_data)
 
         # adata is None since we don't extract cell masks for predicted covariates
         cond_data = self._get_condition_data(
