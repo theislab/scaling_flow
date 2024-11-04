@@ -293,8 +293,9 @@ class TestCellFlow:
         cf.prepare_data(
             sample_rep="X",
             control_key="control",
-            perturbation_covariates={"drug": ["drug1"]},
-            perturbation_covariate_reps={"drug": "drug"},
+            perturbation_covariates={"drug": ["drug1"], "cell_type": ["cell_type"]},
+            perturbation_covariate_reps={"drug": "drug", "cell_type": "cell_type"},
+            split_covariates=["cell_type"],
         )
 
         condition_encoder_kwargs = {}
@@ -311,7 +312,7 @@ class TestCellFlow:
 
         cf.train(num_iterations=3)
 
-        adata_pred = adata_perturbation[:100].copy()
+        adata_pred = adata_perturbation
         adata_pred.obs["control"] = True
         covariate_data = adata_perturbation.obs.iloc[:3]
 
@@ -319,7 +320,6 @@ class TestCellFlow:
 
         assert isinstance(pred, dict)
         out = next(iter(pred.values()))
-        assert out.shape[0] == 100
         assert out.shape[1] == cf._data_dim
 
         adata_pred.obs["control"].iloc[0:20] = False
@@ -328,6 +328,19 @@ class TestCellFlow:
             match=r".*If both `adata` and `covariate_data` are given, all samples in `adata` must be control samples*",
         ):
             cf.predict(adata_pred, sample_rep="X", covariate_data=covariate_data)
+
+        with pytest.raises(
+            ValueError,
+            match=r".*No cells found in `adata` for split covariates*",
+        ):
+            cov_data_ct_1 = covariate_data[covariate_data["cell_type"] == "cell_line_a"]
+            adata_pred_cell_type_2 = adata_pred[
+                adata_pred.obs["cell_type"] == "cell_line_b"
+            ]
+            adata_pred_cell_type_2.obs["control"] = True
+            cf.predict(
+                adata_pred_cell_type_2, sample_rep="X", covariate_data=cov_data_ct_1
+            )
 
     def test_raise_otfm_genot_layers_passed(self, adata_perturbation):
         cf = cfp.model.CellFlow(adata_perturbation, solver="otfm")

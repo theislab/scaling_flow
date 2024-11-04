@@ -13,13 +13,7 @@ from tqdm import tqdm
 
 from cfp._logging import logger
 from cfp._types import ArrayLike
-from cfp.data._data import (
-    ConditionData,
-    PredictionData,
-    ReturnData,
-    TrainingData,
-    ValidationData,
-)
+from cfp.data._data import ConditionData, PredictionData, ReturnData, TrainingData, ValidationData
 
 from ._utils import _flatten_list, _to_list
 
@@ -133,7 +127,9 @@ class DataManager:
         perturb_covar_keys = _flatten_list(
             self._perturbation_covariates.values()
         ) + list(self._sample_covariates)
-        perturb_covar_keys += [col for col in self._split_covariates if col not in perturb_covar_keys]
+        perturb_covar_keys += [
+            col for col in self._split_covariates if col not in perturb_covar_keys
+        ]
         self._perturb_covar_keys = [k for k in perturb_covar_keys if k is not None]
 
     def get_train_data(self, adata: anndata.AnnData) -> Any:
@@ -148,7 +144,10 @@ class DataManager:
         -------
         Training data for the model.
         """
-        cond_data = self._get_condition_data(adata)
+        split_cov_combs = self._get_split_cov_combs(adata.obs)
+        cond_data = self._get_condition_data(
+            split_cov_combs=split_cov_combs, adata=adata
+        )
         cell_data = self._get_cell_data(adata)
         return TrainingData(
             cell_data=cell_data,
@@ -185,7 +184,10 @@ class DataManager:
         -------
         Validation data for the model.
         """
-        cond_data = self._get_condition_data(adata)
+        split_cov_combs = self._get_split_cov_combs(adata.obs)
+        cond_data = self._get_condition_data(
+            split_cov_combs=split_cov_combs, adata=adata
+        )
         cell_data = self._get_cell_data(adata)
         return ValidationData(
             cell_data=cell_data,
@@ -236,9 +238,11 @@ class DataManager:
         Training data for the model.
         """
         self._verify_prediction_data(adata)
+        split_cov_combs = self._get_split_cov_combs(covariate_data=covariate_data)
 
         # adata is None since we don't extract cell masks for predicted covariates
         cond_data = self._get_condition_data(
+            split_cov_combs=split_cov_combs,
             adata=None,
             covariate_data=covariate_data,
             rep_dict=adata.uns if rep_dict is None else rep_dict,
@@ -247,7 +251,9 @@ class DataManager:
 
         cell_data = self._get_cell_data(adata, sample_rep)
         split_covariates_mask, split_idx_to_covariates = (
-            self._get_split_covariates_mask(adata)
+            self._get_split_covariates_mask(
+                adata=adata, split_cov_combs=split_cov_combs
+            )
         )
 
         return PredictionData(
@@ -283,7 +289,9 @@ class DataManager:
         Condition data for the model.
         """
         self._verify_covariate_data(covariate_data, self._perturb_covar_keys)
+        split_cov_combs = self._get_split_cov_combs(covariate_data)
         cond_data = self._get_condition_data(
+            split_cov_combs=split_cov_combs,
             adata=None,
             covariate_data=covariate_data,
             rep_dict=rep_dict,
@@ -298,8 +306,17 @@ class DataManager:
             data_manager=self,
         )
 
+    def _get_split_cov_combs(
+        self, covariate_data: pd.DataFrame
+    ) -> np.ndarray | list[list[Any]]:
+        if len(self._split_covariates) > 0:
+            return covariate_data[self._split_covariates].drop_duplicates().values
+        else:
+            return [[]]
+
     def _get_condition_data(
         self,
+        split_cov_combs: np.ndarray | list[list[Any]],
         adata: anndata.AnnData | None,
         covariate_data: pd.DataFrame | None = None,
         rep_dict: dict[str, Any] | None = None,
@@ -367,13 +384,6 @@ class DataManager:
 
         src_counter = 0
         tgt_counter = 0
-
-        if len(self._split_covariates) > 0:
-            split_cov_combs = (
-                covariate_data[self._split_covariates].drop_duplicates().values
-            )
-        else:
-            split_cov_combs = [[]]
 
         # iterate over unique split covariate combinations
         for split_combination in split_cov_combs:
@@ -569,16 +579,16 @@ class DataManager:
         return split_covariates_mask, split_idx_to_covariates, split_cov_mask
 
     def _get_split_covariates_mask(
-        self, adata: anndata.AnnData
+        self, adata: anndata.AnnData, split_cov_combs: np.ndarray | list[list[Any]]
     ) -> tuple[ArrayLike, dict[int, tuple[Any]]]:
         # here we assume that adata only contains source cells
         if len(self.split_covariates) == 0:
             return jnp.full((len(adata),), 0, dtype=jnp.int32), {}
         split_covariates_mask = np.full((len(adata),), -1, dtype=jnp.int32)
-        split_cov_combs = adata.obs[self.split_covariates].drop_duplicates().values
         split_idx_to_covariates: dict[int, Any] = {}
         src_counter = 0
         for split_combination in split_cov_combs:
+            split_covariates_mask_previous = split_covariates_mask.copy()
             split_covariates_mask, split_idx_to_covariates, _ = (
                 self._get_split_combination_mask(
                     covariate_data=adata.obs,
@@ -589,6 +599,11 @@ class DataManager:
                     src_counter=src_counter,
                 )
             )
+
+            if (split_covariates_mask == split_covariates_mask_previous).all():
+                raise ValueError(
+                    f"No cells found in `adata` for split covariates {split_combination}."
+                )
             src_counter += 1
         return jnp.asarray(split_covariates_mask), split_idx_to_covariates
 
