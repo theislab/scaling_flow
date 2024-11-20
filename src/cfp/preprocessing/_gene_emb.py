@@ -1,5 +1,12 @@
+import logging
+import os
+from dataclasses import dataclass
+
 import requests
-import scanpy as sc
+import torch
+from esm import FastaBatchedDataset, pretrained
+
+logger = logging.getLogger(__name__)
 
 
 def fetch_canonical_transcript_info(ensembl_gene_id: str):
@@ -64,11 +71,87 @@ def write_sequence_from_ensembl(ensembl_gene_id: list[str], fasta_file_output: s
     return results
 
 
-def augment_adata_with_gene_embeddings(
-    adata: sc.AnnData, treat_key: str = "perturbation"
-) -> sc.AnnData:
-    gene_ids = adata.obs[treat_key].unique().tolist()
-    res = write_sequence_from_ensembl(gene_ids, "gene_embeddings.fasta")
-    # TODO: not sure how / where to add them.
-    adata.obs["gene_embedding"] = res
-    pass
+@dataclass
+class EmbeddingConfig:
+    model_name: str
+    output_dir: str
+    include: str = "mean"
+    use_gpu: bool = True
+    toks_per_batch: int = 4096
+    truncation_seq_length: int = 1022
+    repr_layers: list[int] = [-1]
+    _valid_includes = ["per_tok", "mean", "bos"]
+
+    def __post_init__(self):
+        self.fasta_path = os.path.join(self.output_dir, "sequences.fasta")
+        assert (
+            self.include in self._valid_includes
+        ), f"Must be one of {self._valid_includes}"
+
+
+def embedding_from_seq(config: EmbeddingConfig):
+    model, alphabet = pretrained.load_model_and_alphabet(config.model_name)
+    model.eval()
+    if torch.cuda.is_available() and config.use_gpu:
+        model = model.cuda()
+    dataset = FastaBatchedDataset.from_file(config.fasta_path)
+    batches = dataset.get_batch_indices(config.toks_per_batch, extra_toks_per_seq=1)
+    data_loader = torch.utils.data.DataLoader(
+        dataset,
+        collate_fn=alphabet.get_batch_converter(config.truncation_seq_length),
+        batch_sampler=batches,
+    )
+    logger.info(f"Read {len(dataset)} sequences from {config.fasta_path}")
+    # Don't overwrite existing embeddings
+    for file in os.listdir(config.output_dir):
+        if file.endswith(".pth"):
+            logger.info(
+                f"Found existing .pth file in {config.output_dir}. Skipping embedding generation."
+            )
+            return
+
+        assert all(
+            -(model.num_layers + 1) <= i <= model.num_layers for i in config.repr_layers
+        )
+    repr_layers = [
+        (i + model.num_layers + 1) % (model.num_layers + 1) for i in config.repr_layers
+    ]
+
+    with torch.no_grad():
+        for batch_idx, (labels, strs, toks) in enumerate(data_loader):
+            print(
+                f"Processing {batch_idx + 1} of {len(batches)} batches ({toks.size(0)} sequences)"
+            )
+            if torch.cuda.is_available() and config.use_gpu:
+                toks = toks.to(device="cuda", non_blocking=True)
+
+            out = model(toks, repr_layers=repr_layers, return_contacts=False)
+            representations = {
+                layer: t.to(device="cpu") for layer, t in out["representations"].items()
+            }
+
+            for i, label in enumerate(labels):
+                output_file = os.path.join(config.output_dir, f"{label}.pth")
+                result = {"label": label}
+                truncate_len = min(config.truncation_seq_length, len(strs[i]))
+                # Call clone on tensors to ensure tensors are not views into a larger representation
+                # See https://github.com/pytorch/pytorch/issues/1995
+                if "per_tok" in config.include:
+                    result["representations"] = {
+                        layer: t[i, 1 : truncate_len + 1].clone()
+                        for layer, t in representations.items()
+                    }
+                if "mean" in config.include:
+                    result["mean_representations"] = {
+                        layer: t[i, 1 : truncate_len + 1].mean(0).clone()
+                        for layer, t in representations.items()
+                    }
+                if "bos" in config.include:
+                    result["bos_representations"] = {
+                        layer: t[i, 0].clone() for layer, t in representations.items()
+                    }
+
+                torch.save(
+                    result,
+                    output_file,
+                )
