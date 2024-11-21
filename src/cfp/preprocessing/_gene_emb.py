@@ -2,9 +2,21 @@ import logging
 import os
 from dataclasses import dataclass
 
+import pandas as pd
 import requests
-import torch
-from esm import FastaBatchedDataset, pretrained
+
+try:
+    import torch
+    from esm import FastaBatchedDataset, pretrained
+except ImportError as e:
+    torch = None
+    FastaBatchedDataset = None
+    pretrained = None
+    raise ImportError(
+        "To use gene embedding, please install `esm` and `torch` \
+             via `pip install -e .['embedding']`."
+    ) from e
+
 
 logger = logging.getLogger(__name__)
 
@@ -52,6 +64,8 @@ def write_sequence_from_ensembl(ensembl_gene_id: list[str], fasta_file_output: s
     assert fasta_file_output.endswith(".fasta"), "Output file must be in FASTA format"
     missing_ids = []
     results = {}
+    columns = ["gene_id", "transcript_id", "display_name"]
+    df = pd.DataFrame(columns=columns)
     with open(fasta_file_output, "w") as f:
         for gene_id in ensembl_gene_id:
             canonical_transcript_info = fetch_canonical_transcript_info(gene_id)
@@ -61,13 +75,18 @@ def write_sequence_from_ensembl(ensembl_gene_id: list[str], fasta_file_output: s
                 protein_sequence = fetch_protein_sequence(transcript_id)
             if protein_sequence:
                 results[gene_id] = protein_sequence
-                f.write(
-                    f">query_{ensembl_gene_id}_canonical_transcript_{transcript_id}_Name_{display_name}\n"
-                )
+                f.write(f">{gene_id}\n")
                 f.write(f"{protein_sequence}\n")
+                df_iter = pd.DataFrame(
+                    [[gene_id, transcript_id, display_name]], columns=columns
+                )
+                df = pd.concat([df, df_iter])
             else:
                 missing_ids.append(gene_id)
-    print(f"Missing sequence for ids: {set(missing_ids)}")
+    logger.info(f"Missing sequence for ids: {set(missing_ids)}")
+    df.to_csv(
+        os.path.join(os.path.dirname(fasta_file_output), "gene_info.csv"), index=False
+    )
     return results
 
 
@@ -89,7 +108,9 @@ class EmbeddingConfig:
         ), f"Must be one of {self._valid_includes}"
 
 
-def embedding_from_seq(config: EmbeddingConfig):
+def embedding_from_seq(
+    config: EmbeddingConfig, gene_ids: list[str], save_to_disk: bool = True
+):
     model, alphabet = pretrained.load_model_and_alphabet(config.model_name)
     model.eval()
     if torch.cuda.is_available() and config.use_gpu:
@@ -102,6 +123,7 @@ def embedding_from_seq(config: EmbeddingConfig):
         batch_sampler=batches,
     )
     logger.info(f"Read {len(dataset)} sequences from {config.fasta_path}")
+    results: dict[str, dict[str, torch.Tensor]] = {}
     # Don't overwrite existing embeddings
     for file in os.listdir(config.output_dir):
         if file.endswith(".pth"):
@@ -119,7 +141,7 @@ def embedding_from_seq(config: EmbeddingConfig):
 
     with torch.no_grad():
         for batch_idx, (labels, strs, toks) in enumerate(data_loader):
-            print(
+            logger.info(
                 f"Processing {batch_idx + 1} of {len(batches)} batches ({toks.size(0)} sequences)"
             )
             if torch.cuda.is_available() and config.use_gpu:
@@ -136,22 +158,53 @@ def embedding_from_seq(config: EmbeddingConfig):
                 truncate_len = min(config.truncation_seq_length, len(strs[i]))
                 # Call clone on tensors to ensure tensors are not views into a larger representation
                 # See https://github.com/pytorch/pytorch/issues/1995
+                emb = None
                 if "per_tok" in config.include:
-                    result["representations"] = {
+                    emb = {
                         layer: t[i, 1 : truncate_len + 1].clone()
                         for layer, t in representations.items()
                     }
-                if "mean" in config.include:
-                    result["mean_representations"] = {
+                elif "mean" in config.include:
+                    emb = {
                         layer: t[i, 1 : truncate_len + 1].mean(0).clone()
                         for layer, t in representations.items()
                     }
-                if "bos" in config.include:
-                    result["bos_representations"] = {
+                elif "bos" in config.include:
+                    emb = {
                         layer: t[i, 0].clone() for layer, t in representations.items()
                     }
 
-                torch.save(
-                    result,
-                    output_file,
-                )
+                result[config.include] = emb
+                if save_to_disk:
+                    torch.save(
+                        result,
+                        output_file,
+                    )
+                    results[label] = output_file
+                else:
+                    results[label] = emb
+    return results
+
+
+def create_gene_embedding(
+    adata,
+    gene_key: str,
+    embedding_config: EmbeddingConfig | None = None,
+):
+    if embedding_config is None:
+        embedding_config = EmbeddingConfig(
+            model_name="esm2_t36_3B_UR50D",
+            output_dir="gene_embeddings",
+            include="mean",
+            use_gpu=True,  # Use GPU only if available
+            toks_per_batch=4096,
+            truncation_seq_length=1022,
+            repr_layers=[-1],
+        )
+    os.makedirs(embedding_config.output_dir, exist_ok=True)
+    gene_ids = adata.obs[gene_key].unique().tolist()
+    sequences = write_sequence_from_ensembl(gene_ids, embedding_config.fasta_path)
+    gene_with_embedding = list(sequences.keys())
+    results = embedding_from_seq(embedding_config, gene_with_embedding)
+    adata.uns["gene_embedding"] = results
+    return adata
