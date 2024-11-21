@@ -82,6 +82,11 @@ external = [
     "scvi-tools",
 ]
 
+embedding = [
+    "fair-esm",
+    "torch",
+]
+
 [tool.hatch.build.targets.wheel]
 packages = ['src/cfp']
 
