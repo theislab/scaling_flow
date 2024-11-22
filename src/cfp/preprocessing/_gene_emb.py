@@ -1,9 +1,12 @@
-import logging
 import os
 from dataclasses import dataclass
+from functools import cached_property
 
+import anndata as ad
 import pandas as pd
 import requests
+
+from cfp._logging import logger
 
 try:
     import torch
@@ -13,12 +16,9 @@ except ImportError as e:
     FastaBatchedDataset = None
     pretrained = None
     raise ImportError(
-        "To use gene embedding, please install `esm` and `torch` \
+        "To use gene embedding, please install `fair-esm` and `torch` \
              via `pip install -e .['embedding']`."
     ) from e
-
-
-logger = logging.getLogger(__name__)
 
 
 def fetch_canonical_transcript_info(ensembl_gene_id: str):
@@ -41,6 +41,7 @@ def fetch_canonical_transcript_info(ensembl_gene_id: str):
             canonical_transcript_info = {
                 "transcript_id": transcript["id"],
                 "display_name": transcript.get("display_name", "Unknown Protein"),
+                "biotype": transcript.get("biotype", "Unknown Biotype"),
             }
             break
 
@@ -60,56 +61,105 @@ def fetch_protein_sequence(ensembl_transcript_id: str):
     return protein_data.get("seq", "")
 
 
+@dataclass
+class GeneInfo:
+    gene_id: str
+
+    def __post_init__(self):
+        self._is_protein_coding: bool = False
+        self.transcript_id: str | None = None
+        self.display_name: str | None = None
+        self.canonical_transcript_info = fetch_canonical_transcript_info(self.gene_id)
+        if self.canonical_transcript_info:
+            self.transcript_id = self.canonical_transcript_info["transcript_id"]
+            self.display_name = self.canonical_transcript_info["display_name"]
+            self._is_protein_coding = (
+                self.canonical_transcript_info["biotype"] == "protein_coding"
+            )
+
+    @property
+    def is_protein_coding(self) -> bool:
+        return self._is_protein_coding
+
+    @cached_property
+    def protein_sequence(self) -> str | None:
+        if self.is_protein_coding:
+            return fetch_protein_sequence(self.transcript_id)
+        return None
+
+    @property
+    def seq_len(self) -> int | None:
+        if self.protein_sequence:
+            return len(self.protein_sequence)
+        return None
+
+
 def write_sequence_from_ensembl(ensembl_gene_id: list[str], fasta_file_output: str):
     assert fasta_file_output.endswith(".fasta"), "Output file must be in FASTA format"
     missing_ids = []
     results = {}
-    columns = ["gene_id", "transcript_id", "display_name"]
+    columns = [
+        "gene_id",
+        "transcript_id",
+        "display_name",
+        "is_protein_coding",
+        "seq_len",
+        "protein_sequence",
+    ]
     df = pd.DataFrame(columns=columns)
     with open(fasta_file_output, "w") as f:
         for gene_id in ensembl_gene_id:
-            canonical_transcript_info = fetch_canonical_transcript_info(gene_id)
-            if canonical_transcript_info:
-                transcript_id = canonical_transcript_info["transcript_id"]
-                display_name = canonical_transcript_info["display_name"]
-                protein_sequence = fetch_protein_sequence(transcript_id)
-            if protein_sequence:
-                results[gene_id] = protein_sequence
+            gene_info = GeneInfo(gene_id)
+            results[gene_id] = gene_info.protein_sequence
+            data = [
+                [
+                    gene_id,
+                    gene_info.transcript_id,
+                    gene_info.display_name,
+                    gene_info.is_protein_coding,
+                    gene_info.seq_len,
+                    gene_info.protein_sequence,
+                ]
+            ]
+            if gene_info.is_protein_coding:
                 f.write(f">{gene_id}\n")
-                f.write(f"{protein_sequence}\n")
-                df_iter = pd.DataFrame(
-                    [[gene_id, transcript_id, display_name]], columns=columns
-                )
-                df = pd.concat([df, df_iter])
+                f.write(f"{gene_info.protein_sequence}\n")
             else:
                 missing_ids.append(gene_id)
-    logger.info(f"Missing sequence for ids: {set(missing_ids)}")
+            df_iter = pd.DataFrame(data, columns=columns)
+            df = pd.concat([df, df_iter])
+
+    if missing_ids:
+        logger.info(f"Missing sequence for ids: {set(missing_ids)}")
     df.to_csv(
         os.path.join(os.path.dirname(fasta_file_output), "gene_info.csv"), index=False
     )
-    return results
+    return df
 
 
 @dataclass
 class EmbeddingConfig:
-    model_name: str
-    output_dir: str
+    model_name: str = "esm2_t36_3B_UR50D"
+    output_dir: str = "gene_embeddings"
     include: str = "mean"
     use_gpu: bool = True
     toks_per_batch: int = 4096
     truncation_seq_length: int = 1022
-    repr_layers: list[int] = [-1]
+    repr_layers: list[int] | None = None
+    save_to_disk: bool = True
     _valid_includes = ["per_tok", "mean", "bos"]
 
     def __post_init__(self):
         self.fasta_path = os.path.join(self.output_dir, "sequences.fasta")
+        if self.repr_layers is None:
+            self.repr_layers = [-1]
         assert (
             self.include in self._valid_includes
         ), f"Must be one of {self._valid_includes}"
 
 
 def embedding_from_seq(
-    config: EmbeddingConfig, gene_ids: list[str], save_to_disk: bool = True
+    config: EmbeddingConfig,
 ):
     model, alphabet = pretrained.load_model_and_alphabet(config.model_name)
     model.eval()
@@ -175,22 +225,26 @@ def embedding_from_seq(
                     }
 
                 result[config.include] = emb
-                if save_to_disk:
+                average_layers = torch.stack(list(emb.values())).mean(0)
+                result["average_layers"] = average_layers
+                if config.save_to_disk:
                     torch.save(
                         result,
                         output_file,
                     )
                     results[label] = output_file
                 else:
-                    results[label] = emb
+                    results[label] = average_layers
     return results
 
 
 def create_gene_embedding(
-    adata,
+    adata: ad.AnnData,
     gene_key: str,
     embedding_config: EmbeddingConfig | None = None,
+    gene_emb_key: str = "gene_embedding",
 ):
+    adata = adata.copy()
     if embedding_config is None:
         embedding_config = EmbeddingConfig(
             model_name="esm2_t36_3B_UR50D",
@@ -203,8 +257,36 @@ def create_gene_embedding(
         )
     os.makedirs(embedding_config.output_dir, exist_ok=True)
     gene_ids = adata.obs[gene_key].unique().tolist()
-    sequences = write_sequence_from_ensembl(gene_ids, embedding_config.fasta_path)
-    gene_with_embedding = list(sequences.keys())
-    results = embedding_from_seq(embedding_config, gene_with_embedding)
-    adata.uns["gene_embedding"] = results
+    metadata = write_sequence_from_ensembl(gene_ids, embedding_config.fasta_path)
+    results = embedding_from_seq(embedding_config)
+    adata.uns[gene_emb_key] = results
+    adata.uns[gene_emb_key + "_metadata"] = metadata
     return adata
+
+
+def mock_adata():
+    adata = ad.AnnData(
+        obs=pd.DataFrame(
+            {
+                "gene_id": [
+                    "ENSG00000139618",
+                    "ENSG00000139618",
+                    "ENSG00000260123",
+                    "ENSG00000049192",
+                ],
+                "cell_id": ["cell1", "cell2", "cell3", "cell4"],
+            }
+        )
+    )
+    return adata
+
+
+if __name__ == "__main__":
+    adata = mock_adata()
+    gene_emb_key = "gene_embedding"
+    embedding_config = EmbeddingConfig(save_to_disk=False, repr_layers=[-2, -1])
+    adata = create_gene_embedding(
+        adata, gene_key="gene_id", embedding_config=embedding_config
+    )
+    print(adata.uns[gene_emb_key])
+    print(adata.uns[gene_emb_key + "_metadata"])
