@@ -12,16 +12,12 @@ license = {file = "LICENSE"}
 aauthors = [
     {name = "Dominik Klein"},
     {name = "Jonas Simon Fleck"},
-    {name = "Alejandro Tejada"},
     {name = "Daniil Bobrovskiy"},
-    {name = "Lea Zimmermann"},
 ]
 maintainers = [
     {name = "Dominik Klein"},
     {name = "Jonas Simon Fleck"},
-    {name = "Alejandro Tejada"},
     {name = "Daniil Bobrovskiy"},
-    {name = "Lea Zimmermann"},
 ]
 urls.Documentation = "https://cell_flow_perturbation.readthedocs.io/"
 urls.Source = "https://github.com/theislab/cell_flow_perturbation"
@@ -29,7 +25,7 @@ urls.Home-page = "https://github.com/theislab/cell_flow_perturbation"
 dependencies = [
     "anndata",
     "scanpy",
-    "ott-jax>=0.4.7",
+    "ott-jax==0.4.7",
     "orbax",
     "flax",
     "cloudpickle",
