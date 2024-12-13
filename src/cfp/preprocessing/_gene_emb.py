@@ -225,8 +225,38 @@ def create_gene_embedding(
     embedding_config: EmbeddingConfig | None = None,
     gene_emb_key: str = "gene_embedding",
     save_to_disk: bool = False,
+    copy: bool = False,
 ):
-    adata = adata.copy()
+    """
+    Create gene embeddings from adata object using ESM2 model.
+
+    Parameters
+    ----------
+    adata : AnnData
+        Annotated data matrix.
+    gene_key : str | Iterable[str]
+        prefix in `adata.obs` containing gene names or list of keys.
+    null_vallue : str | None
+        Value to ignore (useful when using combinations of KO).
+    embedding_config : EmbeddingConfig | None
+        Configuration for embedding model
+    gene_emb_key : str
+        Key to store gene embeddings in `adata.uns`.
+    save_to_disk : bool
+        Save embeddings to disk if :obj:`True`.
+    copy : bool
+        Return a copy of `adata` instead of updating it in place.
+
+    Returns
+    -------
+    AnnData
+        If `copy` is :obj:`True`, returns a new :class:`~anndata.AnnData`
+        Sets the following fields:
+        `adata.uns[gene_emb_key]`: Gene embeddings.
+        `adata.uns[gene_emb_key + "_metadata"]`: Metadata for gene embeddings.
+    """
+    if copy:
+        adata = adata.copy()
     if embedding_config is None:
         embedding_config = EmbeddingConfig(
             model_name="esm2_t36_3B_UR50D",
@@ -256,4 +286,5 @@ def create_gene_embedding(
         import shutil
 
         shutil.rmtree(embedding_config.output_dir)
-    return adata
+    if copy:
+        return adata
