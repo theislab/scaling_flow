@@ -55,7 +55,7 @@ def adata_test_legacy():
 
 
 def test_embedding(adata_with_ko):
-    adata = create_gene_embedding(adata_with_ko, gene_key="gene_target_")
+    adata = create_gene_embedding(adata_with_ko, gene_key="gene_target_", copy=True)
     metadata = adata.uns["gene_embedding_metadata"]
     assert (
         Counter(metadata[metadata.is_protein_coding].gene_id.tolist()) == IS_PROT_CODING
@@ -66,7 +66,7 @@ def test_embedding(adata_with_ko):
 
 def test_legacy_emb(adata_test_legacy):
     """Test if we can reproduce the original embeddings we used."""
-    adata = create_gene_embedding(adata_test_legacy, gene_key="gene")
+    adata = create_gene_embedding(adata_test_legacy, gene_key="gene", copy=True)
     all_genes = adata.obs.gene.tolist()
     for gene in all_genes:
         emb = adata.uns["gene_embedding"][gene]
