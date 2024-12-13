@@ -28,10 +28,10 @@ def centered_pca(
         Layer in `adata.layers` to use for PCA.
     method : str
         Method to use for PCA. If `rapids`, uses `rapids_singlecell` with GPU acceleration. Otherwise, uses `scanpy`.
+    keep_centered_data
+        Whether to keep the centered data. Set to :obj:`False` to save memory.
     copy : bool
         Return a copy of `adata` instead of updating it in place.
-    keep_centered_data
-        TODO
     kwargs : dict
         Additional arguments to pass to `scanpy.pp.pca`.
 
