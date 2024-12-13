@@ -1,4 +1,5 @@
 import os
+from collections.abc import Iterable
 from dataclasses import dataclass
 from functools import cached_property
 
@@ -17,7 +18,7 @@ except ImportError as e:
     pretrained = None
     raise ImportError(
         "To use gene embedding, please install `fair-esm` and `torch` \
-             via `pip install -e .['embedding']`."
+            e.g. via `pip install -e .['embedding']`."
     ) from e
 
 
@@ -141,26 +142,18 @@ def write_sequence_from_ensembl(ensembl_gene_id: list[str], fasta_file_output: s
 class EmbeddingConfig:
     model_name: str = "esm2_t36_3B_UR50D"
     output_dir: str = "gene_embeddings"
-    include: str = "mean"
     use_gpu: bool = True
     toks_per_batch: int = 4096
     truncation_seq_length: int = 1022
     repr_layers: list[int] | None = None
-    save_to_disk: bool = True
-    _valid_includes = ["per_tok", "mean", "bos"]
 
     def __post_init__(self):
         self.fasta_path = os.path.join(self.output_dir, "sequences.fasta")
         if self.repr_layers is None:
             self.repr_layers = [-1]
-        assert (
-            self.include in self._valid_includes
-        ), f"Must be one of {self._valid_includes}"
 
 
-def embedding_from_seq(
-    config: EmbeddingConfig,
-):
+def embedding_from_seq(config: EmbeddingConfig, save_to_disk: bool = False):
     model, alphabet = pretrained.load_model_and_alphabet(config.model_name)
     model.eval()
     if torch.cuda.is_available() and config.use_gpu:
@@ -208,26 +201,13 @@ def embedding_from_seq(
                 truncate_len = min(config.truncation_seq_length, len(strs[i]))
                 # Call clone on tensors to ensure tensors are not views into a larger representation
                 # See https://github.com/pytorch/pytorch/issues/1995
-                emb = None
-                if "per_tok" in config.include:
-                    emb = {
-                        layer: t[i, 1 : truncate_len + 1].clone()
-                        for layer, t in representations.items()
-                    }
-                elif "mean" in config.include:
-                    emb = {
-                        layer: t[i, 1 : truncate_len + 1].mean(0).clone()
-                        for layer, t in representations.items()
-                    }
-                elif "bos" in config.include:
-                    emb = {
-                        layer: t[i, 0].clone() for layer, t in representations.items()
-                    }
-
-                result[config.include] = emb
+                emb = {
+                    layer: t[i, 1 : truncate_len + 1].mean(0).clone()
+                    for layer, t in representations.items()
+                }
                 average_layers = torch.stack(list(emb.values())).mean(0)
-                result["average_layers"] = average_layers
-                if config.save_to_disk:
+                result["embedding"] = average_layers
+                if save_to_disk:
                     torch.save(
                         result,
                         output_file,
@@ -240,27 +220,42 @@ def embedding_from_seq(
 
 def create_gene_embedding(
     adata: ad.AnnData,
-    gene_key: str,
+    gene_key: str | Iterable[str],
+    null_vallue: str | None = None,
     embedding_config: EmbeddingConfig | None = None,
     gene_emb_key: str = "gene_embedding",
+    save_to_disk: bool = False,
 ):
     adata = adata.copy()
     if embedding_config is None:
         embedding_config = EmbeddingConfig(
             model_name="esm2_t36_3B_UR50D",
-            output_dir="gene_embeddings",
-            include="mean",
+            output_dir="gene_embeddings" if save_to_disk else "tmp_fasta",
             use_gpu=True,  # Use GPU only if available
             toks_per_batch=4096,
             truncation_seq_length=1022,
             repr_layers=[-1],
         )
     os.makedirs(embedding_config.output_dir, exist_ok=True)
-    gene_ids = adata.obs[gene_key].unique().tolist()
-    metadata = write_sequence_from_ensembl(gene_ids, embedding_config.fasta_path)
+    if isinstance(gene_key, str):
+        # We use it as a prefix
+        mask_col = adata.obs.columns.str.startswith(gene_key)
+        columns = adata.obs.columns[mask_col]
+    else:
+        columns = gene_key
+    unique_genes = set()
+    for col in columns:
+        unique_genes.update(adata.obs[col].unique().tolist())
+    unique_genes = unique_genes - {null_vallue, None}
+    print(unique_genes)
+    metadata = write_sequence_from_ensembl(unique_genes, embedding_config.fasta_path)
     results = embedding_from_seq(embedding_config)
     adata.uns[gene_emb_key] = results
     adata.uns[gene_emb_key + "_metadata"] = metadata
+    if not save_to_disk:
+        import shutil
+
+        shutil.rmtree(embedding_config.output_dir)
     return adata
 
 
@@ -268,11 +263,17 @@ def mock_adata():
     adata = ad.AnnData(
         obs=pd.DataFrame(
             {
-                "gene_id": [
+                "gene_target_1": [
                     "ENSG00000139618",
                     "ENSG00000139618",
                     "ENSG00000260123",
                     "ENSG00000049192",
+                ],
+                "gene_target_2": [
+                    "ENSG00000049192",
+                    "ENSG00000206450",
+                    None,
+                    None,
                 ],
                 "cell_id": ["cell1", "cell2", "cell3", "cell4"],
             }
@@ -284,9 +285,6 @@ def mock_adata():
 if __name__ == "__main__":
     adata = mock_adata()
     gene_emb_key = "gene_embedding"
-    embedding_config = EmbeddingConfig(save_to_disk=False, repr_layers=[-2, -1])
-    adata = create_gene_embedding(
-        adata, gene_key="gene_id", embedding_config=embedding_config
-    )
+    adata = create_gene_embedding(adata, gene_key="gene_target_")
     print(adata.uns[gene_emb_key])
     print(adata.uns[gene_emb_key + "_metadata"])
