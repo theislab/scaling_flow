@@ -257,34 +257,3 @@ def create_gene_embedding(
 
         shutil.rmtree(embedding_config.output_dir)
     return adata
-
-
-def mock_adata():
-    adata = ad.AnnData(
-        obs=pd.DataFrame(
-            {
-                "gene_target_1": [
-                    "ENSG00000139618",
-                    "ENSG00000139618",
-                    "ENSG00000260123",
-                    "ENSG00000049192",
-                ],
-                "gene_target_2": [
-                    "ENSG00000049192",
-                    "ENSG00000206450",
-                    None,
-                    None,
-                ],
-                "cell_id": ["cell1", "cell2", "cell3", "cell4"],
-            }
-        )
-    )
-    return adata
-
-
-if __name__ == "__main__":
-    adata = mock_adata()
-    gene_emb_key = "gene_embedding"
-    adata = create_gene_embedding(adata, gene_key="gene_target_")
-    print(adata.uns[gene_emb_key])
-    print(adata.uns[gene_emb_key + "_metadata"])
