@@ -74,7 +74,3 @@ def test_legacy_emb(adata_test_legacy):
         legacy_emb = torch.load(os.path.join(ARTIFACTS_DIR, fname))
         legacy_emb = legacy_emb["mean_representations"][36]
         assert torch.allclose(emb, legacy_emb, atol=1e-4, rtol=1e-4)
-
-
-if __name__ == "__main__":
-    pytest.main([__file__])
