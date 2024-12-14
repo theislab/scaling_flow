@@ -22,7 +22,7 @@ except ImportError as e:
     ) from e
 
 
-def fetch_canonical_transcript_info(ensembl_gene_id: str):
+def fetch_canonical_transcript_info(ensembl_gene_id: str) -> dict[str, str] | None:
     server = "https://rest.ensembl.org"
     ext = f"/lookup/id/{ensembl_gene_id}?expand=1"
     headers = {"Content-Type": "application/json"}
@@ -49,7 +49,7 @@ def fetch_canonical_transcript_info(ensembl_gene_id: str):
     return canonical_transcript_info
 
 
-def fetch_protein_sequence(ensembl_transcript_id: str):
+def fetch_protein_sequence(ensembl_transcript_id: str) -> str:
     server = "https://rest.ensembl.org"
     ext = f"/sequence/id/{ensembl_transcript_id}?type=protein"
     headers = {"Content-Type": "application/json"}
@@ -95,7 +95,9 @@ class GeneInfo:
         return None
 
 
-def write_sequence_from_ensembl(ensembl_gene_id: list[str], fasta_file_output: str):
+def write_sequence_from_ensembl(
+    ensembl_gene_id: list[str], fasta_file_output: str
+) -> pd.DataFrame:
     assert fasta_file_output.endswith(".fasta"), "Output file must be in FASTA format"
     missing_ids = []
     results = {}
@@ -153,7 +155,9 @@ class EmbeddingConfig:
             self.repr_layers = [-1]
 
 
-def embedding_from_seq(config: EmbeddingConfig, save_to_disk: bool = False):
+def embedding_from_seq(
+    config: EmbeddingConfig, save_to_disk: bool = False
+) -> dict[str, str | torch.Tensor]:
     model, alphabet = pretrained.load_model_and_alphabet(config.model_name)
     model.eval()
     if torch.cuda.is_available() and config.use_gpu:
@@ -218,7 +222,7 @@ def embedding_from_seq(config: EmbeddingConfig, save_to_disk: bool = False):
     return results
 
 
-def create_gene_embedding(
+def get_esm_embedding(
     adata: ad.AnnData,
     gene_key: str | Iterable[str],
     null_vallue: str | None = None,
@@ -226,9 +230,9 @@ def create_gene_embedding(
     gene_emb_key: str = "gene_embedding",
     save_to_disk: bool = False,
     copy: bool = False,
-):
+) -> ad.AnnData | None:
     """
-    Create gene embeddings from adata object using ESM2 model.
+    Create gene embeddings from adata object using ESM2 model :cite:`lin:2023`.
 
     Parameters
     ----------
