@@ -36,7 +36,6 @@ dependencies = [
     "diffrax",
     "session-info",
     "adjustText",
-    "scvi-tools"
 ]
 
 [project.optional-dependencies]

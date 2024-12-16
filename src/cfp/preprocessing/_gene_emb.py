@@ -6,7 +6,6 @@ from functools import cached_property
 import anndata as ad
 import pandas as pd
 import requests
-from transformers import AutoTokenizer, EsmModel
 
 from cfp._logging import logger
 
@@ -19,7 +18,7 @@ except ImportError as e:
     EsmModel = None
     raise ImportError(
         "To use gene embedding, please install `fair-esm` and `torch` \
-            e.g. via `pip install -e .['embedding']`."
+            e.g. via `pip install cfp['embedding']`."
     ) from e
 
 
@@ -50,7 +49,7 @@ def fetch_canonical_transcript_info(ensembl_gene_id: str) -> dict[str, str] | No
     return canonical_transcript_info
 
 
-def fetch_protein_sequence(ensembl_transcript_id: str) -> str:
+def fetch_protein_sequence(ensembl_transcript_id: str | None) -> str:
     server = "https://rest.ensembl.org"
     ext = f"/sequence/id/{ensembl_transcript_id}?type=protein"
     headers = {"Content-Type": "application/json"}
@@ -97,8 +96,8 @@ class GeneInfo:
 
 
 def prot_sequence_from_ensembl(ensembl_gene_id: list[str]) -> pd.DataFrame:
-    missing_ids = []
-    results = {}
+    missing_ids: list[str] = []
+    results: dict[str, str | None] = {}
     columns = [
         "gene_id",
         "transcript_id",
@@ -154,7 +153,7 @@ class BatchedDataset:
         sizes = [(len(s), i) for i, s in enumerate(self.sequence_strs)]
         sizes.sort()
         batches = []
-        buf = []
+        buf: list[int] = []
         max_len = 0
 
         def _flush_current_buf():
@@ -269,10 +268,10 @@ def get_esm_embedding(
         columns = adata.obs.columns[mask_col]
     else:
         columns = gene_key
-    unique_genes = set()
+    genes_todo = []
     for col in columns:
-        unique_genes.update(adata.obs[col].unique().tolist())
-    unique_genes = unique_genes - {null_value, None}
+        genes_todo.extend(adata.obs[col].unique().tolist())
+    unique_genes = list(set(genes_todo) - {null_value, None})
     metadata = prot_sequence_from_ensembl(unique_genes)
     to_emb = metadata[metadata.protein_sequence.notnull()]
     use_cuda = use_cuda and torch.cuda.is_available()
@@ -291,8 +290,8 @@ def get_esm_embedding(
             batch = {k: v.cuda() for k, v in batch.items()}
         batch_results = esm(**batch).last_hidden_state
         for i, name in enumerate(batch_metadata["gene_id"]):
-            trunc_len = min(trunc_len, len(batch_metadata["protein_sequence"][i]))
-            emb = batch_results[i, 1 : trunc_len + 1].mean(0).clone()
+            trunc_len = min(trunc_len, len(batch_metadata["protein_sequence"][i]))  # type: ignore[type-var]
+            emb = batch_results[i, 1 : trunc_len + 1].mean(0).clone()  # type: ignore[operator]
             results[name] = emb
     adata.uns[gene_emb_key] = results
     adata.uns[gene_emb_key + "_metadata"] = metadata
