@@ -111,7 +111,7 @@ class CFJaxSCVI(JaxSCVI):
         use_rep: str = "X_scVI",
         indices: Sequence[int] | None = None,
         give_mean: bool = False,
-        batch_size: int | None = 10240,
+        batch_size: int | None = 1024,
     ) -> ArrayLike:
         r"""
         Return the reconstructed expression for each cell.
