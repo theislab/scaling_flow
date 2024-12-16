@@ -6,16 +6,17 @@ from functools import cached_property
 import anndata as ad
 import pandas as pd
 import requests
+from transformers import AutoTokenizer, EsmModel
 
 from cfp._logging import logger
 
 try:
     import torch
-    from esm import FastaBatchedDataset, pretrained
+    from transformers import AutoTokenizer, EsmModel
 except ImportError as e:
     torch = None
-    FastaBatchedDataset = None
-    pretrained = None
+    AutoTokenizer = None
+    EsmModel = None
     raise ImportError(
         "To use gene embedding, please install `fair-esm` and `torch` \
             e.g. via `pip install -e .['embedding']`."
@@ -95,10 +96,7 @@ class GeneInfo:
         return None
 
 
-def write_sequence_from_ensembl(
-    ensembl_gene_id: list[str], fasta_file_output: str
-) -> pd.DataFrame:
-    assert fasta_file_output.endswith(".fasta"), "Output file must be in FASTA format"
+def prot_sequence_from_ensembl(ensembl_gene_id: list[str]) -> pd.DataFrame:
     missing_ids = []
     results = {}
     columns = [
@@ -110,126 +108,124 @@ def write_sequence_from_ensembl(
         "protein_sequence",
     ]
     df = pd.DataFrame(columns=columns)
-    with open(fasta_file_output, "w") as f:
-        for gene_id in ensembl_gene_id:
-            gene_info = GeneInfo(gene_id)
-            results[gene_id] = gene_info.protein_sequence
-            data = [
-                [
-                    gene_id,
-                    gene_info.transcript_id,
-                    gene_info.display_name,
-                    gene_info.is_protein_coding,
-                    gene_info.seq_len,
-                    gene_info.protein_sequence,
-                ]
+    for gene_id in ensembl_gene_id:
+        gene_info = GeneInfo(gene_id)
+        results[gene_id] = gene_info.protein_sequence
+        data = [
+            [
+                gene_id,
+                gene_info.transcript_id,
+                gene_info.display_name,
+                gene_info.is_protein_coding,
+                gene_info.seq_len,
+                gene_info.protein_sequence,
             ]
-            if gene_info.is_protein_coding:
-                f.write(f">{gene_id}\n")
-                f.write(f"{gene_info.protein_sequence}\n")
-            else:
-                missing_ids.append(gene_id)
-            df_iter = pd.DataFrame(data, columns=columns)
-            df = pd.concat([df, df_iter])
+        ]
+        df_iter = pd.DataFrame(data, columns=columns)
+        df = pd.concat([df, df_iter])
 
     if missing_ids:
         logger.info(f"Missing sequence for ids: {set(missing_ids)}")
-    df.to_csv(
-        os.path.join(os.path.dirname(fasta_file_output), "gene_info.csv"), index=False
-    )
     return df
 
 
-@dataclass
-class EmbeddingConfig:
-    model_name: str = "esm2_t36_3B_UR50D"
-    output_dir: str = "gene_embeddings"
-    use_gpu: bool = True
-    toks_per_batch: int = 4096
-    truncation_seq_length: int = 1022
-    repr_layers: list[int] | None = None
-
-    def __post_init__(self):
-        self.fasta_path = os.path.join(self.output_dir, "sequences.fasta")
-        if self.repr_layers is None:
-            self.repr_layers = [-1]
+def order_to_batch_list(unordered_list, batch_idx):
+    all_batch_names = []
+    for batch in batch_idx:
+        batch_names = [unordered_list[i] for i in batch]
+        all_batch_names.append(batch_names)
+    return all_batch_names
 
 
-def embedding_from_seq(
-    config: EmbeddingConfig, save_to_disk: bool = False
-) -> dict[str, str | torch.Tensor]:
-    model, alphabet = pretrained.load_model_and_alphabet(config.model_name)
-    model.eval()
-    if torch.cuda.is_available() and config.use_gpu:
-        model = model.cuda()
-    dataset = FastaBatchedDataset.from_file(config.fasta_path)
-    batches = dataset.get_batch_indices(config.toks_per_batch, extra_toks_per_seq=1)
+class BatchedDataset:
+    """Modified batched dataset from fair-esm `c9c7d4f0fec964ce10c3e11dccec6c16edaa5144`"""
+
+    def __init__(self, sequence_labels, sequence_strs):
+        self.sequence_labels = list(sequence_labels)
+        self.sequence_strs = list(sequence_strs)
+
+    def __len__(self):
+        return len(self.sequence_labels)
+
+    def __getitem__(self, idx):
+        return self.sequence_labels[idx], self.sequence_strs[idx]
+
+    def get_batch_indices(self, toks_per_batch, extra_toks_per_seq=0):
+        sizes = [(len(s), i) for i, s in enumerate(self.sequence_strs)]
+        sizes.sort()
+        batches = []
+        buf = []
+        max_len = 0
+
+        def _flush_current_buf():
+            nonlocal max_len, buf
+            if len(buf) == 0:
+                return
+            batches.append(buf)
+            buf = []
+            max_len = 0
+
+        for sz, i in sizes:
+            sz += extra_toks_per_seq
+            if max(sz, max_len) * (len(buf) + 1) > toks_per_batch:
+                _flush_current_buf()
+            max_len = max(max_len, sz)
+            buf.append(i)
+
+        _flush_current_buf()
+        return batches
+
+
+def create_dataloader(prot_names, sequences, toks_per_batch, collate_fn):
+    dataset = BatchedDataset(prot_names, sequences)
+    batches = dataset.get_batch_indices(toks_per_batch, extra_toks_per_seq=1)
     data_loader = torch.utils.data.DataLoader(
         dataset,
-        collate_fn=alphabet.get_batch_converter(config.truncation_seq_length),
+        collate_fn=collate_fn,
         batch_sampler=batches,
     )
-    logger.info(f"Read {len(dataset)} sequences from {config.fasta_path}")
-    results: dict[str, dict[str, torch.Tensor]] = {}
-    # Don't overwrite existing embeddings
-    for file in os.listdir(config.output_dir):
-        if file.endswith(".pth"):
-            logger.info(
-                f"Found existing .pth file in {config.output_dir}. Skipping embedding generation."
-            )
-            return
+    return data_loader
 
-        assert all(
-            -(model.num_layers + 1) <= i <= model.num_layers for i in config.repr_layers
+
+def _get_esm_collate_fn(tokenizer, max_length, truncation, return_tensors):
+    def collate_fn(batch):
+        # batch of tuples (gene_id, sequence)
+        gene_id, seq = zip(*batch, strict=False)
+        metadata = {"gene_id": gene_id, "protein_sequence": seq}
+        token = tokenizer(
+            seq,
+            padding=True,
+            max_length=max_length,
+            truncation=truncation,
+            return_tensors=return_tensors,
         )
-    repr_layers = [
-        (i + model.num_layers + 1) % (model.num_layers + 1) for i in config.repr_layers
-    ]
+        return metadata, token
 
-    with torch.no_grad():
-        for batch_idx, (labels, strs, toks) in enumerate(data_loader):
-            logger.info(
-                f"Processing {batch_idx + 1} of {len(batches)} batches ({toks.size(0)} sequences)"
-            )
-            if torch.cuda.is_available() and config.use_gpu:
-                toks = toks.to(device="cuda", non_blocking=True)
+    return collate_fn
 
-            out = model(toks, repr_layers=repr_layers, return_contacts=False)
-            representations = {
-                layer: t.to(device="cpu") for layer, t in out["representations"].items()
-            }
 
-            for i, label in enumerate(labels):
-                output_file = os.path.join(config.output_dir, f"{label}.pth")
-                result = {"label": label}
-                truncate_len = min(config.truncation_seq_length, len(strs[i]))
-                # Call clone on tensors to ensure tensors are not views into a larger representation
-                # See https://github.com/pytorch/pytorch/issues/1995
-                emb = {
-                    layer: t[i, 1 : truncate_len + 1].mean(0).clone()
-                    for layer, t in representations.items()
-                }
-                average_layers = torch.stack(list(emb.values())).mean(0)
-                result["embedding"] = average_layers
-                if save_to_disk:
-                    torch.save(
-                        result,
-                        output_file,
-                    )
-                    results[label] = output_file
-                else:
-                    results[label] = average_layers
-    return results
+def get_model_and_tokenizer(model_name, use_cuda):
+    model_path = os.path.join("facebook", model_name)
+    model = EsmModel.from_pretrained(model_path)
+    model.eval()
+    tokenizer = AutoTokenizer.from_pretrained(model_path)
+    if use_cuda:
+        model = model.cuda()
+    model.requires_grad_(False)
+    return model, tokenizer
 
 
 def get_esm_embedding(
     adata: ad.AnnData,
-    gene_key: str | Iterable[str],
-    null_vallue: str | None = None,
-    embedding_config: EmbeddingConfig | None = None,
+    gene_key: str | Iterable[str] = "gene_target_",
+    null_value: str | None = None,
     gene_emb_key: str = "gene_embedding",
-    save_to_disk: bool = False,
     copy: bool = False,
+    esm_model_name: str = "esm2_t36_3B_UR50D",
+    toks_per_batch: int = 4096,
+    trunc_len: int | None = 1022,
+    truncation: bool = True,
+    use_cuda: bool = True,
 ) -> ad.AnnData | None:
     """
     Create gene embeddings from adata object using ESM2 model :cite:`lin:2023`.
@@ -240,16 +236,22 @@ def get_esm_embedding(
         Annotated data matrix.
     gene_key : str | Iterable[str]
         prefix in `adata.obs` containing gene names or list of keys.
-    null_vallue : str | None
+    null_value : str | None
         Value to ignore (useful when using combinations of KO).
-    embedding_config : EmbeddingConfig | None
-        Configuration for embedding model
     gene_emb_key : str
         Key to store gene embeddings in `adata.uns`.
-    save_to_disk : bool
-        Save embeddings to disk if :obj:`True`.
     copy : bool
         Return a copy of `adata` instead of updating it in place.
+    esm_model_name : str
+        Name of the ESM model to use.
+    toks_per_batch : int
+        Number of tokens per batch.
+    trunc_len : int | None
+        Maximum length of the sequence.
+    truncation : bool
+        Whether to truncate the sequence.
+    use_cuda : bool
+        Use GPU if available.
 
     Returns
     -------
@@ -261,16 +263,6 @@ def get_esm_embedding(
     """
     if copy:
         adata = adata.copy()
-    if embedding_config is None:
-        embedding_config = EmbeddingConfig(
-            model_name="esm2_t36_3B_UR50D",
-            output_dir="gene_embeddings" if save_to_disk else "tmp_fasta",
-            use_gpu=True,  # Use GPU only if available
-            toks_per_batch=4096,
-            truncation_seq_length=1022,
-            repr_layers=[-1],
-        )
-    os.makedirs(embedding_config.output_dir, exist_ok=True)
     if isinstance(gene_key, str):
         # We use it as a prefix
         mask_col = adata.obs.columns.str.startswith(gene_key)
@@ -280,15 +272,29 @@ def get_esm_embedding(
     unique_genes = set()
     for col in columns:
         unique_genes.update(adata.obs[col].unique().tolist())
-    unique_genes = unique_genes - {null_vallue, None}
-    print(unique_genes)
-    metadata = write_sequence_from_ensembl(unique_genes, embedding_config.fasta_path)
-    results = embedding_from_seq(embedding_config)
+    unique_genes = unique_genes - {null_value, None}
+    metadata = prot_sequence_from_ensembl(unique_genes)
+    to_emb = metadata[metadata.protein_sequence.notnull()]
+    use_cuda = use_cuda and torch.cuda.is_available()
+    esm, tokenizer = get_model_and_tokenizer(esm_model_name, use_cuda)
+    data_loader = create_dataloader(
+        prot_names=to_emb["gene_id"].to_list(),
+        sequences=to_emb["protein_sequence"].to_list(),
+        toks_per_batch=toks_per_batch,
+        collate_fn=_get_esm_collate_fn(
+            tokenizer, max_length=trunc_len, truncation=truncation, return_tensors="pt"
+        ),
+    )
+    results = {}
+    for batch_metadata, batch in data_loader:
+        if use_cuda:
+            batch = {k: v.cuda() for k, v in batch.items()}
+        batch_results = esm(**batch).last_hidden_state
+        for i, name in enumerate(batch_metadata["gene_id"]):
+            trunc_len = min(trunc_len, len(batch_metadata["protein_sequence"][i]))
+            emb = batch_results[i, 1 : trunc_len + 1].mean(0).clone()
+            results[name] = emb
     adata.uns[gene_emb_key] = results
     adata.uns[gene_emb_key + "_metadata"] = metadata
-    if not save_to_disk:
-        import shutil
-
-        shutil.rmtree(embedding_config.output_dir)
     if copy:
         return adata

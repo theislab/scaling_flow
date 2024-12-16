@@ -84,7 +84,7 @@ external = [
 ]
 
 embedding = [
-    "fair-esm",
+    "transformers",
     "torch",
 ]
 
