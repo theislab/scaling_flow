@@ -11,9 +11,11 @@ from cfp._logging import logger
 
 try:
     import torch
+    from torch.utils.data import DataLoader
     from transformers import AutoTokenizer, EsmModel
 except ImportError as e:
     torch = None
+    DataLoader = None
     AutoTokenizer = None
     EsmModel = None
     raise ImportError(
@@ -149,7 +151,9 @@ class BatchedDataset:
     def __getitem__(self, idx):
         return self.sequence_labels[idx], self.sequence_strs[idx]
 
-    def get_batch_indices(self, toks_per_batch, extra_toks_per_seq=0):
+    def get_batch_indices(
+        self, toks_per_batch, extra_toks_per_seq=0
+    ) -> list[list[int]]:
         sizes = [(len(s), i) for i, s in enumerate(self.sequence_strs)]
         sizes.sort()
         batches = []
@@ -175,10 +179,10 @@ class BatchedDataset:
         return batches
 
 
-def create_dataloader(prot_names, sequences, toks_per_batch, collate_fn):
+def create_dataloader(prot_names, sequences, toks_per_batch, collate_fn) -> DataLoader:
     dataset = BatchedDataset(prot_names, sequences)
     batches = dataset.get_batch_indices(toks_per_batch, extra_toks_per_seq=1)
-    data_loader = torch.utils.data.DataLoader(
+    data_loader = DataLoader(
         dataset,
         collate_fn=collate_fn,
         batch_sampler=batches,
@@ -203,11 +207,13 @@ def _get_esm_collate_fn(tokenizer, max_length, truncation, return_tensors):
     return collate_fn
 
 
-def get_model_and_tokenizer(model_name, use_cuda):
+def get_model_and_tokenizer(
+    model_name: str, use_cuda: bool, cache_dir: None | str
+) -> tuple[EsmModel, AutoTokenizer]:
     model_path = os.path.join("facebook", model_name)
-    model = EsmModel.from_pretrained(model_path)
+    model = EsmModel.from_pretrained(model_path, cache_dir=cache_dir)
     model.eval()
-    tokenizer = AutoTokenizer.from_pretrained(model_path)
+    tokenizer = AutoTokenizer.from_pretrained(model_path, cache_dir=cache_dir)
     if use_cuda:
         model = model.cuda()
     model.requires_grad_(False)
@@ -225,6 +231,7 @@ def get_esm_embedding(
     trunc_len: int | None = 1022,
     truncation: bool = True,
     use_cuda: bool = True,
+    cache_dir: str | None = None,
 ) -> ad.AnnData | None:
     """
     Create gene embeddings from adata object using ESM2 model :cite:`lin:2023`.
@@ -251,6 +258,8 @@ def get_esm_embedding(
         Whether to truncate the sequence.
     use_cuda : bool
         Use GPU if available.
+    cache_dir : str | None
+        Directory to cache the model.
 
     Returns
     -------
@@ -262,6 +271,11 @@ def get_esm_embedding(
     """
     if copy:
         adata = adata.copy()
+    if os.getenv("HF_HOME") is None and cache_dir is None:
+        logger.warning(
+            "HF_HOME environment variable is not set and `cache_dir` is None. \
+                Cache will be stored in the current directory."
+        )
     if isinstance(gene_key, str):
         # We use it as a prefix
         mask_col = adata.obs.columns.str.startswith(gene_key)
@@ -275,7 +289,7 @@ def get_esm_embedding(
     metadata = prot_sequence_from_ensembl(unique_genes)
     to_emb = metadata[metadata.protein_sequence.notnull()]
     use_cuda = use_cuda and torch.cuda.is_available()
-    esm, tokenizer = get_model_and_tokenizer(esm_model_name, use_cuda)
+    esm, tokenizer = get_model_and_tokenizer(esm_model_name, use_cuda, cache_dir)
     data_loader = create_dataloader(
         prot_names=to_emb["gene_id"].to_list(),
         sequences=to_emb["protein_sequence"].to_list(),
