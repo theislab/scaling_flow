@@ -1,7 +1,8 @@
 import os
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from functools import cached_property
+from typing import Any
 
 import anndata as ad
 import pandas as pd
@@ -19,7 +20,7 @@ except ImportError as e:
     AutoTokenizer = None
     EsmModel = None
     raise ImportError(
-        "To use gene embedding, please install `fair-esm` and `torch` \
+        "To use gene embedding, please install `transformers` and `torch` \
             e.g. via `pip install cfp['embedding']`."
     ) from e
 
@@ -130,12 +131,14 @@ def prot_sequence_from_ensembl(ensembl_gene_id: list[str]) -> pd.DataFrame:
     return df
 
 
-def order_to_batch_list(unordered_list, batch_idx):
-    all_batch_names = []
+def order_to_batch_list(
+    unordered_list: list[Any], batch_idx: list[list[int]]
+) -> list[list[Any]]:
+    ordered_list = []
     for batch in batch_idx:
-        batch_names = [unordered_list[i] for i in batch]
-        all_batch_names.append(batch_names)
-    return all_batch_names
+        batch_iter = [unordered_list[i] for i in batch]
+        ordered_list.append(batch_iter)
+    return ordered_list
 
 
 class BatchedDataset:
@@ -179,7 +182,12 @@ class BatchedDataset:
         return batches
 
 
-def create_dataloader(prot_names, sequences, toks_per_batch, collate_fn) -> DataLoader:
+def create_dataloader(
+    prot_names: list[str],
+    sequences: list[str],
+    toks_per_batch: int,
+    collate_fn: Callable,
+) -> DataLoader:
     dataset = BatchedDataset(prot_names, sequences)
     batches = dataset.get_batch_indices(toks_per_batch, extra_toks_per_seq=1)
     data_loader = DataLoader(
@@ -190,7 +198,9 @@ def create_dataloader(prot_names, sequences, toks_per_batch, collate_fn) -> Data
     return data_loader
 
 
-def _get_esm_collate_fn(tokenizer, max_length, truncation, return_tensors):
+def _get_esm_collate_fn(
+    tokenizer: Callable, max_length: int | None, truncation: bool, return_tensors: str
+) -> Callable:
     def collate_fn(batch):
         # batch of tuples (gene_id, sequence)
         gene_id, seq = zip(*batch, strict=False)
