@@ -116,5 +116,5 @@ def compute_metrics_fast(x: ArrayLike, y: ArrayLike) -> dict[str, float]:
     metrics = {}
     metrics["r_squared"] = compute_r_squared(x, y)
     metrics["e_distance"] = compute_e_distance(x, y)
-    metrics["mmd_distance"] = compute_scalar_mmd(x, y)
+    metrics["mmd"] = compute_scalar_mmd(x, y)
     return metrics
