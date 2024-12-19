@@ -24,6 +24,13 @@ except ImportError as e:
             e.g. via `pip install cfp['embedding']`."
     ) from e
 
+__all__ = [
+    "get_esm_embedding",
+    "protein_features_from_genes",
+    "GeneInfo",
+    "prot_sequence_from_ensembl",
+]
+
 
 def fetch_canonical_transcript_info(ensembl_gene_id: str) -> dict[str, str] | None:
     server = "https://rest.ensembl.org"
@@ -186,7 +193,7 @@ def create_dataloader(
     prot_names: list[str],
     sequences: list[str],
     toks_per_batch: int,
-    collate_fn: Callable,
+    collate_fn: Callable,  # type: ignore[type-arg]
 ) -> DataLoader:
     dataset = BatchedDataset(prot_names, sequences)
     batches = dataset.get_batch_indices(toks_per_batch, extra_toks_per_seq=1)
@@ -199,8 +206,8 @@ def create_dataloader(
 
 
 def _get_esm_collate_fn(
-    tokenizer: Callable, max_length: int | None, truncation: bool, return_tensors: str
-) -> Callable:
+    tokenizer: Callable, max_length: int | None, truncation: bool, return_tensors: str  # type: ignore[type-arg]
+) -> Callable:  # type: ignore[type-arg]
     def collate_fn(batch):
         # batch of tuples (gene_id, sequence)
         gene_id, seq = zip(*batch, strict=False)
@@ -228,6 +235,69 @@ def get_model_and_tokenizer(
         model = model.cuda()
     model.requires_grad_(False)
     return model, tokenizer
+
+
+def protein_features_from_genes(
+    genes: list[str],
+    esm_model_name: str = "esm1_t34_670M_UR50S",
+    toks_per_batch: int = 4096,
+    trunc_len: int | None = 1022,
+    truncation: bool = True,
+    use_cuda: bool = True,
+    cache_dir: None | str = None,
+) -> tuple[dict[str, torch.Tensor], pd.DataFrame]:
+    """
+    Compute gene embeddings using ESM2 :cite:`lin:2023`.
+
+    Parameters
+    ----------
+    genes : list[str]
+        List of gene names.
+    esm_model_name : str
+        Name of the ESM model to use.
+    toks_per_batch : int
+        Number of tokens per batch.
+    trunc_len : int | None
+        Maximum length of the sequence.
+    truncation : bool
+        Whether to truncate the sequence.
+    use_cuda : bool
+        Use GPU if available.
+    cache_dir : str | None
+        Directory to cache the model.
+
+    Returns
+    -------
+    dict[str, torch.Tensor]
+        Dictionary with gene names as keys and embeddings as values.
+    """
+    if os.getenv("HF_HOME") is None and cache_dir is None:
+        logger.warning(
+            "HF_HOME environment variable is not set and `cache_dir` is None. \
+                Cache will be stored in the current directory."
+        )
+    metadata = prot_sequence_from_ensembl(genes)
+    to_emb = metadata[metadata.protein_sequence.notnull()]
+    use_cuda = use_cuda and torch.cuda.is_available()
+    esm, tokenizer = get_model_and_tokenizer(esm_model_name, use_cuda, cache_dir)
+    data_loader = create_dataloader(
+        prot_names=to_emb["gene_id"].to_list(),
+        sequences=to_emb["protein_sequence"].to_list(),
+        toks_per_batch=toks_per_batch,
+        collate_fn=_get_esm_collate_fn(
+            tokenizer, max_length=trunc_len, truncation=truncation, return_tensors="pt"
+        ),
+    )
+    results = {}
+    for batch_metadata, batch in data_loader:
+        if use_cuda:
+            batch = {k: v.cuda() for k, v in batch.items()}
+        batch_results = esm(**batch).last_hidden_state
+        for i, name in enumerate(batch_metadata["gene_id"]):
+            trunc_len = min(trunc_len, len(batch_metadata["protein_sequence"][i]))  # type: ignore[type-var]
+            emb = batch_results[i, 1 : trunc_len + 1].mean(0).clone()  # type: ignore[operator]
+            results[name] = emb
+    return results, metadata
 
 
 def get_esm_embedding(
@@ -281,42 +351,26 @@ def get_esm_embedding(
     """
     if copy:
         adata = adata.copy()
-    if os.getenv("HF_HOME") is None and cache_dir is None:
-        logger.warning(
-            "HF_HOME environment variable is not set and `cache_dir` is None. \
-                Cache will be stored in the current directory."
-        )
     if isinstance(gene_key, str):
         # We use it as a prefix
         mask_col = adata.obs.columns.str.startswith(gene_key)
         columns = adata.obs.columns[mask_col]
     else:
+        assert all(col in adata.obs.columns for col in gene_key)
         columns = gene_key
     genes_todo = []
     for col in columns:
         genes_todo.extend(adata.obs[col].unique().tolist())
     unique_genes = list(set(genes_todo) - {null_value, None})
-    metadata = prot_sequence_from_ensembl(unique_genes)
-    to_emb = metadata[metadata.protein_sequence.notnull()]
-    use_cuda = use_cuda and torch.cuda.is_available()
-    esm, tokenizer = get_model_and_tokenizer(esm_model_name, use_cuda, cache_dir)
-    data_loader = create_dataloader(
-        prot_names=to_emb["gene_id"].to_list(),
-        sequences=to_emb["protein_sequence"].to_list(),
+    results, metadata = protein_features_from_genes(
+        genes=unique_genes,
+        esm_model_name=esm_model_name,
         toks_per_batch=toks_per_batch,
-        collate_fn=_get_esm_collate_fn(
-            tokenizer, max_length=trunc_len, truncation=truncation, return_tensors="pt"
-        ),
+        trunc_len=trunc_len,
+        truncation=truncation,
+        use_cuda=use_cuda,
+        cache_dir=cache_dir,
     )
-    results = {}
-    for batch_metadata, batch in data_loader:
-        if use_cuda:
-            batch = {k: v.cuda() for k, v in batch.items()}
-        batch_results = esm(**batch).last_hidden_state
-        for i, name in enumerate(batch_metadata["gene_id"]):
-            trunc_len = min(trunc_len, len(batch_metadata["protein_sequence"][i]))  # type: ignore[type-var]
-            emb = batch_results[i, 1 : trunc_len + 1].mean(0).clone()  # type: ignore[operator]
-            results[name] = emb
     adata.uns[gene_emb_key] = results
     adata.uns[gene_emb_key + "_metadata"] = metadata
     if copy:
