@@ -12,6 +12,7 @@ def centered_pca(
     n_comps: int = 50,
     layer: str | None = None,
     method: str = "scanpy",
+    keep_centered_data: bool = True,
     copy: bool = False,
     **kwargs,
 ) -> ad.AnnData | None:
@@ -27,6 +28,8 @@ def centered_pca(
         Layer in `adata.layers` to use for PCA.
     method : str
         Method to use for PCA. If `rapids`, uses `rapids_singlecell` with GPU acceleration. Otherwise, uses `scanpy`.
+    keep_centered_data
+        Whether to keep the centered data. Set to :obj:`False` to save memory.
     copy : bool
         Return a copy of `adata` instead of updating it in place.
     kwargs : dict
@@ -40,7 +43,7 @@ def centered_pca(
         `.obsm["X_pca"]`: PCA coordinates.
         `.varm["PCs"]`: Principal components.
         `.varm["X_mean"]`: Mean of the data matrix.
-        `.layers["X_centered"]`: Centered data matrix.
+        `.layers["X_centered"]`: Centered data matrix. # TODO adapt
         `.uns['pca']['variance_ratio']`: Variance ratio of each principal component.
         `.uns['pca']['variance']`: Variance of each principal component.
     """
@@ -49,7 +52,7 @@ def centered_pca(
 
     adata.varm["X_mean"] = np.array(X.mean(axis=0).T)
     adata.layers["X_centered"] = np.array(adata.X - adata.varm["X_mean"].T)
-
+    
     if method == "rapids":
         try:
             import rapids_singlecell as rsc
@@ -80,7 +83,10 @@ def centered_pca(
             f"Invalid method: {method}. Valid options are 'scanpy' and 'rapids'."
         )
 
-    adata.layers["X_centered"] = csr_matrix(adata.layers["X_centered"])
+    if keep_centered_data:
+        adata.layers["X_centered"] = csr_matrix(adata.layers["X_centered"])
+    else:
+        del adata.layers["X_centered"]
 
     if copy:
         return adata
