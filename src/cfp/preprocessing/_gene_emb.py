@@ -228,7 +228,7 @@ def get_model_and_tokenizer(
     model_name: str, use_cuda: bool, cache_dir: None | str
 ) -> tuple[EsmModel, AutoTokenizer]:
     model_path = os.path.join("facebook", model_name)
-    model = EsmModel.from_pretrained(model_path, cache_dir=cache_dir)
+    model = EsmModel.from_pretrained(model_path, cache_dir=cache_dir, add_pooling_layer=False)
     model.eval()
     tokenizer = AutoTokenizer.from_pretrained(model_path, cache_dir=cache_dir)
     if use_cuda:
@@ -239,7 +239,7 @@ def get_model_and_tokenizer(
 
 def protein_features_from_genes(
     genes: list[str],
-    esm_model_name: str = "esm1_t34_670M_UR50S",
+    esm_model_name: str = "esm2_t36_3B_UR50D",
     toks_per_batch: int = 4096,
     trunc_len: int | None = 1022,
     truncation: bool = True,
