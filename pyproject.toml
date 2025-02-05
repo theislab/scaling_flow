@@ -9,15 +9,17 @@ description = "Modeling complex perturbations with flow matching and optimal tra
 readme = "README.md"
 requires-python = ">=3.10"
 license = {file = "LICENSE"}
-aauthors = [
+authors = [
     {name = "Dominik Klein"},
     {name = "Jonas Simon Fleck"},
     {name = "Daniil Bobrovskiy"},
+    {name = "Guillaume Huguet"},
 ]
 maintainers = [
     {name = "Dominik Klein"},
     {name = "Jonas Simon Fleck"},
     {name = "Daniil Bobrovskiy"},
+    {name = "Guillaume Huguet"},
 ]
 urls.Documentation = "https://cell_flow_perturbation.readthedocs.io/"
 urls.Source = "https://github.com/theislab/cell_flow_perturbation"
@@ -77,6 +79,11 @@ pp = [
 
 external = [
     "scvi-tools",
+]
+
+embedding = [
+    "transformers",
+    "torch",
 ]
 
 [tool.hatch.build.targets.wheel]
