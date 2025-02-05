@@ -219,11 +219,14 @@ class PCADecodedMetrics(Metrics):
     Parameters
     ----------
     ref_adata : ad.AnnData
-        An :class:`~anndata.AnnData` object with the reference data containing `adata.varm["X_mean"]` and `adata.varm["PCs"]`.
+        An :class:`~anndata.AnnData` object with the reference data containing
+        `adata.varm["X_mean"]` and `adata.varm["PCs"]`.
     metrics : list
-        List of metrics to compute. Supported metrics are `"r_squared"`, `"mmd"`, `"sinkhorn_div"`, and `"e_distance"`.
+        List of metrics to compute. Supported metrics are `"r_squared"`, `"mmd"`, `"sinkhorn_div"`,
+        and `"e_distance"`.
     metric_aggregation : list
-        List of aggregation functions to use for each metric. Supported aggregations are `"mean"` and `"median"`.
+        List of aggregation functions to use for each metric. Supported aggregations are `"mean"`
+        and `"median"`.
     log_prefix : str
         Prefix to add to the log keys.
     """
@@ -278,9 +281,11 @@ class VAEDecodedMetrics(Metrics):
     adata
         An :class:`~anndata.AnnData` object in the same format as the ``'vae'`` was set up.
     metrics : list
-        List of metrics to compute. Supported metrics are `"r_squared"`, `"mmd"`, `"sinkhorn_div"`, and `"e_distance"`.
+        List of metrics to compute. Supported metrics are `"r_squared"`, `"mmd"`, `"sinkhorn_div"`,
+        and `"e_distance"`.
     metric_aggregation : list
-        List of aggregation functions to use for each metric. Supported aggregations are `"mean"` and `"median"`.
+        List of aggregation functions to use for each metric. Supported aggregations are `"mean"`
+        and `"median"`.
     log_prefix : str
         Prefix to add to the log keys.
     """
@@ -422,7 +427,8 @@ class CallbackRunner:
     Parameters
     ----------
     callbacks : list
-        List of callbacks to run. Callbacks should be of type `ComputationCallback` or `LoggingCallback`
+        List of callbacks to run. Callbacks should be of type `ComputationCallback` or
+        `LoggingCallback`
 
     Returns
     -------

@@ -81,8 +81,10 @@ class MLPBlock(BaseModule):
 
 
 class SelfAttention(BaseModule):
-    """
-    Self-attention optionally followed by FC layer with residual connection, making it a transformer block.
+    """Self-attention layer
+
+    Self-attention layer that can optionally be followed by a FC layer with residual connection,
+    making it a transformer block.
 
     Parameters
     ----------
@@ -118,7 +120,8 @@ class SelfAttention(BaseModule):
         Parameters
         ----------
         x
-            Input tensor of shape ``(batch_size, set_size, input_dim)`` or ``(batch_size, input_dim)``.
+            Input tensor of shape ``(batch_size, set_size, input_dim)`` or
+            ``(batch_size, input_dim)``.
         mask
             Mask tensor of shape ``(batch_size, 1 | num_heads, set_size, set_size)``.
         training
@@ -401,15 +404,19 @@ class ConditionEncoder(BaseModule):
         Dimensionality of the output.
     pooling
         Pooling method, should be one of:
-        - ``'mean'``: Aggregates combinations of covariates by the mean of their learned embeddings.
-        - ``'attention_token'``: Aggregates combinations of covariates by an attention mechanism with a token.
-        - ``'attention_seed'``: Aggregates combinations of covariates by an attention mechanism with a seed.
+        - ``'mean'``: Aggregates combinations of covariates by the mean of their learned
+          embeddings.
+        - ``'attention_token'``: Aggregates combinations of covariates by an attention mechanism
+          with a token.
+        - ``'attention_seed'``: Aggregates combinations of covariates by an attention mechanism
+          with a seed.
     pooling_kwargs
         Keyword arguments for the pooling method.
     covariates_not_pooled
         Covariates that will escape pooling (should be identical across all set elements).
     layers_before_pool
-        Layers before pooling. Either a sequence of tuples with layer type and parameters or a dictionary with input-specific layers.
+        Layers before pooling. Either a sequence of tuples with layer type and parameters or a
+          dictionary with input-specific layers.
     layers_after_pool
         Layers after pooling.
     output_dropout

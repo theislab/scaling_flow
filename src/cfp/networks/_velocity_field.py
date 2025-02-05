@@ -27,10 +27,11 @@ class ConditionalVelocityField(nn.Module):
         max_combination_length
             Maximum number of covariates in a combination.
         encode_conditions
-                Processes the embedding of the perturbation conditions if :obj:`True`. If :obj:`False`,
-                directly inputs the embedding of the perturbation conditions to the generative velocity field.
-                In the latter case, ``'condition_embedding_dim'``, ``'condition_encoder_kwargs'``, ``'pooling'``,
-                ``'pooling_kwargs'``, ``'layers_before_pool'``, ``'layers_after_pool'``, ``'cond_output_dropout'``
+                Processes the embedding of the perturbation conditions if :obj:`True`. If
+                :obj:`False`, directly inputs the embedding of the perturbation conditions to the
+                generative velocity field. In the latter case, ``'condition_embedding_dim'``,
+                ``'condition_encoder_kwargs'``, ``'pooling'``, ``'pooling_kwargs'``,
+                ``'layers_before_pool'``, ``'layers_after_pool'``, ``'cond_output_dropout'``
                 are ignored.
         condition_embedding_dim
             Dimensions of the condition embedding.
@@ -41,7 +42,8 @@ class ConditionalVelocityField(nn.Module):
         pooling_kwargs
             Keyword arguments for the pooling method.
         layers_before_pool
-            Layers before pooling. Either a sequence of tuples with layer type and parameters or a dictionary with input-specific layers.
+            Layers before pooling. Either a sequence of tuples with layer type and parameters or
+            a dictionary with input-specific layers.
         layers_after_pool
             Layers after pooling.
         cond_output_dropout
@@ -169,7 +171,8 @@ class ConditionalVelocityField(nn.Module):
             x
                 Data of shape ``[batch, ...]``.
             condition
-                Condition dictionary, with condition names as keys and condition representations of shape ``[batch, max_combination_length, condition_dim]`` as values.
+                Condition dictionary, with condition names as keys and condition representations
+                of shape ``[batch, max_combination_length, condition_dim]`` as values.
             train
                 If :obj:`True`, enables dropout for training.
 
@@ -258,5 +261,5 @@ class ConditionalVelocityField(nn.Module):
 
     @property
     def output_dims(self):
-        """Dimonsions of the output layers."""
+        """Dimensions of the output layers."""
         return tuple(self.decoder_dims) + (self.output_dim,)

@@ -27,7 +27,8 @@ def centered_pca(
     layer : str
         Layer in `adata.layers` to use for PCA.
     method : str
-        Method to use for PCA. If `rapids`, uses `rapids_singlecell` with GPU acceleration. Otherwise, uses `scanpy`.
+        Method to use for PCA. If `rapids`, uses `rapids_singlecell` with GPU acceleration.
+        Otherwise, uses `scanpy`.
     keep_centered_data
         Whether to keep the centered data. Set to :obj:`False` to save memory.
     copy : bool
@@ -52,7 +53,7 @@ def centered_pca(
 
     adata.varm["X_mean"] = np.array(X.mean(axis=0).T)
     adata.layers["X_centered"] = np.array(adata.X - adata.varm["X_mean"].T)
-    
+
     if method == "rapids":
         try:
             import rapids_singlecell as rsc
@@ -108,9 +109,11 @@ def reconstruct_pca(
     query_adata : ad.AnnData
         An :class:`~anndata.AnnData` object with the query data.
     use_rep : str
-        Representation to use for PCA. If `X`, uses `adata.X`. Otherwise, uses `adata.obsm[use_rep]`.
+        Representation to use for PCA. If `X`, uses `adata.X`. Otherwise, uses `
+        adata.obsm[use_rep]`.
     ref_adata : ad.AnnData
-        An :class:`~anndata.AnnData` object with the reference data containing `adata.varm["X_mean"]` and `adata.varm["PCs"]`.
+        An :class:`~anndata.AnnData` object with the reference data containing
+        `adata.varm["X_mean"]` and `adata.varm["PCs"]`.
     ref_means : ArrayLike
         Mean of the reference data. Only used if `ref_adata` is `None`.
     ref_pcs : ArrayLike
@@ -122,7 +125,8 @@ def reconstruct_pca(
 
     Returns
     -------
-        If `copy` is :obj:`True`, returns a new :class:`~anndata.AnnData` object with the PCA results stored in `adata.obsm`. Otherwise, updates `adata` in place.
+        If `copy` is :obj:`True`, returns a new :class:`~anndata.AnnData` object with the PCA
+        results stored in `adata.obsm`. Otherwise, updates `adata` in place.
 
         Sets the following fields:
         `.layers["X_recon"]`: Reconstructed data matrix.
@@ -165,7 +169,8 @@ def project_pca(
     query_adata : ad.AnnData
         An :class:`~anndata.AnnData` object with the query data.
     ref_adata : ad.AnnData
-        An :class:`~anndata.AnnData` object with the reference data containing `adata.varm["X_mean"]` and `adata.varm["PCs"]`.
+        An :class:`~anndata.AnnData` object with the reference data containing
+        `adata.varm["X_mean"]` and `adata.varm["PCs"]`.
     ref_means : ArrayLike
         Mean of the reference data. Only used if `ref_adata` is `None`.
     ref_pcs : ArrayLike
@@ -177,7 +182,8 @@ def project_pca(
 
     Returns
     -------
-        If `copy` is :obj:`True`, returns a new :class:`~anndata.AnnData` object with the PCA results stored in `adata.obsm`. Otherwise, updates `adata` in place.
+        If `copy` is :obj:`True`, returns a new :class:`~anndata.AnnData` object with the PCA
+        results stored in `adata.obsm`. Otherwise, updates `adata` in place.
 
         Sets the following fields:
         `.obsm["X_pca"]`: PCA coordinates.

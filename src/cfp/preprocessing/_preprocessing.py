@@ -30,13 +30,15 @@ def annotate_compounds(
     query_id_type: str
         Type of the compound identifiers. Either "name" or "cid".
     obs_key_prefixes: str
-        Prefix for the keys in `adata.obs` to store the annotations. If `None`, uses `compound_keys` as prefixes.
+        Prefix for the keys in `adata.obs` to store the annotations. If `None`, uses
+        `compound_keys` as prefixes.
     copy: bool
         Return a copy of `adata` instead of updating it in place.
 
     Returns
     -------
-        If `copy` is :obj:`True`, returns a new :class:`~anndata.AnnData` object with the compound annotations stored in `adata.obs`. Otherwise, updates `adata` in place.
+        If `copy` is :obj:`True`, returns a new :class:`~anndata.AnnData` object with the compound
+        annotations stored in `adata.obs`. Otherwise, updates `adata` in place.
 
         Sets the following fields for each value in `compound_keys`:
         `.obs[f"{obs_key_prefix}_pubchem_name"]`: Name of the compound.
@@ -152,7 +154,8 @@ def get_molecular_fingerprints(
     compound_keys: str
         Key(s) in `adata.obs` containing the compound identifiers.
     smiles_keys: str
-        Key(s) in `adata.obs` containing the SMILES strings. If `None`, uses `f"{compound_key}_smiles"`.
+        Key(s) in `adata.obs` containing the SMILES strings. If `None`, uses
+        `f"{compound_key}_smiles"`.
     uns_key_added: str
         Key in `adata.uns` to store the fingerprints.
     radius: int
@@ -234,7 +237,8 @@ def encode_onehot(
 
     Returns
     -------
-        If `copy` is :obj:`True`, returns a new :class:`~anndata.AnnData` object with the one-hot encodings stored in `adata.uns`. Otherwise, updates `adata` in place.
+        If `copy` is :obj:`True`, returns a new :class:`~anndata.AnnData` object with the one-hot
+        encodings stored in `adata.uns`. Otherwise, updates `adata` in place.
 
         Sets the following fields:
         `.uns[uns_key_added]`: Dictionary containing the one-hot encodings for each covariate.

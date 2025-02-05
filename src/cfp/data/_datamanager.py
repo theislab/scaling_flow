@@ -226,10 +226,11 @@ class DataManager:
             Key in :attr:`~anndata.AnnData.obsm` where the sample representation of the control
             is stored or `X` to use :attr:`~anndata.AnnData.X`.
         covariate_data
-            A :class:`~pandas.DataFrame` with columns defining the covariates as in :meth:`cfp.model.CellFlow.prepare_data`
-            and stored in :attr:`dm`.
+            A :class:`~pandas.DataFrame` with columns defining the covariates as
+            in :meth:`cfp.model.CellFlow.prepare_data` and stored in :attr:`dm`. # TODO clarify :attr:`dm`
         rep_dict
-            Dictionary with representations of the covariates. If not provided, :attr:`~anndata.AnnData.uns` is used.
+            Dictionary with representations of the covariates.
+            If not provided, :attr:`~anndata.AnnData.uns` is used.
         condition_id_key
             Key in :attr:`~pandas.DataFrame` that defines the condition names.
 

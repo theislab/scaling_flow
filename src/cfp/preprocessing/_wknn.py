@@ -33,9 +33,11 @@ def compute_wknn(
     Parameters
     ----------
     ref_adata : ad.AnnData
-        An :class:`~anndata.AnnData` object with the reference representation to build ref-query neighbor graph
+        An :class:`~anndata.AnnData` object with the reference representation to build ref-query
+        neighbor graph
     query_adata : ad.AnnData
-        An :class:`~anndata.AnnData` object with the query representation to build ref-query neighbor graph
+        An :class:`~anndata.AnnData` object with the query representation to build ref-query
+        neighbor graph
     n_neighbors : int
         Number of neighbors per cell
     ref_rep_key : str
@@ -61,7 +63,8 @@ def compute_wknn(
 
     Returns
     -------
-        If `copy` is :obj:`True`, returns a new :class:`~anndata.AnnData` object with the weighted k-nearest neighbors stored in `adata.uns`. Otherwise, updates `adata` in place.
+        If `copy` is :obj:`True`, returns a new :class:`~anndata.AnnData` object with the
+        weighted k-nearest neighbors stored in `adata.uns`. Otherwise, updates `adata` in place.
 
         Sets the following fields:
         `.uns[uns_key_added]`: Weighted k-nearest neighbors graph
@@ -111,7 +114,8 @@ def transfer_labels(
 
     Returns
     -------
-        If `copy` is :obj:`True`, returns a new :class:`~anndata.AnnData` object with the transferred labels stored in `adata.obs`. Otherwise, updates `adata` in place.
+        If `copy` is :obj:`True`, returns a new :class:`~anndata.AnnData` object with the
+        transferred labels stored in `adata.obs`. Otherwise, updates `adata` in place.
 
         Sets the following fields:
         `.obs[f"{label_key}_transfer"]`: Transferred labels
