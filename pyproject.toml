@@ -8,7 +8,7 @@ version = "0.0.1"
 description = "Modeling complex perturbations with flow matching and optimal transport"
 readme = "README.md"
 requires-python = ">=3.10"
-license = {file = "LICENSE"}
+license = {file = "LICENSE.md"}
 aauthors = [
     {name = "Dominik Klein"},
     {name = "Jonas Simon Fleck"},
@@ -32,7 +32,7 @@ dependencies = [
     "diffrax",
     "session-info",
     "adjustText",
-    "sklearn==1.5.1",
+    "scikit-learn==1.5.1",
 ]
 
 [project.optional-dependencies]
