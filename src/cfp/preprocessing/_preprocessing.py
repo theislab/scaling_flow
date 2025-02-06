@@ -13,7 +13,7 @@ __all__ = ["encode_onehot", "annotate_compounds", "get_molecular_fingerprints"]
 
 
 def annotate_compounds(
-    adata,
+    adata: ad.AnnData,
     compound_keys: str | Sequence[str],
     query_id_type: Literal["name", "cid"] = "name",
     obs_key_prefixes: str | Sequence[str] | None = None,
