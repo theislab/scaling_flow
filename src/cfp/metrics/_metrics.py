@@ -50,7 +50,7 @@ def pairwise_squeuclidean(x, y):
 
 
 @jax.jit
-def compute_e_distance_fast(x, y) -> float:
+def compute_e_distance_fast(x: ArrayLike, y: ArrayLike) -> float:
     """Compute the energy distance as in Peidli et al."""
     sigma_X = pairwise_squeuclidean(x, x).mean()
     sigma_Y = pairwise_squeuclidean(y, y).mean()
