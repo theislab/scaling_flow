@@ -45,6 +45,19 @@ def compute_e_distance(x: ArrayLike, y: ArrayLike) -> float:
     return 2 * delta - sigma_X - sigma_Y
 
 
+def pairwise_squeuclidean(x, y):
+    return ((x[:, None, :] - y[None, :, :]) ** 2).sum(-1)
+
+
+@jax.jit
+def compute_e_distance_fast(x, y) -> float:
+    """Compute the energy distance as in Peidli et al."""
+    sigma_X = pairwise_squeuclidean(x, x).mean()
+    sigma_Y = pairwise_squeuclidean(y, y).mean()
+    delta = pairwise_squeuclidean(x, y).mean()
+    return 2 * delta - sigma_X - sigma_Y
+
+
 def compute_metrics(x: ArrayLike, y: ArrayLike) -> dict[str, float]:
     """Compute different metrics for x (true) and y (predicted)."""
     metrics = {}
