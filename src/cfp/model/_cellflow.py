@@ -123,18 +123,18 @@ class CellFlow:
         -------
         Updates the following fields:
 
-        - :attr:`cfp.model.CellFlow.dm` - the :class:`cfp.data.DataManager` object.
+        - :attr:`cfp.model.CellFlow._dm` - the :class:`cfp.data.DataManager` object.
         - :attr:`cfp.model.CellFlow.train_data` - the training data.
 
         Example
         -------
             Consider the case where we have combinations of drugs along with dosages, saved in
-            :attr:`anndata.AnnData.obs` as columns `drug_1` and `drug_2` with three different
+            :attr:`~anndata.AnnData.obs` as columns `drug_1` and `drug_2` with three different
             drugs `DrugA`, `DrugB`, and `DrugC`, and `dose_1` and `dose_2` for their dosages,
-            respectively. We store the embeddings of the drugs in :attr:`anndata.AnnData.uns`
+            respectively. We store the embeddings of the drugs in :attr:`~anndata.AnnData.uns`
             under the key `drug_embeddings`, while the dosage columns are numeric. Moreover, we
             have a covariate `cell_type` with values `cell_typeA` and `cell_typeB`, with embeddings
-            stored in :attr:`anndata.AnnData.uns` under the key `cell_type_embeddings`. Note that
+            stored in :attr:`~anndata.AnnData.uns` under the key `cell_type_embeddings`. Note that
             we then also have to set ``'split_covariates'`` as we assume we have an unperturbed
             population for each cell type.
 
@@ -310,7 +310,7 @@ class CellFlow:
         layers_before_pool
             Layers applied to the condition embeddings before pooling. Can be of type
 
-            - :class:`Tuple` with elements corresponding to dictionaries with keys:
+            - :class:`tuple` with elements corresponding to dictionaries with keys:
 
                 - ``'layer_type'`` of type :class:`str` indicating the type of the layer, can be
                   ``'mlp'`` or ``'self_attention'``.
@@ -322,7 +322,7 @@ class CellFlow:
 
         layers_after_pool
             Layers applied to the condition embeddings after pooling, and before applying the last
-            layer of size ``'condition_embedding_dim'``. Should be of type :class:`Tuple` with
+            layer of size ``'condition_embedding_dim'``. Should be of type :class:`tuple` with
             elements corresponding to dictionaries with keys:
 
             - ``'layer_type'`` of type :class:`str` indicating the type of the layer, can be
@@ -370,7 +370,7 @@ class CellFlow:
             Only relevant if ``'solver'`` is ``'genot'``, otherwise ignored.
             Layers processing the cell data serving as an additional condition to the
             model (see :cite:`klein:23`). Should be of the same form as ``'layers_after_pool'``,
-            i.e. a :class:`Tuple` with each element a :class:`dict` with keys:
+            i.e. a :class:`tuple` with each element a :class:`dict` with keys:
 
                 - ``'layer_type'`` of type :class:`str` indicating the type of the layer, can be
                   ``'mlp'`` or ``'self_attention'``.
@@ -566,7 +566,8 @@ class CellFlow:
         covariate_data
             Covariate data defining the condition to predict. This :class:`~pandas.DataFrame`
             should have the same columns as :attr:`~anndata.AnnData.obs` of
-            :attr:`cfp.model.CellFlow.adata`, and as registered in :attr:`cfp.model.CellFlow.dm`.
+            :attr:`cfp.model.CellFlow.adata`, and as registered in 
+            :attr:`cfp.model.CellFlow._dm`.
         sample_rep
             Key in :attr:`~anndata.AnnData.obsm` where the sample representation is stored or
             ``'X'`` to use :attr:`~anndata.AnnData.X`. If :obj:`None`, the key is assumed to be
