@@ -8,16 +8,18 @@ version = "0.0.1"
 description = "Modeling complex perturbations with flow matching and optimal transport"
 readme = "README.md"
 requires-python = ">=3.10"
-license = {file = "LICENSE"}
-aauthors = [
+license = {file = "LICENSE.md"}
+authors = [
     {name = "Dominik Klein"},
     {name = "Jonas Simon Fleck"},
     {name = "Daniil Bobrovskiy"},
+    {name = "Guillaume Huguet"},
 ]
 maintainers = [
     {name = "Dominik Klein"},
     {name = "Jonas Simon Fleck"},
     {name = "Daniil Bobrovskiy"},
+    {name = "Guillaume Huguet"},
 ]
 urls.Documentation = "https://cell_flow_perturbation.readthedocs.io/"
 urls.Source = "https://github.com/theislab/cell_flow_perturbation"
@@ -32,7 +34,7 @@ dependencies = [
     "diffrax",
     "session-info",
     "adjustText",
-    "sklearn==1.5.1",
+    "scikit-learn==1.5.1",
 ]
 
 [project.optional-dependencies]
@@ -77,6 +79,11 @@ pp = [
 
 external = [
     "scvi-tools",
+]
+
+embedding = [
+    "transformers",
+    "torch",
 ]
 
 [tool.hatch.build.targets.wheel]
