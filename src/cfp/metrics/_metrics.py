@@ -45,6 +45,20 @@ def compute_e_distance(x: ArrayLike, y: ArrayLike) -> float:
     return 2 * delta - sigma_X - sigma_Y
 
 
+def pairwise_squeuclidean(x: ArrayLike, y: ArrayLike) -> ArrayLike:
+    """Compute pairwise squared euclidean distances."""
+    return ((x[:, None, :] - y[None, :, :]) ** 2).sum(-1)
+
+
+@jax.jit
+def compute_e_distance_fast(x: ArrayLike, y: ArrayLike) -> float:
+    """Compute the energy distance as in Peidli et al."""
+    sigma_X = pairwise_squeuclidean(x, x).mean()
+    sigma_Y = pairwise_squeuclidean(y, y).mean()
+    delta = pairwise_squeuclidean(x, y).mean()
+    return 2 * delta - sigma_X - sigma_Y
+
+
 def compute_metrics(x: ArrayLike, y: ArrayLike) -> dict[str, float]:
     """Compute different metrics for x (true) and y (predicted)."""
     metrics = {}
@@ -57,7 +71,9 @@ def compute_metrics(x: ArrayLike, y: ArrayLike) -> dict[str, float]:
     return metrics
 
 
-def compute_mean_metrics(metrics: dict[str, dict[str, float]], prefix: str = ""):
+def compute_mean_metrics(
+    metrics: dict[str, dict[str, float]], prefix: str = ""
+) -> dict[str, float]:
     """Compute the mean value of different metrics."""
     metric_names = list(list(metrics.values())[0].keys())
     metric_dict: dict[str, list[float]] = {
@@ -72,7 +88,7 @@ def compute_mean_metrics(metrics: dict[str, dict[str, float]], prefix: str = "")
 
 
 @jax.jit
-def rbf_kernel_fast(x: ArrayLike, y: ArrayLike, gamma: float):
+def rbf_kernel_fast(x: ArrayLike, y: ArrayLike, gamma: float) -> ArrayLike:
     xx = (x**2).sum(1)
     yy = (y**2).sum(1)
     xy = x @ y.T
