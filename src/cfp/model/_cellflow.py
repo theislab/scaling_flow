@@ -200,7 +200,7 @@ class CellFlow:
             An :class:`anndata.AnnData` object.
         name
             Name of the validation data defining the key in :attr:`validation_data`.
-        n_conditions_on_log_iterations
+        n_conditions_on_log_iteration
             Number of conditions to use for computation callbacks at each logged iteration.
             If :obj:`None`, use all conditions.
         n_conditions_on_train_end

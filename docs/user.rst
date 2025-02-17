@@ -35,7 +35,8 @@ Networks
     SelfAttention
     SeedAttentionPooling
     TokenAttentionPooling
-
+    MLPBlock
+    SelfAttentionBlock
 
 Utils
 ~~~~~
@@ -45,3 +46,20 @@ Utils
     :toctree: genapi
 
     match_linear
+
+Training
+~~~~~
+.. module:: cfp.training
+.. currentmodule:: cfp.training
+.. autosummary::
+    :toctree: genapi
+
+    BaseCallback
+    CallbackRunner
+    ComputationCallback
+    LoggingCallback
+    Metrics
+    PCADecodedMetrics
+    VAEDecodedMetrics
+    WandbLogger
+    CellFlowTrainer
