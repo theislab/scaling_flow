@@ -143,7 +143,7 @@ class ValidationSampler(BaseValidSampler):
         Parameters
         ----------
         mode
-            Sampling mode. Either "on_log_iteration" or "on_train_end".
+            Sampling mode. Either ``"on_log_iteration"`` or ``"on_train_end"``.
 
         Returns
         -------

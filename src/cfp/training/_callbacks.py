@@ -6,7 +6,7 @@ import anndata as ad
 import jax.tree as jt
 import jax.tree_util as jtu
 import numpy as np
-from numpy.typing import ArrayLike
+from cfp._types import ArrayLike
 
 from cfp.metrics._metrics import compute_e_distance, compute_r_squared, compute_scalar_mmd, compute_sinkhorn_div
 
@@ -36,7 +36,7 @@ agg_fn_to_func: dict[str, Callable[[ArrayLike], float | ArrayLike]] = {
 
 
 class BaseCallback(abc.ABC):
-    """Base class for callbacks in the CellFlowTrainer"""
+    """Base class for callbacks in the :class:`~cfp.training.CellFlowTrainer`"""
 
     @abc.abstractmethod
     def on_train_begin(self, *args: Any, **kwargs: Any) -> None:
@@ -55,7 +55,7 @@ class BaseCallback(abc.ABC):
 
 
 class LoggingCallback(BaseCallback, abc.ABC):
-    """Base class for logging callbacks in the CellFlowTrainer"""
+    """Base class for logging callbacks in the :class:`~cfp.training.CellFlowTrainer`"""
 
     @abc.abstractmethod
     def on_train_begin(self) -> Any:
@@ -86,7 +86,7 @@ class LoggingCallback(BaseCallback, abc.ABC):
 
 
 class ComputationCallback(BaseCallback, abc.ABC):
-    """Base class for computation callbacks in the CellFlowTrainer"""
+    """Base class for computation callbacks in the :class:`~cfp.training.CellFlowTrainer`"""
 
     @abc.abstractmethod
     def on_train_begin(self) -> Any:
@@ -104,9 +104,9 @@ class ComputationCallback(BaseCallback, abc.ABC):
         Parameters
         ----------
         validation_data
-            Validation data in nested dictionary format with same keys as `predicted_data`
+            Validation data in nested dictionary format with same keys as ``predicted_data``
         predicted_data
-            Predicted data in nested dictionary format with same keys as `validation_data`
+            Predicted data in nested dictionary format with same keys as ``validation_data``
 
         Returns
         -------
@@ -125,9 +125,9 @@ class ComputationCallback(BaseCallback, abc.ABC):
         Parameters
         ----------
         validation_data
-            Validation data in nested dictionary format with same keys as `predicted_data`
+            Validation data in nested dictionary format with same keys as ``predicted_data``
         predicted_data
-            Predicted data in nested dictionary format with same keys as `validation_data`
+            Predicted data in nested dictionary format with same keys as ``validation_data``
 
         Returns
         -------
@@ -141,14 +141,14 @@ class Metrics(ComputationCallback):
 
     Parameters
     ----------
-    metrics : list
+    metrics
         List of metrics to compute
-    metric_aggregation : list
+    metric_aggregations
         List of aggregation functions to use for each metric
 
     Returns
     -------
-        None
+        :obj:`None`
     """
 
     def __init__(
@@ -178,9 +178,12 @@ class Metrics(ComputationCallback):
     ) -> dict[str, float]:
         """Called at each validation/log iteration to compute metrics
 
-        Args:
-            validation_data: Validation data
-            predicted_data: Predicted data
+        Parameters
+        ----------
+        validation_data
+            Validation data in nested dictionary format with same keys as ``predicted_data``
+        predicted_data
+            Predicted data in nested dictionary format with same keys as ``valid_data``
         """
         metrics = {}
         for metric in self.metrics:
@@ -205,10 +208,10 @@ class Metrics(ComputationCallback):
 
         Parameters
         ----------
-        validation_data : dict
-            Validation data
-        predicted_data : dict
-            Predicted data
+        validation_data
+            Validation data in nested dictionary format with same keys as ``predicted_data``
+        predicted_data
+            Predicted data in nested dictionary format with same keys as ``validation_data``
         """
         return self.on_log_iteration(validation_data, predicted_data)
 
@@ -218,16 +221,16 @@ class PCADecodedMetrics(Metrics):
 
     Parameters
     ----------
-    ref_adata : ad.AnnData
+    ref_adata
         An :class:`~anndata.AnnData` object with the reference data containing
-        `adata.varm["X_mean"]` and `adata.varm["PCs"]`.
-    metrics : list
-        List of metrics to compute. Supported metrics are `"r_squared"`, `"mmd"`, `"sinkhorn_div"`,
-        and `"e_distance"`.
-    metric_aggregation : list
-        List of aggregation functions to use for each metric. Supported aggregations are `"mean"`
-        and `"median"`.
-    log_prefix : str
+        ``adata.varm["X_mean"]`` and ``adata.varm["PCs"]``.
+    metrics
+        List of metrics to compute. Supported metrics are ``"r_squared"``, ``"mmd"``, 
+        ``"sinkhorn_div"``, and ``"e_distance"``.
+    metric_aggregations
+        List of aggregation functions to use for each metric. Supported aggregations are ``"mean"``
+        and ``"median"``.
+    log_prefix
         Prefix to add to the log keys.
     """
 
@@ -255,10 +258,10 @@ class PCADecodedMetrics(Metrics):
 
         Parameters
         ----------
-        validation_data : dict
-            Validation data
-        predicted_data : dict
-            Predicted data
+        validation_data
+            Validation data in nested dictionary format with same keys as ``predicted_data``
+        predicted_data
+            Predicted data in nested dictionary format with same keys as ``validation_data``
         """
         validation_data_decoded = jtu.tree_map(self.reconstruct_data, validation_data)
         predicted_data_decoded = jtu.tree_map(self.reconstruct_data, predicted_data)
@@ -279,14 +282,14 @@ class VAEDecodedMetrics(Metrics):
         A VAE model object with a ``'get_reconstruction'`` method, can be an instance
         of :class:`cfp.external.CFJaxSCVI`.
     adata
-        An :class:`~anndata.AnnData` object in the same format as the ``'vae'`` was set up.
-    metrics : list
-        List of metrics to compute. Supported metrics are `"r_squared"`, `"mmd"`, `"sinkhorn_div"`,
-        and `"e_distance"`.
-    metric_aggregation : list
-        List of aggregation functions to use for each metric. Supported aggregations are `"mean"`
-        and `"median"`.
-    log_prefix : str
+        An :class:`~anndata.AnnData` object in the same format as the ``vae``.
+    metrics
+        List of metrics to compute. Supported metrics are ``"r_squared"``, ``"mmd"``,
+        ``"sinkhorn_div"``, and ``"e_distance"``.
+    metric_aggregations
+        List of aggregation functions to use for each metric. Supported aggregations are ``"mean"``
+        and ``"median"``.
+    log_prefix
         Prefix to add to the log keys.
     """
 
@@ -314,10 +317,10 @@ class VAEDecodedMetrics(Metrics):
 
         Parameters
         ----------
-        validation_data : dict
-            Validation data
-        predicted_data : dict
-            Predicted data
+        validation_data
+            Validation data in nested dictionary format with same keys as ``predicted_data``
+        predicted_data
+            Predicted data in nested dictionary format with same keys as ``validation_data``
         """
         validation_data_in_anndata = jtu.tree_map(self._create_anndata, validation_data)
         predicted_data_in_anndata = jtu.tree_map(self._create_anndata, predicted_data)
@@ -350,18 +353,18 @@ class WandbLogger(LoggingCallback):
 
     Parameters
     ----------
-    project : str
+    project
         The project name in wandb
-    out_dir : str
+    out_dir
         The output directory to save the logs
-    config : dict
+    config
         The configuration to log
-    **kwargs : Any
-        Additional keyword arguments to pass to wandb.init
+    **kwargs
+        Additional keyword arguments to pass to :func:`wandb.init`
 
     Returns
     -------
-        None
+        :obj:`None`
     """
 
     def __init__(
@@ -422,17 +425,18 @@ class WandbLogger(LoggingCallback):
 
 
 class CallbackRunner:
-    """Runs a set of computational and logging callbacks in the CellFlowTrainer
+    """Runs a set of computational and logging callbacks in the :class:`~cfp.training.CellFlowTrainer`
 
     Parameters
     ----------
-    callbacks : list
-        List of callbacks to run. Callbacks should be of type `ComputationCallback` or
-        `LoggingCallback`
+    callbacks
+        List of callbacks to run. Callbacks should be of type 
+        :class:`~cfp.training.ComputationCallback` or 
+        :class:`~cfp.training.LoggingCallback`
 
     Returns
     -------
-        None
+        :obj:`None`
     """
 
     def __init__(
@@ -469,14 +473,14 @@ class CallbackRunner:
 
         Parameters
         ----------
-        valid_data : dict
-            Validation data
-        pred_data : dict
-            Predicted data
+        valid_data
+            Validation data in nested dictionary format with same keys as ``pred_data``
+        pred_data
+            Predicted data in nested dictionary format with same keys as ``valid_data``
 
         Returns
         -------
-            dict_to_log: Dictionary containing data to log
+            ``dict_to_log``: Dictionary containing data to log
         """
         dict_to_log: dict[str, Any] = {}
 
@@ -501,7 +505,7 @@ class CallbackRunner:
 
         Returns
         -------
-            dict_to_log: Dictionary containing data to log
+            ``dict_to_log``: Dictionary containing data to log
         """
         dict_to_log: dict[str, Any] = {}
 

@@ -88,3 +88,12 @@ Preprocessing
     get_molecular_fingerprints
     compute_wknn
     transfer_labels
+
+External
+~~~~~
+.. module:: cfp.external
+.. currentmodule:: cfp.external
+.. autosummary::
+    :toctree: genapi
+
+    CFJaxSCVI
