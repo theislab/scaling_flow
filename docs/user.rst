@@ -72,3 +72,19 @@ Plotting
     :toctree: genapi
 
     plot_condition_embedding
+
+Preprocessing
+~~~~~
+.. module:: cfp.preprocessing
+.. currentmodule:: cfp.preprocessing
+.. autosummary::
+    :toctree: genapi
+
+    centered_pca
+    project_pca
+    reconstruct_pca
+    annotate_compounds
+    encode_onehot
+    get_molecular_fingerprints
+    compute_wknn
+    transfer_labels

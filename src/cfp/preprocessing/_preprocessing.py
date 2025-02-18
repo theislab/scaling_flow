@@ -4,7 +4,7 @@ from typing import Any, Literal
 import anndata as ad
 import numpy as np
 import sklearn.preprocessing as preprocessing
-from numpy.typing import ArrayLike
+from cfp._types import ArrayLike
 
 from cfp._logging import logger
 from cfp.data._utils import _to_list
@@ -23,27 +23,28 @@ def annotate_compounds(
 
     Parameters
     ----------
-    adata: ad.AnnData
+    adata
         An :class:`~anndata.AnnData` object.
-    compound_keys: str
-        Key(s) in `adata.obs` containing the compound identifiers.
-    query_id_type: str
-        Type of the compound identifiers. Either "name" or "cid".
-    obs_key_prefixes: str
-        Prefix for the keys in `adata.obs` to store the annotations. If `None`, uses
-        `compound_keys` as prefixes.
-    copy: bool
+    compound_keys
+        Key(s) in :attr:`~anndata.AnnData.obs` containing the compound identifiers.
+    query_id_type
+        Type of the compound identifiers. Either ``'name'`` or ``'cid'``.
+    obs_key_prefixes
+        Prefix for the keys in :attr:`~anndata.AnnData.obs` to store the annotations. If :obj:`None`, 
+        uses `compound_keys` as prefixes.
+    copy
         Return a copy of `adata` instead of updating it in place.
 
     Returns
     -------
         If `copy` is :obj:`True`, returns a new :class:`~anndata.AnnData` object with the compound
-        annotations stored in `adata.obs`. Otherwise, updates `adata` in place.
+        annotations stored in :attr:`~anndata.AnnData.obs`. Otherwise, updates `adata` in place.
 
         Sets the following fields for each value in `compound_keys`:
-        `.obs[f"{obs_key_prefix}_pubchem_name"]`: Name of the compound.
-        `.obs[f"{obs_key_prefix}_pubchem_ID"]`: PubChem CID of the compound.
-        `.obs[f"{obs_key_prefix}_smiles"]`: SMILES representation of the compound.
+
+        - ``.obs[f"{obs_key_prefix}_pubchem_name"]``: Name of the compound.
+        - ``.obs[f"{obs_key_prefix}_pubchem_ID"]``: PubChem CID of the compound.
+        - ``.obs[f"{obs_key_prefix}_smiles"]``: SMILES representation of the compound.
     """
     try:
         import pertpy as pt
@@ -145,32 +146,33 @@ def get_molecular_fingerprints(
     n_bits: int = 1024,
     copy: bool = False,
 ) -> None | ad.AnnData:
-    """Computes Morgan fingerprints for compounds in `adata` and stores them in `adata.uns`.
+    """Computes Morgan fingerprints for compounds in `adata` and stores them in :attr:`~anndata.AnnData.uns`.
 
     Parameters
     ----------
-    adata: ad.AnnData
+    adata
         An :class:`~anndata.AnnData` object.
-    compound_keys: str
-        Key(s) in `adata.obs` containing the compound identifiers.
-    smiles_keys: str
-        Key(s) in `adata.obs` containing the SMILES strings. If `None`, uses
-        `f"{compound_key}_smiles"`.
-    uns_key_added: str
-        Key in `adata.uns` to store the fingerprints.
-    radius: int
+    compound_keys
+        Key(s) in :attr:`~anndata.AnnData.obs` containing the compound identifiers.
+    smiles_keys
+        Key(s) in :attr:`~anndata.AnnData.obs` containing the SMILES strings. If :obj:`None`, uses
+        ``f"{compound_key}_smiles"``.
+    uns_key_added
+        Key in :attr:`~anndata.AnnData.uns` to store the fingerprints.
+    radius
         Radius of the Morgan fingerprints.
-    n_bits: int
+    n_bits
         Number of bits in the fingerprint.
-    copy: bool
+    copy
         Return a copy of `adata` instead of updating it in place
 
     Returns
     -------
-        Updates `adata.uns` with the computed fingerprints.
+        Updates :attr:`~anndata.AnnData.uns` with the computed fingerprints.
 
         Sets the following fields:
-        `.uns[uns_key_added]`: Dictionary containing the fingerprints for each compound.
+
+        - ``.uns[uns_key_added]``: Dictionary containing the fingerprints for each compound.
     """
     adata = adata.copy() if copy else adata
 
@@ -220,28 +222,29 @@ def encode_onehot(
     exclude_values: str | Sequence[Any] = None,
     copy: bool = False,
 ) -> None | ad.AnnData:
-    """Encodes covariates `adata.obs` as one-hot vectors and stores them in `adata.uns`.
+    """Encodes covariates :attr:`~anndata.AnnData.obs` as one-hot vectors and stores them in :attr:`~anndata.AnnData.uns`.
 
     Parameters
     ----------
-    adata : ad.AnnData
+    adata
         An :class:`~anndata.AnnData` object.
-    covariate_keys : str | Sequence[str]
-        Key(s) in `adata.obs` containing the covariate(s) to encode.
-    uns_key_added : str
-        Key in `adata.uns` to store the one-hot encodings.
-    exclude_values : str | Sequence[Any]
+    covariate_keys
+        Key(s) in :attr:`~anndata.AnnData.obs` containing the covariate(s) to encode.
+    uns_key_added
+        Key in :attr:`~anndata.AnnData.uns` to store the one-hot encodings.
+    exclude_values
         Value(s) to exclude from the one-hot encoding.
-    copy : bool
+    copy
         Return a copy of `adata` instead of updating it in place.
 
     Returns
     -------
         If `copy` is :obj:`True`, returns a new :class:`~anndata.AnnData` object with the one-hot
-        encodings stored in `adata.uns`. Otherwise, updates `adata` in place.
+        encodings stored in :attr:`~anndata.AnnData.uns`. Otherwise, updates `adata` in place.
 
         Sets the following fields:
-        `.uns[uns_key_added]`: Dictionary containing the one-hot encodings for each covariate.
+
+        - ``.uns[uns_key_added]``: Dictionary containing the one-hot encodings for each covariate.
     """
     adata = adata.copy() if copy else adata
 

@@ -1,8 +1,8 @@
 import anndata as ad
 import numpy as np
 import scanpy as sc
-from numpy.typing import ArrayLike
 from scipy.sparse import csr_matrix
+from cfp._types import ArrayLike
 
 __all__ = ["centered_pca", "reconstruct_pca", "project_pca"]
 
@@ -16,37 +16,39 @@ def centered_pca(
     copy: bool = False,
     **kwargs,
 ) -> ad.AnnData | None:
-    """Performs PCA on the centered data matrix and stores the results in `adata.obsm`.
+    """Performs PCA on the centered data matrix and stores the results in :attr:`~anndata.AnnData.obsm`.
 
     Parameters
     ----------
-    adata : ad.AnnData
+    adata
         An :class:`~anndata.AnnData` object.
-    n_comps : int
+    n_comps
         Number of principal components to compute.
-    layer : str
-        Layer in `adata.layers` to use for PCA.
-    method : str
+    layer
+        Layer in :attr:`~anndata.AnnData.layers` to use for PCA.
+    method
         Method to use for PCA. If `rapids`, uses `rapids_singlecell` with GPU acceleration.
         Otherwise, uses `scanpy`.
     keep_centered_data
         Whether to keep the centered data. Set to :obj:`False` to save memory.
-    copy : bool
+    copy
         Return a copy of `adata` instead of updating it in place.
-    kwargs : dict
-        Additional arguments to pass to `scanpy.pp.pca`.
+    kwargs
+        Additional arguments to pass to :func:`scanpy.pp.pca`.
 
     Returns
     -------
-        If `copy` is :obj:`True`, returns a new :class:`~anndata.AnnData` object with the PCA results stored in `adata.obsm`. Otherwise, updates `adata` in place.
+        If `copy` is :obj:`True`, returns a new :class:`~anndata.AnnData` object with the PCA 
+        results stored in :attr:`~anndata.AnnData.obsm`. Otherwise, updates `adata` in place.
 
         Sets the following fields:
-        `.obsm["X_pca"]`: PCA coordinates.
-        `.varm["PCs"]`: Principal components.
-        `.varm["X_mean"]`: Mean of the data matrix.
-        `.layers["X_centered"]`: Centered data matrix. # TODO adapt
-        `.uns['pca']['variance_ratio']`: Variance ratio of each principal component.
-        `.uns['pca']['variance']`: Variance of each principal component.
+
+        - ``.obsm["X_pca"]``: PCA coordinates.
+        - ``.varm["PCs"]``: Principal components.
+        - ``.varm["X_mean"]``: Mean of the data matrix.
+        - ``.layers["X_centered"]``: Centered data matrix. # TODO adapt
+        - ``.uns['pca']['variance_ratio']``: Variance ratio of each principal component.
+        - ``.uns['pca']['variance']``: Variance of each principal component.
     """
     adata = adata.copy() if copy else adata
     X = adata.X if layer in [None, "X"] else adata.layers[layer]
@@ -106,30 +108,31 @@ def reconstruct_pca(
 
     Parameters
     ----------
-    query_adata : ad.AnnData
+    query_adata
         An :class:`~anndata.AnnData` object with the query data.
     use_rep : str
-        Representation to use for PCA. If `X`, uses `adata.X`. Otherwise, uses `
-        adata.obsm[use_rep]`.
-    ref_adata : ad.AnnData
+        Representation to use for PCA. If ``'X'``, uses :attr:`~anndata.AnnData.X`. Otherwise, uses 
+        ``adata.obsm[use_rep]``.
+    ref_adata
         An :class:`~anndata.AnnData` object with the reference data containing
-        `adata.varm["X_mean"]` and `adata.varm["PCs"]`.
-    ref_means : ArrayLike
-        Mean of the reference data. Only used if `ref_adata` is `None`.
-    ref_pcs : ArrayLike
-        Principal components of the reference data. Only used if `ref_adata` is `None`.
-    layers_key_added : str
-        Key in `adata.layers` to store the reconstructed data matrix.
-    copy : bool
+        ``adata.varm["X_mean"]`` and ``adata.varm["PCs"]``.
+    ref_means
+        Mean of the reference data. Only used if `ref_adata` is :obj:`None`.
+    ref_pcs
+        Principal components of the reference data. Only used if `ref_adata` is :obj:`None`.
+    layers_key_added
+        Key in :attr:`~anndata.AnnData.layers` to store the reconstructed data matrix.
+    copy
         Return a copy of `adata` instead of updating it in place.
 
     Returns
     -------
         If `copy` is :obj:`True`, returns a new :class:`~anndata.AnnData` object with the PCA
-        results stored in `adata.obsm`. Otherwise, updates `adata` in place.
+        results stored in :attr:`~anndata.AnnData.obsm`. Otherwise, updates `adata` in place.
 
         Sets the following fields:
-        `.layers["X_recon"]`: Reconstructed data matrix.
+
+        - ``.layers["X_recon"]``: Reconstructed data matrix.
     """
     if copy:
         query_adata = query_adata.copy()
@@ -166,27 +169,28 @@ def project_pca(
 
     Parameters
     ----------
-    query_adata : ad.AnnData
+    query_adata
         An :class:`~anndata.AnnData` object with the query data.
-    ref_adata : ad.AnnData
+    ref_adata
         An :class:`~anndata.AnnData` object with the reference data containing
-        `adata.varm["X_mean"]` and `adata.varm["PCs"]`.
-    ref_means : ArrayLike
-        Mean of the reference data. Only used if `ref_adata` is `None`.
-    ref_pcs : ArrayLike
-        Principal components of the reference data. Only used if `ref_adata` is `None`.
-    layer : str
-        Layer in `adata.layers` to use for PCA.
-    obsm_key_added : str
-        Key in `adata.obsm` to store the PCA coordinates.
+        ``adata.varm["X_mean"]`` and ``adata.varm["PCs"]``.
+    ref_means
+        Mean of the reference data. Only used if `ref_adata` is :obj:`None`.
+    ref_pcs
+        Principal components of the reference data. Only used if `ref_adata` is :obj:`None`.
+    layer
+        Layer in :attr:`~anndata.AnnData.layers` to use for PCA.
+    obsm_key_added
+        Key in :attr:`~anndata.AnnData.obsm` to store the PCA coordinates.
 
     Returns
     -------
         If `copy` is :obj:`True`, returns a new :class:`~anndata.AnnData` object with the PCA
-        results stored in `adata.obsm`. Otherwise, updates `adata` in place.
+        results stored in :attr:`~anndata.AnnData.obsm`. Otherwise, updates `adata` in place.
 
         Sets the following fields:
-        `.obsm["X_pca"]`: PCA coordinates.
+
+        - ``.obsm["X_pca"]``: PCA coordinates.
     """
     if copy:
         query_adata = query_adata.copy()
