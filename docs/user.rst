@@ -63,3 +63,12 @@ Training
     VAEDecodedMetrics
     WandbLogger
     CellFlowTrainer
+
+Plotting
+~~~~~
+.. module:: cfp.plotting
+.. currentmodule:: cfp.plotting
+.. autosummary::
+    :toctree: genapi
+
+    plot_condition_embedding

@@ -116,8 +116,8 @@ class OTFlowMatching:
         rng
             Random number generator.
         batch
-            Data batch with keys `src_cell_data`, `tgt_cell_data`, and
-            optionally `condition`.
+            Data batch with keys ``src_cell_data``, ``tgt_cell_data``, and
+            optionally ``condition``.
 
         Returns
         -------
@@ -174,7 +174,7 @@ class OTFlowMatching:
         condition
             Condition of the input data of shape [batch_size, ...].
         kwargs
-            Keyword arguments for :func:`~diffrax.odesolve`.
+            Keyword arguments for :func:`diffrax.diffeqsolve`.
 
         Returns
         -------

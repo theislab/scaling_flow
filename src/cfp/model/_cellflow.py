@@ -123,7 +123,7 @@ class CellFlow:
         -------
         Updates the following fields:
 
-        - :attr:`cfp.model.CellFlow._dm` - the :class:`cfp.data.DataManager` object.
+        - :attr:`cfp.model.CellFlow.data_manager` - the :class:`cfp.data.DataManager` object.
         - :attr:`cfp.model.CellFlow.train_data` - the training data.
 
         Example
@@ -567,7 +567,7 @@ class CellFlow:
             Covariate data defining the condition to predict. This :class:`~pandas.DataFrame`
             should have the same columns as :attr:`~anndata.AnnData.obs` of
             :attr:`cfp.model.CellFlow.adata`, and as registered in 
-            :attr:`cfp.model.CellFlow._dm`.
+            :attr:`cfp.model.CellFlow.data_manager`.
         sample_rep
             Key in :attr:`~anndata.AnnData.obsm` where the sample representation is stored or
             ``'X'`` to use :attr:`~anndata.AnnData.X`. If :obj:`None`, the key is assumed to be

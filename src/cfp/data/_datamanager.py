@@ -47,20 +47,20 @@ class DataManager:
         numeric (concentration or magnitude of the perturbation). If multiple groups
         are provided, the first is interpreted as the primary perturbation and the
         others as covariates corresponding to these perturbations, e.g.
-        `{"drug":("drugA", "drugB"), "time":("drugA_time", "drugB_time")}`.
+        ``{"drug":("drugA", "drugB"), "time":("drugA_time", "drugB_time")}``.
     perturbation_covariate_reps
         A dictionary where the keys indicate the name of the covariate group and the
         values are keys in :attr:`~anndata.AnnData.uns` storing a dictionary with
-        the representation of the covariates. E.g. `{"drug":"drug_embeddings"}`
-        with `adata.uns["drug_embeddings"] = {"drugA": np.array, "drugB": np.array}`.
+        the representation of the covariates. E.g. ``{"drug":"drug_embeddings"}``
+        with ``adata.uns["drug_embeddings"] = {"drugA": np.array, "drugB": np.array}``.
     sample_covariates
         Keys in :attr:`~anndata.AnnData.obs` indicating sample covatiates to be taken
-        into account for training and prediction, e.g. `["age", "cell_type"]`.
+        into account for training and prediction, e.g. ``["age", "cell_type"]``.
     sample_covariate_reps
         A dictionary where the keys indicate the name of the covariate group and the
         values are keys in :attr:`~anndata.AnnData.uns` storing a dictionary with the
-        representation of the covariates. E.g. `{"cell_type": "cell_type_embeddings"}`
-        with `adata.uns["cell_type_embeddings"] = {"cell_typeA": np.array, "cell_typeB": np.array}`.
+        representation of the covariates. E.g. ``{"cell_type": "cell_type_embeddings"}`` with 
+        ``adata.uns["cell_type_embeddings"] = {"cell_typeA": np.array, "cell_typeB": np.array}``.
     split_covariates
         Covariates in :attr:`~anndata.AnnData.obs` to split all control cells into
         different control populations. The perturbed cells are also split according to these
@@ -138,7 +138,7 @@ class DataManager:
         Parameters
         ----------
         adata
-            An :class:`anndata.AnnData` object.
+            An :class:`~anndata.AnnData` object.
 
         Returns
         -------
@@ -174,7 +174,7 @@ class DataManager:
         Parameters
         ----------
         adata
-            An :class:`~anndata.Anndata` object.
+            An :class:`~anndata.AnnData` object.
         n_conditions_on_log_iteration
             Number of conditions to validate on during logging.
         n_conditions_on_train_end
@@ -227,12 +227,13 @@ class DataManager:
             is stored or `X` to use :attr:`~anndata.AnnData.X`.
         covariate_data
             A :class:`~pandas.DataFrame` with columns defining the covariates as
-            in :meth:`cfp.model.CellFlow.prepare_data` and stored in :attr:`dm`. # TODO clarify :attr:`dm`
+            in :meth:`cfp.model.CellFlow.prepare_data` and stored in 
+            :attr:`cfp.model.CellFlow.data_manager`.
         rep_dict
             Dictionary with representations of the covariates.
             If not provided, :attr:`~anndata.AnnData.uns` is used.
         condition_id_key
-            Key in :attr:`~pandas.DataFrame` that defines the condition names.
+            Key in :class:`~pandas.DataFrame` that defines the condition names.
 
         Returns
         -------

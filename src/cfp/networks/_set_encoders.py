@@ -404,7 +404,8 @@ class ConditionEncoder(BaseModule):
         Dimensionality of the output.
     pooling
         Pooling method, should be one of:
-        - ``'mean'``: Aggregates combinations of covariates by the mean of their learned
+
+        - ``'mean'``: Aggregates combinations of covariates by the mean of their learned 
           embeddings.
         - ``'attention_token'``: Aggregates combinations of covariates by an attention mechanism
           with a token.
@@ -416,7 +417,7 @@ class ConditionEncoder(BaseModule):
         Covariates that will escape pooling (should be identical across all set elements).
     layers_before_pool
         Layers before pooling. Either a sequence of tuples with layer type and parameters or a
-          dictionary with input-specific layers.
+        dictionary with input-specific layers.
     layers_after_pool
         Layers after pooling.
     output_dropout
