@@ -47,7 +47,7 @@ def plot_condition_embedding(
         hue
             Covariate to color by.
         key
-            Key in `adata.uns` where the embedding is stored. #TODO: correct
+            Key where the embedding is stored.
         labels
             Column in ``'df'`` with labels to plot. If :obj:`None`, doesn't plot labels.
         col_dict
@@ -65,7 +65,7 @@ def plot_condition_embedding(
 
     Returns
     -------
-        :obj:`None` or :class:`matplotlib.figure.Figure`, depending on `return_fig`.
+        :obj:`None` or :class:`matplotlib.figure.Figure`, depending on ``return_fig``.
     """
     df_embedding, df_metadata = _split_df(df)
     if embedding == "raw_embedding":

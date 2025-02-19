@@ -255,7 +255,7 @@ class SeedAttentionPooling(BaseModule):
 
     References
     ----------
-    #FIXME: add set transformer reference
+    :cite:`vaswani:17`
     """
 
     num_heads: int = 8

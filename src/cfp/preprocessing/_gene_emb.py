@@ -327,7 +327,7 @@ def get_esm_embedding(
     gene_emb_key
         Key to store gene embeddings in :attr:`~anndata.AnnData.uns`.
     copy
-        Return a copy of `adata` instead of updating it in place.
+        Return a copy of ``adata`` instead of updating it in place.
     esm_model_name
         Name of the ESM model to use.
     toks_per_batch

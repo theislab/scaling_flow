@@ -41,9 +41,9 @@ def compute_wknn(
     n_neighbors
         Number of neighbors per cell
     ref_rep_key
-        Key in :attr:`~anndata.AnnData.obsm` of `ref_adata` containing the reference representation
+        Key in :attr:`~anndata.AnnData.obsm` of ``ref_adata`` containing the reference representation
     query_rep_key
-        Key in :attr:`~anndata.AnnData.obsm` of `query_adata` containing the query representation
+        Key in :attr:`~anndata.AnnData.obsm` of ``query_adata`` containing the query representation
     uns_key_added
         Key to store the weighted k-nearest neighbors graph in :attr:`~anndata.AnnData.uns`
     query2ref
@@ -60,13 +60,13 @@ def compute_wknn(
     top_n
         The number of top neighbors to consider
     copy
-        Return a copy of `ref_adata` instead of updating it in place
+        Return a copy of ``ref_adata`` instead of updating it in place
 
     Returns
     -------
-        If `copy` is :obj:`True`, returns a new :class:`~anndata.AnnData` object with the
+        If ``copy`` is :obj:`True`, returns a new :class:`~anndata.AnnData` object with the
         weighted k-nearest neighbors stored in :attr:`~anndata.AnnData.uns`. Otherwise, updates 
-        `adata` in place.
+        ``adata`` in place.
 
         Sets the following fields:
 
@@ -109,17 +109,17 @@ def transfer_labels(
     ref_adata
         An :class:`~anndata.AnnData` object with the reference data
     label_key : str
-        Key in :attr:`~anndata.AnnData.obs` of `ref_adata` containing the labels
+        Key in :attr:`~anndata.AnnData.obs` of ``ref_adata`` containing the labels
     wknn_key : str
-        Key in :attr:`~anndata.AnnData.uns` of `ref_adata` containing the weighted k-nearest 
+        Key in :attr:`~anndata.AnnData.uns` of ``ref_adata`` containing the weighted k-nearest 
         neighbors graph
     copy : bool
-        Return a copy of `query_adata` instead of updating it in place
+        Return a copy of ``query_adata`` instead of updating it in place
 
     Returns
     -------
-        If `copy` is :obj:`True`, returns a new :class:`~anndata.AnnData` object with the
-        transferred labels stored in :attr:`~anndata.AnnData.obs`. Otherwise, updates `adata` in 
+        If ``copy`` is :obj:`True`, returns a new :class:`~anndata.AnnData` object with the
+        transferred labels stored in :attr:`~anndata.AnnData.obs`. Otherwise, updates ``adata`` in 
         place.
 
         Sets the following fields:

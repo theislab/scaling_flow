@@ -27,19 +27,19 @@ def centered_pca(
     layer
         Layer in :attr:`~anndata.AnnData.layers` to use for PCA.
     method
-        Method to use for PCA. If `rapids`, uses `rapids_singlecell` with GPU acceleration.
-        Otherwise, uses `scanpy`.
+        Method to use for PCA. If ``"rapids"``, uses :func:`rapids_singlecell.pp.pca` with GPU acceleration.
+        Otherwise, uses :func:`scanpy.pp.pca`.
     keep_centered_data
         Whether to keep the centered data. Set to :obj:`False` to save memory.
     copy
-        Return a copy of `adata` instead of updating it in place.
+        Return a copy of ``adata`` instead of updating it in place.
     kwargs
-        Additional arguments to pass to :func:`scanpy.pp.pca`.
+        Additional arguments to pass to :func:`scanpy.pp.pca` or :func:`rapids_singlecell.pp.pca`
 
     Returns
     -------
-        If `copy` is :obj:`True`, returns a new :class:`~anndata.AnnData` object with the PCA 
-        results stored in :attr:`~anndata.AnnData.obsm`. Otherwise, updates `adata` in place.
+        If ``copy`` is :obj:`True`, returns a new :class:`~anndata.AnnData` object with the PCA 
+        results stored in :attr:`~anndata.AnnData.obsm`. Otherwise, updates ``adata`` in place.
 
         Sets the following fields:
 
@@ -117,18 +117,18 @@ def reconstruct_pca(
         An :class:`~anndata.AnnData` object with the reference data containing
         ``adata.varm["X_mean"]`` and ``adata.varm["PCs"]``.
     ref_means
-        Mean of the reference data. Only used if `ref_adata` is :obj:`None`.
+        Mean of the reference data. Only used if ``ref_adata`` is :obj:`None`.
     ref_pcs
-        Principal components of the reference data. Only used if `ref_adata` is :obj:`None`.
+        Principal components of the reference data. Only used if ``ref_adata`` is :obj:`None`.
     layers_key_added
         Key in :attr:`~anndata.AnnData.layers` to store the reconstructed data matrix.
     copy
-        Return a copy of `adata` instead of updating it in place.
+        Return a copy of ``adata`` instead of updating it in place.
 
     Returns
     -------
         If `copy` is :obj:`True`, returns a new :class:`~anndata.AnnData` object with the PCA
-        results stored in :attr:`~anndata.AnnData.obsm`. Otherwise, updates `adata` in place.
+        results stored in :attr:`~anndata.AnnData.obsm`. Otherwise, updates ``adata`` in place.
 
         Sets the following fields:
 
@@ -175,9 +175,9 @@ def project_pca(
         An :class:`~anndata.AnnData` object with the reference data containing
         ``adata.varm["X_mean"]`` and ``adata.varm["PCs"]``.
     ref_means
-        Mean of the reference data. Only used if `ref_adata` is :obj:`None`.
+        Mean of the reference data. Only used if ``ref_adata`` is :obj:`None`.
     ref_pcs
-        Principal components of the reference data. Only used if `ref_adata` is :obj:`None`.
+        Principal components of the reference data. Only used if ``ref_adata`` is :obj:`None`.
     layer
         Layer in :attr:`~anndata.AnnData.layers` to use for PCA.
     obsm_key_added
@@ -185,8 +185,8 @@ def project_pca(
 
     Returns
     -------
-        If `copy` is :obj:`True`, returns a new :class:`~anndata.AnnData` object with the PCA
-        results stored in :attr:`~anndata.AnnData.obsm`. Otherwise, updates `adata` in place.
+        If ``copy`` is :obj:`True`, returns a new :class:`~anndata.AnnData` object with the PCA
+        results stored in :attr:`~anndata.AnnData.obsm`. Otherwise, updates ``adata`` in place.
 
         Sets the following fields:
 

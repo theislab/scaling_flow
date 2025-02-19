@@ -498,10 +498,10 @@ class CallbackRunner:
 
         Parameters
         ----------
-        valid_data : dict
-            Validation data
-        pred_data : dict
-            Predicted data
+        valid_data: dict
+            Validation data in nested dictionary format with same keys as ``pred_data``
+        pred_data: dict
+            Predicted data in nested dictionary format with same keys as ``valid_data``
 
         Returns
         -------

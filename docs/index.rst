@@ -16,7 +16,7 @@ CellFlow perturbation
         Learn how to install :mod:`cfp`.
 
     .. grid-item-card:: User API
-        :link: user
+        :link: user/index
         :link-type: doc
 
         Find a detailed documentation of :mod:`cfp`.
@@ -27,11 +27,11 @@ CellFlow perturbation
         TODO
 
 .. toctree::
-    :maxdepth: 2
+    :maxdepth: 3
     :hidden:
 
     installation
-    user
+    user/index
     developer
     contributing
     references

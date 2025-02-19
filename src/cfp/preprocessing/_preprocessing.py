@@ -19,7 +19,7 @@ def annotate_compounds(
     obs_key_prefixes: str | Sequence[str] | None = None,
     copy: bool = False,
 ) -> None | ad.AnnData:
-    """Annotates compounds in `adata` using pertpy and PubChem.
+    """Annotates compounds in ``adata`` using pertpy and PubChem.
 
     Parameters
     ----------
@@ -31,16 +31,16 @@ def annotate_compounds(
         Type of the compound identifiers. Either ``'name'`` or ``'cid'``.
     obs_key_prefixes
         Prefix for the keys in :attr:`~anndata.AnnData.obs` to store the annotations. If :obj:`None`, 
-        uses `compound_keys` as prefixes.
+        uses ``compound_keys`` as prefixes.
     copy
-        Return a copy of `adata` instead of updating it in place.
+        Return a copy of ``adata`` instead of updating it in place.
 
     Returns
     -------
-        If `copy` is :obj:`True`, returns a new :class:`~anndata.AnnData` object with the compound
-        annotations stored in :attr:`~anndata.AnnData.obs`. Otherwise, updates `adata` in place.
+        If ``copy`` is :obj:`True`, returns a new :class:`~anndata.AnnData` object with the compound
+        annotations stored in :attr:`~anndata.AnnData.obs`. Otherwise, updates ``adata`` in place.
 
-        Sets the following fields for each value in `compound_keys`:
+        Sets the following fields for each value in ``compound_keys``:
 
         - ``.obs[f"{obs_key_prefix}_pubchem_name"]``: Name of the compound.
         - ``.obs[f"{obs_key_prefix}_pubchem_ID"]``: PubChem CID of the compound.
@@ -146,7 +146,7 @@ def get_molecular_fingerprints(
     n_bits: int = 1024,
     copy: bool = False,
 ) -> None | ad.AnnData:
-    """Computes Morgan fingerprints for compounds in `adata` and stores them in :attr:`~anndata.AnnData.uns`.
+    """Computes Morgan fingerprints for compounds in ``adata`` and stores them in :attr:`~anndata.AnnData.uns`.
 
     Parameters
     ----------
@@ -164,7 +164,7 @@ def get_molecular_fingerprints(
     n_bits
         Number of bits in the fingerprint.
     copy
-        Return a copy of `adata` instead of updating it in place
+        Return a copy of ``adata`` instead of updating it in place
 
     Returns
     -------
@@ -235,12 +235,12 @@ def encode_onehot(
     exclude_values
         Value(s) to exclude from the one-hot encoding.
     copy
-        Return a copy of `adata` instead of updating it in place.
+        Return a copy of ``adata`` instead of updating it in place.
 
     Returns
     -------
-        If `copy` is :obj:`True`, returns a new :class:`~anndata.AnnData` object with the one-hot
-        encodings stored in :attr:`~anndata.AnnData.uns`. Otherwise, updates `adata` in place.
+        If ``copy`` is :obj:`True`, returns a new :class:`~anndata.AnnData` object with the one-hot
+        encodings stored in :attr:`~anndata.AnnData.uns`. Otherwise, updates ``adata`` in place.
 
         Sets the following fields:
 

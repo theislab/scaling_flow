@@ -32,9 +32,9 @@ class DataManager:
     categorical
         Whether the primary covariate is categorical.
     max_combination_length
-        Maximum number of combinations of primary `perturbation_covariates`.
+        Maximum number of combinations of primary ``perturbation_covariates``.
     sample_rep
-        Key in :attr:`~anndata.AnnData.obsm` where the sample representation is stored or `X`
+        Key in :attr:`~anndata.AnnData.obsm` where the sample representation is stored or ``'X'``
         to use :attr:`~anndata.AnnData.X`.
     covariate_data
         Dataframe with covariates. If :obj:`None`, :attr:`~anndata.AnnData.obs` is used.
@@ -59,15 +59,15 @@ class DataManager:
     sample_covariate_reps
         A dictionary where the keys indicate the name of the covariate group and the
         values are keys in :attr:`~anndata.AnnData.uns` storing a dictionary with the
-        representation of the covariates. E.g. ``{"cell_type": "cell_type_embeddings"}`` with 
+        representation of the covariates. E.g. ``{"cell_type": "cell_type_embeddings"}`` with
         ``adata.uns["cell_type_embeddings"] = {"cell_typeA": np.array, "cell_typeB": np.array}``.
     split_covariates
         Covariates in :attr:`~anndata.AnnData.obs` to split all control cells into
         different control populations. The perturbed cells are also split according to these
         columns, but if these covariates should also be encoded in the model, the corresponding
-        column should also be used in `perturbation_covariates` or `sample_covariates`.
+        column should also be used in ``perturbation_covariates`` or ``sample_covariates``.
     null_value
-        Value to use for padding to `max_combination_length`.
+        Value to use for padding to ``max_combination_length``.
     """
 
     def __init__(
@@ -221,10 +221,10 @@ class DataManager:
         Parameters
         ----------
         adata
-            An :class:`anndata.AnnData` object to extract control cells from.
+            An :class:`~anndata.AnnData` object to extract control cells from.
         sample_rep
             Key in :attr:`~anndata.AnnData.obsm` where the sample representation of the control
-            is stored or `X` to use :attr:`~anndata.AnnData.X`.
+            is stored or ``'X'`` to use :attr:`~anndata.AnnData.X`.
         covariate_data
             A :class:`~pandas.DataFrame` with columns defining the covariates as
             in :meth:`cfp.model.CellFlow.prepare_data` and stored in 
@@ -284,7 +284,8 @@ class DataManager:
         covariate_data
             Dataframe with covariates.
         condition_id_key
-            Key in `covariate_data` that defines the condition id.
+            Key in ``covariate_data`` that defines the condition id.
+        rep_dict
 
         Returns
         -------
@@ -988,7 +989,7 @@ class DataManager:
 
     @property
     def adata(self) -> anndata.AnnData:
-        """An :class:`anndata.AnnData` object used for instantiating the DataManager."""
+        """An :class:`~anndata.AnnData` object used for instantiating the DataManager."""
         return self._adata
 
     @property
@@ -1043,7 +1044,7 @@ class DataManager:
 
     @property
     def covariate_reps(self) -> dict[str, str]:
-        """Dictionary which stores representation of covariates, i.e. the union of `sample_covariate_reps` and `perturbation_covariate_reps`."""
+        """Dictionary which stores representation of covariates, i.e. the union of ``sample_covariate_reps`` and ``perturbation_covariate_reps``."""
         return self._covariate_reps
 
     @property

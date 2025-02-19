@@ -92,11 +92,11 @@ class TrainingData(BaseDataMixin):
     split_covariates_mask
         Mask of the split covariates.
     split_idx_to_covariates
-        Dictionary explaining values in `split_covariates_mask`.
+        Dictionary explaining values in ``split_covariates_mask``.
     perturbation_covariates_mask
         Mask of the perturbation covariates.
     perturbation_idx_to_covariates
-        Dictionary explaining values in `perturbation_covariates_mask`.
+        Dictionary explaining values in ``perturbation_covariates_mask``.
     condition_data
         Dictionary with embeddings for conditions.
     control_to_perturbation
@@ -141,11 +141,11 @@ class ValidationData(BaseDataMixin):
     split_covariates_mask
         Mask of the split covariates.
     split_idx_to_covariates
-        Dictionary explaining values in `split_covariates_mask`.
+        Dictionary explaining values in ``split_covariates_mask``.
     perturbation_covariates_mask
         Mask of the perturbation covariates.
     perturbation_idx_to_covariates
-        Dictionary explaining values in `perturbation_covariates_mask`.
+        Dictionary explaining values in ``perturbation_covariates_mask``.
     condition_data
         Dictionary with embeddings for conditions.
     control_to_perturbation
@@ -204,7 +204,7 @@ class PredictionData(BaseDataMixin):
     max_combination_length
         Maximum number of covariates in a combination.
     null_value
-        Token to use for masking `null_value`.
+        Token to use for masking ``null_value``.
     """
 
     cell_data: jax.Array  # (n_cells, n_features)
