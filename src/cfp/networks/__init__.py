@@ -4,6 +4,7 @@ from cfp.networks._set_encoders import (
                                         SeedAttentionPooling,
                                         SelfAttention,
                                         TokenAttentionPooling,
+                                        SelfAttentionBlock,
 )
 from cfp.networks._velocity_field import ConditionalVelocityField
 
@@ -14,4 +15,5 @@ __all__ = [
     "SelfAttention",
     "SeedAttentionPooling",
     "TokenAttentionPooling",
+    "SelfAttentionBlock",
 ]

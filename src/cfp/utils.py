@@ -42,7 +42,7 @@ def match_linear(
     threshold
         Convergence criterion for the Sinkhorn algorithm.
     kwargs
-        Additional arguments for :class:`ott.solvers.linear.Sinkhorn`.
+        Additional arguments for :class:`ott.solvers.linear.sinkhorn.Sinkhorn`.
 
     Returns
     -------

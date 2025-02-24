@@ -66,21 +66,22 @@ class CFJaxSCVI(JaxSCVI):
         Parameters
         ----------
         adata
-            AnnData object with equivalent structure to initial AnnData. If `None`, defaults to the
-            AnnData object used to initialize the model.
+            :class:`~anndata.AnnData` object with equivalent structure to initial 
+            :class:`~anndata.AnnData` object. If `:obj:`None`, defaults to the 
+            :class:`~anndata.AnnData` object used to initialize the model.
         indices
-            Indices of cells in adata to use. If `None`, all cells are used.
+            Indices of cells in adata to use. If :obj:`None`, all cells are used.
         give_mean
             Whether to return the mean of the posterior distribution or a sample.
         n_samples
             Number of samples to use for computing the latent representation.
         batch_size
-            Minibatch size for data loading into model. Defaults to `scvi.settings.batch_size`.
+            Minibatch size for data loading into model. Defaults to 
+            :attr:`scvi.settings.ScviConfig.batch_size`.
 
         Returns
         -------
-        latent_representation : np.ndarray
-            Low-dimensional representation for each cell
+        Low-dimensional representation for each cell
         """
         self._check_if_trained(warn=False)
 
@@ -123,20 +124,20 @@ class CFJaxSCVI(JaxSCVI):
         data
             TODO
         use_rep
-            Key for `.obsm` that contains the latent representation to use.
+            Key for :attr:`~anndata.AnnData.obsm` that contains the latent representation to use.
         indices
-            Indices of cells in adata to use. If `None`, all cells are used.
+            Indices of cells in adata to use. If :obj:`None`, all cells are used.
         give_mean
             Whether to return the mean of the negative binomial distribution or the
             unscaled expression.
         n_samples
             Number of samples to use for computing the latent representation.
         batch_size
-            Minibatch size for data loading into model. Defaults to `scvi.settings.batch_size`.
+            Minibatch size for data loading into model. Defaults to :attr:`scvi.settings.batch_size`.
 
         Returns
         -------
-        reconstructed_expression : np.ndarray
+        reconstructed_expression
         """
         if batch_size is None:
             batch_size = data.obsm[use_rep].shape[0]

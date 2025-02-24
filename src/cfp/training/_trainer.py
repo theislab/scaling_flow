@@ -25,7 +25,7 @@ class CellFlowTrainer:
 
     Returns
     -------
-        None
+        :obj:`None`
     """
 
     def __init__(
@@ -85,12 +85,14 @@ class CellFlowTrainer:
 
         Parameters
         ----------
+            dataloader
+                Dataloader used.
             num_iterations
                 Number of iterations to train the model.
-            batch_size
-                Batch size.
             valid_freq
                 Frequency of validation.
+            valid_loaders
+                Valid loaders.
             callbacks
                 Callback functions.
             monitor_metrics

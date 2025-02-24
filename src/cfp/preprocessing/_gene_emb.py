@@ -251,19 +251,19 @@ def protein_features_from_genes(
 
     Parameters
     ----------
-    genes : list[str]
+    genes
         List of gene names.
-    esm_model_name : str
+    esm_model_name
         Name of the ESM model to use.
-    toks_per_batch : int
+    toks_per_batch
         Number of tokens per batch.
-    trunc_len : int | None
+    trunc_len
         Maximum length of the sequence.
-    truncation : bool
+    truncation
         Whether to truncate the sequence.
-    use_cuda : bool
+    use_cuda
         Use GPU if available.
-    cache_dir : str | None
+    cache_dir
         Directory to cache the model.
 
     Returns
@@ -318,27 +318,27 @@ def get_esm_embedding(
 
     Parameters
     ----------
-    adata : AnnData
+    adata
         Annotated data matrix.
-    gene_key : str | Iterable[str]
-        prefix in `adata.obs` containing gene names or list of keys.
-    null_value : str | None
+    gene_key
+        prefix in :attr:~anndata.AnnData.obs' containing gene names or list of keys.
+    null_value
         Value to ignore (useful when using combinations of KO).
-    gene_emb_key : str
-        Key to store gene embeddings in `adata.uns`.
-    copy : bool
-        Return a copy of `adata` instead of updating it in place.
-    esm_model_name : str
+    gene_emb_key
+        Key to store gene embeddings in :attr:`~anndata.AnnData.uns`.
+    copy
+        Return a copy of ``adata`` instead of updating it in place.
+    esm_model_name
         Name of the ESM model to use.
-    toks_per_batch : int
+    toks_per_batch
         Number of tokens per batch.
-    trunc_len : int | None
+    trunc_len
         Maximum length of the sequence.
-    truncation : bool
+    truncation
         Whether to truncate the sequence.
-    use_cuda : bool
+    use_cuda
         Use GPU if available.
-    cache_dir : str | None
+    cache_dir
         Directory to cache the model.
 
     Returns
@@ -346,8 +346,9 @@ def get_esm_embedding(
     AnnData
         If `copy` is :obj:`True`, returns a new :class:`~anndata.AnnData`
         Sets the following fields:
-        `adata.uns[gene_emb_key]`: Gene embeddings.
-        `adata.uns[gene_emb_key + "_metadata"]`: Metadata for gene embeddings.
+
+        - ``adata.uns[gene_emb_key]``: Gene embeddings.
+        - ``adata.uns[gene_emb_key + "_metadata"]``: Metadata for gene embeddings.
     """
     if copy:
         adata = adata.copy()

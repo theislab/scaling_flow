@@ -4,7 +4,7 @@ import anndata as ad
 import jax
 import numpy as np
 import pandas as pd
-from numpy.typing import ArrayLike
+from cfp._types import ArrayLike
 from scipy import sparse
 
 from cfp._logging import logger
@@ -32,39 +32,45 @@ def compute_wknn(
 
     Parameters
     ----------
-    ref_adata : ad.AnnData
-        An :class:`~anndata.AnnData` object with the reference representation to build ref-query neighbor graph
-    query_adata : ad.AnnData
-        An :class:`~anndata.AnnData` object with the query representation to build ref-query neighbor graph
-    n_neighbors : int
+    ref_adata
+        An :class:`~anndata.AnnData` object with the reference representation to build ref-query
+        neighbor graph
+    query_adata
+        An :class:`~anndata.AnnData` object with the query representation to build ref-query
+        neighbor graph
+    n_neighbors
         Number of neighbors per cell
-    ref_rep_key : str
-        Key in `ref_adata.obsm` containing the reference representation
-    query_rep_key : str
-        Key in `query_adata.obsm` containing the query representation
-    uns_key_added : str
-        Key to store the weighted k-nearest neighbors graph in `adata.uns`
-    query2ref : bool
+    ref_rep_key
+        Key in :attr:`~anndata.AnnData.obsm` of ``ref_adata`` containing the reference representation
+    query_rep_key
+        Key in :attr:`~anndata.AnnData.obsm` of ``query_adata`` containing the query representation
+    uns_key_added
+        Key to store the weighted k-nearest neighbors graph in :attr:`~anndata.AnnData.uns`
+    query2ref
         Consider query-to-ref neighbors
-    ref2query : bool
+    ref2query
         Consider ref-to-query neighbors
-    weighting_scheme : str
+    weighting_scheme
         How to weight edges in the ref-query neighbor graph. Options are:
-        - `None`: No weighting
-        - `"top_n"`: Binaries edges based on the top `top_n` neighbors.
-        - `"jaccard"`: Weight edges based on the Jaccard index.
-        - `"jaccard_square"`: Weight edges based on the square of the Jaccard index.
-    top_n : int
+
+        - :obj:`None`: No weighting
+        - ``'top_n'``: Binaries edges based on the top `top_n` neighbors.
+        - ``'jaccard'``: Weight edges based on the Jaccard index.
+        - ``'jaccard_square'``: Weight edges based on the square of the Jaccard index.
+    top_n
         The number of top neighbors to consider
-    copy : bool
-        Return a copy of `ref_adata` instead of updating it in place
+    copy
+        Return a copy of ``ref_adata`` instead of updating it in place
 
     Returns
     -------
-        If `copy` is :obj:`True`, returns a new :class:`~anndata.AnnData` object with the weighted k-nearest neighbors stored in `adata.uns`. Otherwise, updates `adata` in place.
+        If ``copy`` is :obj:`True`, returns a new :class:`~anndata.AnnData` object with the
+        weighted k-nearest neighbors stored in :attr:`~anndata.AnnData.uns`. Otherwise, updates 
+        ``adata`` in place.
 
         Sets the following fields:
-        `.uns[uns_key_added]`: Weighted k-nearest neighbors graph
+
+        - ``.uns[uns_key_added]``: Weighted k-nearest neighbors graph
     """
     ref_adata = ref_adata.copy() if copy else ref_adata
 
@@ -98,24 +104,28 @@ def transfer_labels(
 
     Parameters
     ----------
-    query_adata : ad.AnnData
+    query_adata
         An :class:`~anndata.AnnData` object with the query data
-    ref_adata : ad.AnnData
+    ref_adata
         An :class:`~anndata.AnnData` object with the reference data
     label_key : str
-        Key in `ref_adata.obs` containing the labels
+        Key in :attr:`~anndata.AnnData.obs` of ``ref_adata`` containing the labels
     wknn_key : str
-        Key in `ref_adata.uns` containing the weighted k-nearest neighbors graph
+        Key in :attr:`~anndata.AnnData.uns` of ``ref_adata`` containing the weighted k-nearest 
+        neighbors graph
     copy : bool
-        Return a copy of `query_adata` instead of updating it in place
+        Return a copy of ``query_adata`` instead of updating it in place
 
     Returns
     -------
-        If `copy` is :obj:`True`, returns a new :class:`~anndata.AnnData` object with the transferred labels stored in `adata.obs`. Otherwise, updates `adata` in place.
+        If ``copy`` is :obj:`True`, returns a new :class:`~anndata.AnnData` object with the
+        transferred labels stored in :attr:`~anndata.AnnData.obs`. Otherwise, updates ``adata`` in 
+        place.
 
         Sets the following fields:
-        `.obs[f"{label_key}_transfer"]`: Transferred labels
-        `.obs[f"{label_key}_transfer_score"]`: Confidence scores for the transferred labels
+
+        - ``.obs[f"{label_key}_transfer"]``: Transferred labels
+        - ``.obs[f"{label_key}_transfer_score"]``: Confidence scores for the transferred labels
 
     """
     query_adata = query_adata.copy() if copy else query_adata
@@ -223,19 +233,19 @@ def _get_wknn(
 
     Parameters
     ----------
-    ref : ArrayLike
+    ref
         The reference representation to build ref-query neighbor graph
-    query : ArrayLike
+    query
         The query representation to build ref-query neighbor graph
-    k : int
+    k
         Number of neighbors per cell
-    query2ref : bool
+    query2ref
         Consider query-to-ref neighbors
-    ref2query : bool
+    ref2query
         Consider ref-to-query neighbors
-    weighting_scheme : str
+    weighting_scheme
         How to weight edges in the ref-query neighbor graph
-    top_n : int
+    top_n
         The number of top neighbors to consider
     """
     adj_q2r = _build_nn(ref=ref, query=query, k=k)

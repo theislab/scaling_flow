@@ -38,9 +38,8 @@ class GENOT:
         the following signature:
 
         - ``(src_lin, tgt_lin) -> matching`` - linear matching.
-        - ``(src_quad, tgt_quad, src_lin, tgt_lin) -> matching`` -
-        quadratic (fused) GW matching. In the pure GW setting, both ``src_lin``
-        and ``tgt_lin`` will be set to :obj:`None`.
+        - ``(src_quad, tgt_quad, src_lin, tgt_lin) -> matching`` - quadratic (fused) GW matching.
+        In the pure GW setting, both ``src_lin`` and ``tgt_lin`` will be set to :obj:`None`.
 
     source_dim
         Dimensionality of the source distribution.
@@ -176,8 +175,8 @@ class GENOT:
         rng
             Random number generator.
         batch
-            Data batch with keys `src_cell_data`, `tgt_cell_data`, and
-            optionally `condition`.
+            Data batch with keys ``src_cell_data``, ``tgt_cell_data``, and
+            optionally ``condition``.
 
         Returns
         -------
@@ -249,7 +248,7 @@ class GENOT:
         rng
             Random generate used to sample from the latent distribution.
         kwargs
-            Keyword arguments for :func:`~diffrax.odesolve`.
+            Keyword arguments for :func:`diffrax.diffeqsolve`.
 
         Returns
         -------

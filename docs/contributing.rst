@@ -3,13 +3,13 @@ Contributing Guide
 
 TODO: fix links
 
-Scanpy provides extensive developer documentation, most of which applies
+`Scanpy <https://scanpy.readthedocs.io>`_ provides extensive developer documentation, most of which applies
 to this project as well. This document will not reproduce the entire
 content from there but aims to summarize the most important information
 to get you started on contributing.
 
 We assume that you are already familiar with git and making pull requests
-on GitHub. If not, please refer to the Scanpy developer guide.
+on GitHub. If not, please refer to the `Scanpy developer guide <https://scanpy.readthedocs.io/en/stable/dev/index.html>`_.
 
 Installing Development Dependencies
 -----------------------------------
