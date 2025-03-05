@@ -50,7 +50,7 @@ dev = [
     "sphinx_tippy",
     "furo",
 ]
-doc = [
+docs = [
     "docutils>=0.8,!=0.18.*,!=0.19.*",
     "sphinx>=4",
     "sphinx-book-theme>=1.0.0",
