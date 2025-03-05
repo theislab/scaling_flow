@@ -242,6 +242,7 @@ commands =
         --no-cov-on-fail --cov-report=xml --cov-report=term-missing:skip-covered}
 
 [testenv:lint-code]
+extras = test,pp,external,embedding
 description = Lint the code.
 deps = pre-commit>=3.0.0
 skip_install = true
@@ -250,7 +251,7 @@ commands =
 
 [testenv:lint-docs]
 description = Lint the documentation.
-extras = docs
+extras = test,pp,external,embedding
 ignore_errors = true
 allowlist_externals = make
 pass_env = PYENCHANT_LIBRARY_PATH
@@ -261,6 +262,7 @@ commands =
     # make spelling {posargs}
 
 [testenv:examples-docs]
+extras = test,pp,external,embedding
 allowlist_externals = bash
 description = Run the notebooks.
 use_develop = true
@@ -287,7 +289,7 @@ commands =
 [testenv:build-docs]
 description = Build the documentation.
 deps =
-extras = docs
+extras = test,pp,external,embedding
 allowlist_externals = make
 changedir = {tox_root}{/}docs
 commands =
