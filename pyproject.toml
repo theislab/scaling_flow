@@ -64,6 +64,7 @@ doc = [
     "ipython",
     "sphinx-copybutton",
     "pandas",
+    "scvi-tools",
 ]
 test = [
     "pytest",
