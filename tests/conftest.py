@@ -56,7 +56,6 @@ def valid_loader(validdata):
 @pytest.fixture
 def big_validdata():
     class ValidDataToSubsample:
-
         def __init__(self):
             N_SOURCE = 10
             N_COND_TARGET = 5
@@ -64,14 +63,9 @@ def big_validdata():
             self.condition_data = {}
             self.src_data = {i: jnp.ones((10, 5)) * 10 for i in range(N_SOURCE)}
             for i in range(N_SOURCE):
-                self.tgt_data[i] = {
-                    i * N_COND_TARGET + j: jnp.ones((10, 5))
-                    for j in range(N_COND_TARGET)
-                }
+                self.tgt_data[i] = {i * N_COND_TARGET + j: jnp.ones((10, 5)) for j in range(N_COND_TARGET)}
                 for j in range(N_COND_TARGET):
-                    self.condition_data[i * N_COND_TARGET + j] = {
-                        "pert1": jnp.ones((i + j, i + j * 2, 2 * i + j))
-                    }
+                    self.condition_data[i * N_COND_TARGET + j] = {"pert1": jnp.ones((i + j, i + j * 2, 2 * i + j))}
             self.n_conditions_on_log_iteration = 4
             self.n_conditions_on_train_end = 16
             self.max_combination_length = 2
@@ -81,7 +75,6 @@ def big_validdata():
 
 @pytest.fixture()
 def adata_perturbation() -> ad.AnnData:
-
     n_obs = 500
     n_vars = 50
     n_pca = 10
@@ -127,23 +120,17 @@ def adata_perturbation() -> ad.AnnData:
         adata.obs.loc[[str(idx) for idx in control_idcs], col] = "control"
 
     adata.obs["drug_a"] = (
-        (adata.obs["drug1"] == "drug_a")
-        | (adata.obs["drug2"] == "drug_a")
-        | (adata.obs["drug3"] == "drug_a")
+        (adata.obs["drug1"] == "drug_a") | (adata.obs["drug2"] == "drug_a") | (adata.obs["drug3"] == "drug_a")
     )
 
     for col in adata.obs.columns:
         adata.obs[col] = adata.obs[col].astype("category")
 
     adata.obs["drug_b"] = (
-        (adata.obs["drug1"] == "drug_b")
-        | (adata.obs["drug2"] == "drug_b")
-        | (adata.obs["drug3"] == "drug_b")
+        (adata.obs["drug1"] == "drug_b") | (adata.obs["drug2"] == "drug_b") | (adata.obs["drug3"] == "drug_b")
     )
     adata.obs["drug_c"] = (
-        (adata.obs["drug1"] == "drug_c")
-        | (adata.obs["drug2"] == "drug_c")
-        | (adata.obs["drug3"] == "drug_c")
+        (adata.obs["drug1"] == "drug_c") | (adata.obs["drug2"] == "drug_c") | (adata.obs["drug3"] == "drug_c")
     )
     adata.obs["control"] = adata.obs["drug1"] == "control"
 
@@ -209,7 +196,6 @@ def adata_pca() -> ad.AnnData:
 
 @pytest.fixture()
 def adata_with_compounds() -> ad.AnnData:
-
     n_obs = 10
     n_vars = 50
     compound_names = np.array(["AZD1390", "Dabrafenib Mesylate", "GW0742"])

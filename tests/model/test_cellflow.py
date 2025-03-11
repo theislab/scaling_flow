@@ -151,18 +151,14 @@ class TestCellFlow:
         assert out.shape[1] == cf._data_dim
 
         covs = adata_perturbation.obs.drop_duplicates(subset=["drug1"])
-        cond_embed = cf.get_condition_embedding(
-            covariate_data=covs, rep_dict=adata_perturbation.uns
-        )
+        cond_embed = cf.get_condition_embedding(covariate_data=covs, rep_dict=adata_perturbation.uns)
 
         assert isinstance(cond_embed, pd.DataFrame)
         assert cond_embed.shape[0] == len(covs)
         assert cond_embed.shape[1] == condition_embedding_dim
 
     @pytest.mark.parametrize("split_covariates", [[], ["cell_type"]])
-    @pytest.mark.parametrize(
-        "perturbation_covariates", perturbation_covariate_comb_args
-    )
+    @pytest.mark.parametrize("perturbation_covariates", perturbation_covariate_comb_args)
     @pytest.mark.parametrize("solver", ["otfm", "genot"])
     @pytest.mark.parametrize("n_conditions_on_log_iteration", [None, 0, 2])
     @pytest.mark.parametrize("n_conditions_on_train_end", [None, 0, 2])
@@ -189,14 +185,8 @@ class TestCellFlow:
         for k in perturbation_covariates.keys():
             assert k in cf.train_data.condition_data.keys()
             assert cf.train_data.condition_data[k].ndim == 3
-            assert (
-                cf.train_data.condition_data[k].shape[1]
-                == cf.train_data.max_combination_length
-            )
-            assert (
-                cf.train_data.condition_data[k].shape[0]
-                == cf.train_data.n_perturbations
-            )
+            assert cf.train_data.condition_data[k].shape[1] == cf.train_data.max_combination_length
+            assert cf.train_data.condition_data[k].shape[0] == cf.train_data.n_perturbations
 
         cf.prepare_validation_data(
             adata_perturbation,
@@ -210,14 +200,8 @@ class TestCellFlow:
         assert isinstance(cf._validation_data["val"].condition_data, dict)
 
         cond_data = cf._validation_data["val"].condition_data
-        assert (
-            cf._validation_data["val"].n_conditions_on_log_iteration
-            == n_conditions_on_log_iteration
-        )
-        assert (
-            cf._validation_data["val"].n_conditions_on_train_end
-            == n_conditions_on_train_end
-        )
+        assert cf._validation_data["val"].n_conditions_on_log_iteration == n_conditions_on_log_iteration
+        assert cf._validation_data["val"].n_conditions_on_train_end == n_conditions_on_train_end
         for k in perturbation_covariates.keys():
             assert k in cond_data.keys()
             assert cond_data[k].ndim == 3
@@ -254,10 +238,7 @@ class TestCellFlow:
         assert "val" in cf._validation_data
         assert isinstance(cf._validation_data["val"].cell_data, jax.Array)
         assert isinstance(cf._validation_data["val"].condition_data, dict)
-        assert (
-            cf._validation_data["val"].max_combination_length
-            == cf.train_data.max_combination_length
-        )
+        assert cf._validation_data["val"].max_combination_length == cf.train_data.max_combination_length
         cond_data = cf._validation_data["val"].condition_data
         assert "drug" in cond_data.keys()
         assert cond_data["drug"].ndim == 3
@@ -334,13 +315,9 @@ class TestCellFlow:
             match=r".*No cells found in `adata` for split covariates*",
         ):
             cov_data_ct_1 = covariate_data[covariate_data["cell_type"] == "cell_line_a"]
-            adata_pred_cell_type_2 = adata_pred[
-                adata_pred.obs["cell_type"] == "cell_line_b"
-            ]
+            adata_pred_cell_type_2 = adata_pred[adata_pred.obs["cell_type"] == "cell_line_b"]
             adata_pred_cell_type_2.obs["control"] = True
-            cf.predict(
-                adata_pred_cell_type_2, sample_rep="X", covariate_data=cov_data_ct_1
-            )
+            cf.predict(adata_pred_cell_type_2, sample_rep="X", covariate_data=cov_data_ct_1)
 
     def test_raise_otfm_genot_layers_passed(self, adata_perturbation):
         cf = cfp.model.CellFlow(adata_perturbation, solver="otfm")
@@ -366,9 +343,7 @@ class TestCellFlow:
         [(None, None), (["cell_type"], {"cell_type": "cell_type"})],
     )
     @pytest.mark.parametrize("split_covariates", [None, ["cell_type"]])
-    @pytest.mark.parametrize(
-        "perturbation_covariates", perturbation_covariate_comb_args
-    )
+    @pytest.mark.parametrize("perturbation_covariates", perturbation_covariate_comb_args)
     def test_cellflow_get_condition_embedding(
         self,
         adata_perturbation,

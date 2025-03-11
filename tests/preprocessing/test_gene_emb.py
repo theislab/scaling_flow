@@ -9,9 +9,7 @@ import torch
 from cfp.preprocessing._gene_emb import get_esm_embedding
 
 IS_PROT_CODING = Counter(["ENSG00000139618", "ENSG00000206450", "ENSG00000049192"])
-ARTIFACTS_DIR = os.path.join(
-    os.path.dirname(os.path.abspath(__file__)), "../test_artifacts/"
-)
+ARTIFACTS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "../test_artifacts/")
 
 
 @pytest.fixture()
@@ -56,9 +54,7 @@ def adata_test_legacy():
 def test_embedding(adata_with_ko):
     adata = get_esm_embedding(adata_with_ko, gene_key="gene_target_", copy=True)
     metadata = adata.uns["gene_embedding_metadata"]
-    assert (
-        Counter(metadata[metadata.is_protein_coding].gene_id.tolist()) == IS_PROT_CODING
-    )
+    assert Counter(metadata[metadata.is_protein_coding].gene_id.tolist()) == IS_PROT_CODING
     gene_with_prot_seq = metadata[metadata.protein_sequence.notnull()].gene_id.tolist()
     assert Counter(gene_with_prot_seq) == IS_PROT_CODING
 

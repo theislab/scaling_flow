@@ -8,7 +8,6 @@ from cfp.data._datamanager import DataManager
 class TestTrainSampler:
     @pytest.mark.parametrize("batch_size", [1, 31])
     def test_sampling_no_combinations(self, adata_perturbation, batch_size: int):
-
         sample_rep = "X"
         split_covariates = ["cell_type"]
         control_key = "control"
@@ -120,9 +119,7 @@ class TestPredictionSampler:
 
         adata_pred = adata_perturbation[:10].copy()
         adata_pred.obs["control"] = True
-        pred_data = dm.get_prediction_data(
-            adata_pred, covariate_data=adata_pred.obs, sample_rep=sample_rep
-        )
+        pred_data = dm.get_prediction_data(adata_pred, covariate_data=adata_pred.obs, sample_rep=sample_rep)
         s = PredictionSampler(pred_data)
         out = s.sample()
         assert "source" in out

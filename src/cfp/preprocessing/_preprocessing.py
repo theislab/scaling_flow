@@ -56,14 +56,10 @@ def annotate_compounds(
     adata = adata.copy() if copy else adata
 
     compound_keys = _to_list(compound_keys)
-    obs_key_prefixes = (
-        _to_list(obs_key_prefixes) if obs_key_prefixes is not None else compound_keys
-    )
+    obs_key_prefixes = _to_list(obs_key_prefixes) if obs_key_prefixes is not None else compound_keys
 
     if len(compound_keys) != len(obs_key_prefixes):
-        raise ValueError(
-            "The number of `compound_keys` must match the number of values in `obs_key_prefixes`."
-        )
+        raise ValueError("The number of `compound_keys` must match the number of values in `obs_key_prefixes`.")
 
     # Annotate compounds in each query column
     not_found = set()
@@ -77,12 +73,7 @@ def annotate_compounds(
             copy=False,
         )
 
-        na_values = (
-            adata.obs[query_key][adata.obs["smiles"].isna()]
-            .astype(str)
-            .unique()
-            .tolist()
-        )
+        na_values = adata.obs[query_key][adata.obs["smiles"].isna()].astype(str).unique().tolist()
         not_found.update(na_values)
 
         # Drop columns with new annotations
@@ -107,17 +98,13 @@ def annotate_compounds(
         )
 
     if not_found:
-        logger.warning(
-            f"Could not find annotations for the following compounds: {', '.join(not_found)}"
-        )
+        logger.warning(f"Could not find annotations for the following compounds: {', '.join(not_found)}")
 
     if copy:
         return adata
 
 
-def _get_fingerprint(
-    smiles: str, radius: int = 4, n_bits: int = 1024
-) -> ArrayLike | None:
+def _get_fingerprint(smiles: str, radius: int = 4, n_bits: int = 1024) -> ArrayLike | None:
     """Computes Morgan fingerprints for a given SMILES string."""
     try:
         import rdkit.Chem.rdFingerprintGenerator as rfg
@@ -205,9 +192,7 @@ def get_molecular_fingerprints(
             not_found.append(str(comp))
 
     if not_found:
-        logger.warning(
-            f"Could not compute fingerprints for the following compounds: {', '.join(not_found)}"
-        )
+        logger.warning(f"Could not compute fingerprints for the following compounds: {', '.join(not_found)}")
 
     adata.uns[uns_key_added] = valid_fingerprints
 

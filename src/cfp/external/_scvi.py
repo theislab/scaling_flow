@@ -22,7 +22,6 @@ __all__ = ["CFJaxSCVI"]
 
 
 class CFJaxSCVI(JaxSCVI):
-
     _module_cls = CFJaxVAE
 
     def __init__(
@@ -86,13 +85,9 @@ class CFJaxSCVI(JaxSCVI):
         self._check_if_trained(warn=False)
 
         adata = self._validate_anndata(adata)
-        scdl = self._make_data_loader(
-            adata=adata, indices=indices, batch_size=batch_size, iter_ndarray=True
-        )
+        scdl = self._make_data_loader(adata=adata, indices=indices, batch_size=batch_size, iter_ndarray=True)
 
-        jit_inference_fn = self.module.get_jit_inference_fn(
-            inference_kwargs={"n_samples": n_samples}
-        )
+        jit_inference_fn = self.module.get_jit_inference_fn(inference_kwargs={"n_samples": n_samples})
         latent = []
         for array_dict in scdl:
             out = jit_inference_fn(self.module.rngs, array_dict)
@@ -145,9 +140,7 @@ class CFJaxSCVI(JaxSCVI):
         self._check_if_trained(warn=False)
 
         data = self._validate_anndata(data)
-        scdl = self._make_data_loader(
-            adata=data, indices=indices, batch_size=batch_size, iter_ndarray=True
-        )
+        scdl = self._make_data_loader(adata=data, indices=indices, batch_size=batch_size, iter_ndarray=True)
 
         jit_generative_fn = self.module.get_jit_generative_fn()
         # Make dummy dict to conform with scVI functions

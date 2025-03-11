@@ -49,9 +49,7 @@ class TestConditionEncoder:
     @pytest.mark.parametrize("covariates_not_pooled", [[], ["pert4_skip_pool"]])
     @pytest.mark.parametrize("layers_before_pool", layers_before_pool)
     @pytest.mark.parametrize("layers_after_pool", layers_after_pool)
-    def test_condition_encoder_init(
-        self, pooling, covariates_not_pooled, layers_before_pool, layers_after_pool
-    ):
+    def test_condition_encoder_init(self, pooling, covariates_not_pooled, layers_before_pool, layers_after_pool):
         cond_encoder = cfp.networks.ConditionEncoder(
             output_dim=5,
             pooling=pooling,

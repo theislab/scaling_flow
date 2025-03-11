@@ -14,9 +14,7 @@ except (ImportError, TypeError):
     ArrayLike = np.ndarray  # type: ignore[misc]
     DTypeLike = np.dtype
 
-ComputationCallback_t = Callable[
-    [dict[str, ArrayLike], dict[str, ArrayLike]], dict[str, Any]
-]
+ComputationCallback_t = Callable[[dict[str, ArrayLike], dict[str, ArrayLike]], dict[str, Any]]
 LoggingCallback_t = Callable[[dict[str, ArrayLike]], dict[str, Any]]
 
 Layers_t = Sequence[dict[str, Any]]

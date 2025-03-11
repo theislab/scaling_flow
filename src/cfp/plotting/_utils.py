@@ -22,16 +22,11 @@ def set_plotting_vars(
     uns_key = _constants.CFP_KEY
     adata.uns.setdefault(uns_key, {})
     if not override and key in adata.uns[uns_key]:
-        raise KeyError(
-            f"Data in `adata.uns[{uns_key!r}][{key!r}]` "
-            f"already exists, use `override=True`."
-        )
+        raise KeyError(f"Data in `adata.uns[{uns_key!r}][{key!r}]` already exists, use `override=True`.")
     adata.uns[uns_key][key] = value
 
 
-def _get_palette(
-    n_colors: int, palette_name: str | None = "Set1"
-) -> sns.palettes._ColorPalette:
+def _get_palette(n_colors: int, palette_name: str | None = "Set1") -> sns.palettes._ColorPalette:
     try:
         palette = sns.color_palette(palette_name)
     except ValueError:
@@ -93,12 +88,8 @@ def _compute_pca_from_df(df: pd.DataFrame, n_components: int = 30) -> pd.DataFra
     )
 
 
-def _compute_kernel_pca_from_df(
-    df: pd.DataFrame, n_components: int = 30, **kwargs
-) -> pd.DataFrame:
+def _compute_kernel_pca_from_df(df: pd.DataFrame, n_components: int = 30, **kwargs) -> pd.DataFrame:
     similarity_matrix = cosine_similarity(df.values)
     np.fill_diagonal(similarity_matrix, 1.0)
-    X = KernelPCA(n_components=n_components, kernel="precomputed").fit_transform(
-        similarity_matrix
-    )
+    X = KernelPCA(n_components=n_components, kernel="precomputed").fit_transform(similarity_matrix)
     return pd.DataFrame(data=X, columns=list(range(n_components)), index=df.index)

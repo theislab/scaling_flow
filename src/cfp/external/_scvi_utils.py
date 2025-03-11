@@ -126,16 +126,13 @@ class CFJaxVAE(JaxBaseModuleClass):
 
         loss = jnp.mean(reconst_loss + weighted_kl_local)
 
-        return LossOutput(
-            loss=loss, reconstruction_loss=reconst_loss, kl_local=kl_divergence_z
-        )
+        return LossOutput(loss=loss, reconstruction_loss=reconst_loss, kl_local=kl_divergence_z)
 
     def get_jit_generative_fn(
         self,
         get_generative_input_kwargs: dict[str, Any] | None = None,
         generative_kwargs: dict[str, Any] | None = None,
     ):
-
         vars_in = {"params": self.params, **self.state}
         get_generative_input_kwargs = _get_dict_if_none(get_generative_input_kwargs)
         generative_kwargs = _get_dict_if_none(generative_kwargs)
@@ -143,9 +140,7 @@ class CFJaxVAE(JaxBaseModuleClass):
         # @jax.jit
         def _run_generative(rngs, array_dict, inference_outputs):
             module = self.clone()
-            generative_input = module._get_generative_input(
-                array_dict, inference_outputs
-            )
+            generative_input = module._get_generative_input(array_dict, inference_outputs)
             out = module.apply(
                 vars_in,
                 rngs=rngs,

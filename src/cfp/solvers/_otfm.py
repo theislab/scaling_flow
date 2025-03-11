@@ -45,9 +45,7 @@ class OTFlowMatching:
         vf: ConditionalVelocityField,
         flow: dynamics.BaseFlow,
         match_fn: Callable[[jnp.ndarray, jnp.ndarray], jnp.ndarray] | None = None,
-        time_sampler: Callable[
-            [jax.Array, int], jnp.ndarray
-        ] = solver_utils.uniform_sampler,
+        time_sampler: Callable[[jax.Array, int], jnp.ndarray] = solver_utils.uniform_sampler,
         **kwargs: Any,
     ):
         self._is_trained: bool = False
@@ -56,13 +54,10 @@ class OTFlowMatching:
         self.time_sampler = time_sampler
         self.match_fn = jax.jit(match_fn)
 
-        self.vf_state = self.vf.create_train_state(
-            input_dim=self.vf.output_dims[-1], **kwargs
-        )
+        self.vf_state = self.vf.create_train_state(input_dim=self.vf.output_dims[-1], **kwargs)
         self.vf_step_fn = self._get_vf_step_fn()
 
     def _get_vf_step_fn(self) -> Callable:  # type: ignore[type-arg]
-
         @jax.jit
         def vf_step_fn(
             rng: jax.Array,
@@ -71,7 +66,6 @@ class OTFlowMatching:
             target: jnp.ndarray,
             conditions: dict[str, jnp.ndarray] | None,
         ) -> tuple[Any, Any]:
-
             def loss_fn(
                 params: jnp.ndarray,
                 t: jnp.ndarray,
@@ -97,9 +91,7 @@ class OTFlowMatching:
             key_t, key_model = jax.random.split(rng, 2)
             t = self.time_sampler(key_t, batch_size)
             grad_fn = jax.value_and_grad(loss_fn)
-            loss, grads = grad_fn(
-                vf_state.params, t, source, target, conditions, key_model
-            )
+            loss, grads = grad_fn(vf_state.params, t, source, target, conditions, key_model)
             return vf_state.apply_gradients(grads=grads), loss
 
         return vf_step_fn
@@ -159,9 +151,7 @@ class OTFlowMatching:
         )
         return np.asarray(cond_embed)
 
-    def predict(
-        self, x: ArrayLike, condition: dict[str, ArrayLike], **kwargs: Any
-    ) -> ArrayLike:
+    def predict(self, x: ArrayLike, condition: dict[str, ArrayLike], **kwargs: Any) -> ArrayLike:
         """Predict the translated source ``'x'`` under condition ``'condition'``.
 
         This function solves the ODE learnt with
@@ -182,13 +172,9 @@ class OTFlowMatching:
         """
         kwargs.setdefault("dt0", None)
         kwargs.setdefault("solver", diffrax.Tsit5())
-        kwargs.setdefault(
-            "stepsize_controller", diffrax.PIDController(rtol=1e-5, atol=1e-5)
-        )
+        kwargs.setdefault("stepsize_controller", diffrax.PIDController(rtol=1e-5, atol=1e-5))
 
-        def vf(
-            t: jnp.ndarray, x: jnp.ndarray, cond: dict[str, jnp.ndarray] | None
-        ) -> jnp.ndarray:
+        def vf(t: jnp.ndarray, x: jnp.ndarray, cond: dict[str, jnp.ndarray] | None) -> jnp.ndarray:
             params = self.vf_state.params
             return self.vf_state.apply_fn({"params": params}, t, x, cond, train=False)
 

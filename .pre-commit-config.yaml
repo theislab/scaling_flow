@@ -9,12 +9,11 @@ repos:
     rev: v2.5.1
     hooks:
       - id: pyproject-fmt
-        files: ^scripts/pyproject\.toml$
   - repo: https://github.com/astral-sh/ruff-pre-commit
     rev: v0.9.9
     hooks:
       - id: ruff
         args: [--fix, --exit-non-zero-on-fix]
-        files: ^scripts/
+        files: ^(src|tests)/
       - id: ruff-format
-        files: ^scripts/
+        files: ^(src|tests)/
