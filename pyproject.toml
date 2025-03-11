@@ -47,7 +47,6 @@ optional-dependencies.dev = [
   "pre-commit",
   "sphinx",
   "sphinx-autodoc-typehints",
-  "sphinx-build",
   "sphinx-copybutton",
   "sphinx-design",
   "sphinx-tippy",
