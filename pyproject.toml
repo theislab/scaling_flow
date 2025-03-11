@@ -84,7 +84,7 @@ optional-dependencies.pp = [
   "rdkit",
 ]
 optional-dependencies.test = [
-  "coverage",
+  "coverage[toml]>=7",
   "pytest",
   "scvi-tools",
 ]
@@ -154,10 +154,26 @@ addopts = [
 ]
 
 [tool.coverage.run]
-source = [ "cfp" ]
+branch = true
+parallel = true
+source = [ "src/" ]
 omit = [
-  "**/test_*.py",
+  "*/__init__.py",
+  "*/_version.py",
 ]
+
+[tool.coverage.report]
+exclude_lines = [
+  '\#.*pragma:\s*no.?cover',
+  "^if __name__ == .__main__.:$",
+  '^\s*raise AssertionError\b',
+  '^\s*raise NotImplementedError\b',
+  '^\s*return NotImplemented\b',
+]
+precision = 2
+show_missing = true
+skip_empty = true
+sort = "Miss"
 
 [tool.tox]
 legacy_tox_ini = """

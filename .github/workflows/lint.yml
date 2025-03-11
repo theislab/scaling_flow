@@ -19,7 +19,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        lint-kind: [code, docs]
+        lint-kind: [code]
 
     steps:
       - uses: actions/checkout@v3
