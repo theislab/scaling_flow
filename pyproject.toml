@@ -87,6 +87,8 @@ optional-dependencies.pp = [
 optional-dependencies.test = [
   "coverage[toml]>=7",
   "pytest",
+  "pytest-mock>=3.5",
+  "pytest-xdist>=3",
   "scvi-tools",
 ]
 urls.Documentation = "https://cellflow.readthedocs.io/"
