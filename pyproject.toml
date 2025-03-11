@@ -32,6 +32,7 @@ dependencies = [
   "adjusttext",
   "anndata",
   "cloudpickle",
+  "coverage",
   "diffrax",
   "flax",
   "orbax",
