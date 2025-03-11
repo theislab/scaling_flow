@@ -89,7 +89,7 @@ optional-dependencies.test = [
   "pytest",
   "scvi-tools",
 ]
-urls.Documentation = "https://cell_flow_perturbation.readthedocs.io/"
+urls.Documentation = "https://cellflow.readthedocs.io/"
 urls.Home-page = "https://github.com/theislab/cell_flow_perturbation"
 urls.Source = "https://github.com/theislab/cell_flow_perturbation"
 
@@ -156,12 +156,8 @@ addopts = [
 
 [tool.coverage.run]
 branch = true
-parallel = true
+parallel = false
 source = [ "src/" ]
-omit = [
-  "*/__init__.py",
-  "*/_version.py",
-]
 
 [tool.coverage.report]
 exclude_lines = [
