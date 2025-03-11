@@ -52,6 +52,7 @@ jobs:
           python -m pip install --upgrade pip wheel
       - name: Install dependencies
         run: |
+          pip install tox
           pip install ${{ matrix.pip-flags }} ".[optional-dependencies.dev,optional-dependencies.test,optional-dependencies.external,optional-dependencies.docs,optional-dependencies.embedding]"
           pip install wandb omegaconf
       - name: Test
