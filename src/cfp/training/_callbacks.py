@@ -30,8 +30,8 @@ metric_to_func: dict[str, Callable[[ArrayLike, ArrayLike], float | ArrayLike]] =
 }
 
 agg_fn_to_func: dict[str, Callable[[ArrayLike], float | ArrayLike]] = {
-    "mean": lambda x: np.mean(x, axis=0),  # type: ignore[arg-type]
-    "median": lambda x: np.median(x, axis=0),  # type: ignore[arg-type]
+    "mean": lambda x: np.mean(x, axis=0),
+    "median": lambda x: np.median(x, axis=0),
 }
 
 
@@ -305,7 +305,7 @@ class VAEDecodedMetrics(Metrics):
         self.vae = vae
         self._adata_obs = adata.obs.copy()
         self._adata_n_vars = adata.n_vars
-        self.reconstruct_data = self.vae.get_reconstructed_expression
+        self.reconstruct_data = self.vae.get_reconstructed_expression  # type: ignore[attr-defined]
         self.log_prefix = log_prefix
 
     def on_log_iteration(

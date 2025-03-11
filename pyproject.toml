@@ -49,6 +49,7 @@ dev = [
     "sphinx_design",
     "sphinx_tippy",
     "furo",
+    "tox>=4",
 ]
 docs = [
     "docutils>=0.8,!=0.18.*,!=0.19.*",
@@ -84,6 +85,7 @@ external = [
 embedding = [
     "transformers",
     "torch",
+    "requests",
 ]
 
 [tool.hatch.build.targets.wheel]

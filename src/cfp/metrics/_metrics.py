@@ -73,7 +73,7 @@ def compute_metrics(x: ArrayLike, y: ArrayLike) -> dict[str, float]:
 
 def compute_mean_metrics(
     metrics: dict[str, dict[str, float]], prefix: str = ""
-) -> dict[str, float]:
+) -> dict[str, list[float]]:
     """Compute the mean value of different metrics."""
     metric_names = list(list(metrics.values())[0].keys())
     metric_dict: dict[str, list[float]] = {

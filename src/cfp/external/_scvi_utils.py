@@ -55,7 +55,7 @@ class CFJaxVAE(JaxBaseModuleClass):
         input_dict = {"x": x}
         return input_dict
 
-    def inference(self, x: jnp.ndarray, n_samples: int = 1) -> dict:
+    def inference(self, x: jnp.ndarray, n_samples: int = 1) -> dict[str, jnp.ndarray]:
         """Run inference model."""
         mean, var = self.encoder(x, training=self.training)
         stddev = jnp.sqrt(var) + self.eps
@@ -84,7 +84,7 @@ class CFJaxVAE(JaxBaseModuleClass):
         }
         return input_dict
 
-    def generative(self, x, z, batch_index) -> dict:
+    def generative(self, x, z, batch_index) -> dict[str, jnp.ndarray]:
         """Run generative model."""
         # one hot adds an extra dimension
         batch = jax.nn.one_hot(batch_index, self.n_batch).squeeze(-2)

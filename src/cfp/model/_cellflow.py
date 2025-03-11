@@ -180,10 +180,8 @@ class CellFlow:
             null_value=null_value,
         )
 
-        # TODO: rename to self.train_data
         self.train_data = self._dm.get_train_data(self.adata)
-
-        self._data_dim = self.train_data.cell_data.shape[-1]
+        self._data_dim = self.train_data.cell_data.shape[-1]  # type: ignore[union-attr]
 
     def prepare_validation_data(
         self,
@@ -616,7 +614,7 @@ class CellFlow:
                 )
         pred_data = self._dm.get_prediction_data(
             adata,
-            sample_rep=sample_rep,
+            sample_rep=sample_rep,  # type: ignore[arg-type]
             covariate_data=covariate_data,
             condition_id_key=condition_id_key,
         )
@@ -624,7 +622,9 @@ class CellFlow:
         batch = pred_loader.sample()
         src = batch["source"]
         condition = batch.get("condition", None)
-        out = jax.tree.map(functools.partial(self.solver.predict, **kwargs), src, condition)
+        out = jax.tree.map(
+            functools.partial(self.solver.predict, **kwargs), src, condition  # type: ignore[attr-defined]
+        )
         if key_added_prefix is None:
             return out
         if len(pred_data.control_to_perturbation) > 1:
@@ -703,7 +703,7 @@ class CellFlow:
             condition_embeddings[c_key] = self.solver.get_condition_embedding(condition)
 
         df = pd.DataFrame.from_dict(
-            {k: v[0] for k, v in condition_embeddings.items()}  # type: ignore[index]
+            {k: v[0] for k, v in condition_embeddings.items()}
         ).T
 
         if condition_id_key:
@@ -838,7 +838,7 @@ class CellFlow:
             )
         self._train_data = data
 
-    @velocity_field.setter
+    @velocity_field.setter  # type: ignore[attr-defined,no-redef]
     def velocity_field(self, vf: ConditionalVelocityField) -> None:
         """Set the velocity field."""
         if not isinstance(vf, ConditionalVelocityField):

@@ -126,7 +126,7 @@ class CellFlowTrainer:
                 )
 
                 # Run callbacks
-                metrics = crun.on_log_iteration(valid_true_data, valid_pred_data)
+                metrics = crun.on_log_iteration(valid_true_data, valid_pred_data)  # type: ignore[arg-type]
                 self._update_logs(metrics)
 
                 # Update progress bar

@@ -6,11 +6,11 @@ from typing import Any
 
 import anndata as ad
 import pandas as pd
-import requests
 
 from cfp._logging import logger
 
 try:
+    import requests  # type: ignore[import-untyped]
     import torch
     from torch.utils.data import DataLoader
     from transformers import AutoTokenizer, EsmModel

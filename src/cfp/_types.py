@@ -21,4 +21,4 @@ LoggingCallback_t = Callable[[dict[str, ArrayLike]], dict[str, Any]]
 
 Layers_t = Sequence[dict[str, Any]]
 Layers_separate_input_t = dict[str, Layers_t]
-PathLike = os.PathLike | str
+PathLike = os.PathLike | str  # type: ignore[type-arg]

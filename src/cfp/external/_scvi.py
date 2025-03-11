@@ -58,7 +58,7 @@ class CFJaxSCVI(JaxSCVI):
         give_mean: bool = True,
         n_samples: int = 1,
         batch_size: int | None = None,
-    ) -> np.ndarray:
+    ) -> np.ndarray:  # type: ignore[type-arg]
         r"""Return the latent representation for each cell.
 
         This is denoted as :math:`z_n` in our manuscripts.
@@ -140,7 +140,7 @@ class CFJaxSCVI(JaxSCVI):
         reconstructed_expression
         """
         if batch_size is None:
-            batch_size = data.obsm[use_rep].shape[0]
+            batch_size = data.obsm[use_rep].shape[0]  # type: ignore[union-attr]
 
         self._check_if_trained(warn=False)
 

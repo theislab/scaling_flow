@@ -311,7 +311,7 @@ class DataManager:
 
     def _get_split_cov_combs(
         self, covariate_data: pd.DataFrame
-    ) -> np.ndarray | list[list[Any]]:
+    ) -> np.ndarray | list[list[Any]]:  # type: ignore[type-arg]
         if len(self._split_covariates) > 0:
             return covariate_data[self._split_covariates].drop_duplicates().values
         else:
@@ -319,7 +319,7 @@ class DataManager:
 
     def _get_condition_data(
         self,
-        split_cov_combs: np.ndarray | list[list[Any]],
+        split_cov_combs: np.ndarray | list[list[Any]],  # type: ignore[type-arg]
         adata: anndata.AnnData | None,
         covariate_data: pd.DataFrame | None = None,
         rep_dict: dict[str, Any] | None = None,
@@ -397,7 +397,7 @@ class DataManager:
                     self._get_split_combination_mask(
                         covariate_data=adata.obs,
                         split_covariates_mask=split_covariates_mask,  # type: ignore[arg-type]
-                        split_combination=split_combination,
+                        split_combination=split_combination,  # type: ignore[arg-type]
                         split_idx_to_covariates=split_idx_to_covariates,
                         control_mask=control_mask,
                         src_counter=src_counter,
@@ -582,7 +582,7 @@ class DataManager:
         return split_covariates_mask, split_idx_to_covariates, split_cov_mask
 
     def _get_split_covariates_mask(
-        self, adata: anndata.AnnData, split_cov_combs: np.ndarray | list[list[Any]]
+        self, adata: anndata.AnnData, split_cov_combs: np.ndarray | list[list[Any]]  # type: ignore[type-arg]
     ) -> tuple[ArrayLike, dict[int, tuple[Any]]]:
         # here we assume that adata only contains source cells
         if len(self.split_covariates) == 0:
@@ -596,7 +596,7 @@ class DataManager:
                 self._get_split_combination_mask(
                     covariate_data=adata.obs,
                     split_covariates_mask=split_covariates_mask,
-                    split_combination=split_combination,
+                    split_combination=split_combination,  # type: ignore[arg-type]
                     split_idx_to_covariates=split_idx_to_covariates,
                     control_mask=jnp.ones((adata.n_obs,)),
                     src_counter=src_counter,
