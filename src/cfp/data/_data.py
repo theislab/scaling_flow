@@ -108,23 +108,15 @@ class TrainingData(BaseDataMixin):
     """
 
     cell_data: jax.Array  # (n_cells, n_features)
-    split_covariates_mask: (
-        jax.Array
-    )  # (n_cells,), which cell assigned to which source distribution
-    split_idx_to_covariates: dict[
-        int, tuple[Any, ...]
-    ]  # (n_sources,) dictionary explaining split_covariates_mask
-    perturbation_covariates_mask: (
-        jax.Array
-    )  # (n_cells,), which cell assigned to which target distribution
+    split_covariates_mask: jax.Array  # (n_cells,), which cell assigned to which source distribution
+    split_idx_to_covariates: dict[int, tuple[Any, ...]]  # (n_sources,) dictionary explaining split_covariates_mask
+    perturbation_covariates_mask: jax.Array  # (n_cells,), which cell assigned to which target distribution
     perturbation_idx_to_covariates: dict[
         int, tuple[str, ...]
     ]  # (n_targets,), dictionary explaining perturbation_covariates_mask
     perturbation_idx_to_id: dict[int, Any]
     condition_data: dict[str, ArrayLike]  # (n_targets,) all embeddings for conditions
-    control_to_perturbation: dict[
-        int, ArrayLike
-    ]  # mapping from control idx to target distribution idcs
+    control_to_perturbation: dict[int, ArrayLike]  # mapping from control idx to target distribution idcs
     max_combination_length: int
     null_value: Any
     data_manager: Any
@@ -163,23 +155,15 @@ class ValidationData(BaseDataMixin):
     """
 
     cell_data: jax.Array  # (n_cells, n_features)
-    split_covariates_mask: (
-        jax.Array
-    )  # (n_cells,), which cell assigned to which source distribution
-    split_idx_to_covariates: dict[
-        int, tuple[Any, ...]
-    ]  # (n_sources,) dictionary explaining split_covariates_mask
-    perturbation_covariates_mask: (
-        jax.Array
-    )  # (n_cells,), which cell assigned to which target distribution
+    split_covariates_mask: jax.Array  # (n_cells,), which cell assigned to which source distribution
+    split_idx_to_covariates: dict[int, tuple[Any, ...]]  # (n_sources,) dictionary explaining split_covariates_mask
+    perturbation_covariates_mask: jax.Array  # (n_cells,), which cell assigned to which target distribution
     perturbation_idx_to_covariates: dict[
         int, tuple[str, ...]
     ]  # (n_targets,), dictionary explaining perturbation_covariates_mask
     perturbation_idx_to_id: dict[int, Any]
     condition_data: dict[str, ArrayLike]  # (n_targets,) all embeddings for conditions
-    control_to_perturbation: dict[
-        int, jax.Array
-    ]  # mapping from control idx to target distribution idcs
+    control_to_perturbation: dict[int, jax.Array]  # mapping from control idx to target distribution idcs
     max_combination_length: int
     null_value: Any
     data_manager: Any
@@ -208,12 +192,8 @@ class PredictionData(BaseDataMixin):
     """
 
     cell_data: jax.Array  # (n_cells, n_features)
-    split_covariates_mask: (
-        jax.Array
-    )  # (n_cells,), which cell assigned to which source distribution
-    split_idx_to_covariates: dict[
-        int, tuple[Any, ...]
-    ]  # (n_sources,) dictionary explaining split_covariates_mask
+    split_covariates_mask: jax.Array  # (n_cells,), which cell assigned to which source distribution
+    split_idx_to_covariates: dict[int, tuple[Any, ...]]  # (n_sources,) dictionary explaining split_covariates_mask
     perturbation_idx_to_covariates: dict[
         int, tuple[str, ...]
     ]  # (n_targets,), dictionary explaining perturbation_covariates_mask

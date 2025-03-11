@@ -71,14 +71,10 @@ def compute_metrics(x: ArrayLike, y: ArrayLike) -> dict[str, float]:
     return metrics
 
 
-def compute_mean_metrics(
-    metrics: dict[str, dict[str, float]], prefix: str = ""
-) -> dict[str, float]:
+def compute_mean_metrics(metrics: dict[str, dict[str, float]], prefix: str = "") -> dict[str, list[float]]:
     """Compute the mean value of different metrics."""
     metric_names = list(list(metrics.values())[0].keys())
-    metric_dict: dict[str, list[float]] = {
-        prefix + met_name: [] for met_name in metric_names
-    }
+    metric_dict: dict[str, list[float]] = {prefix + met_name: [] for met_name in metric_names}
     for met in metric_names:
         stat = 0.0
         for vals in metrics.values():
@@ -96,9 +92,7 @@ def rbf_kernel_fast(x: ArrayLike, y: ArrayLike, gamma: float) -> ArrayLike:
     return jnp.exp(-gamma * sq_distances)
 
 
-def maximum_mean_discrepancy(
-    x: ArrayLike, y: ArrayLike, gamma: float = 1.0, exact: bool = False
-) -> float:
+def maximum_mean_discrepancy(x: ArrayLike, y: ArrayLike, gamma: float = 1.0, exact: bool = False) -> float:
     """Compute the Maximum Mean Discrepancy (MMD) between two samples: x and y.
 
     Args:
@@ -117,9 +111,7 @@ def maximum_mean_discrepancy(
     return xx.mean() + yy.mean() - 2 * xy.mean()
 
 
-def compute_scalar_mmd(
-    x: ArrayLike, y: ArrayLike, gammas: float | None = None
-) -> float:
+def compute_scalar_mmd(x: ArrayLike, y: ArrayLike, gammas: float | None = None) -> float:
     """Compute MMD across different length scales"""
     if gammas is None:
         gammas = [2, 1, 0.5, 0.1, 0.01, 0.005]

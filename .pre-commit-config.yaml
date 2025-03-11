@@ -1,69 +1,19 @@
-fail_fast: false
-default_language_version:
-  python: python3
-default_stages:
-  - commit
-  - push
-minimum_pre_commit_version: 3.0.0
 repos:
-  - repo: https://github.com/pre-commit/mirrors-mypy
-    rev: v1.10.1
+  # Hooks that are run everywhere
+  - repo: https://github.com/biomejs/pre-commit
+    rev: v1.9.4
     hooks:
-      - id: mypy
-        additional_dependencies: [numpy>=1.25.0]
-        files: ^src
-  - repo: https://github.com/psf/black
-    rev: 24.4.2
+      - id: biome-format
+  # Hooks that are run for scripts
+  - repo: https://github.com/tox-dev/pyproject-fmt
+    rev: v2.5.1
     hooks:
-      - id: black
-        additional_dependencies: [toml]
-  - repo: https://github.com/pre-commit/mirrors-prettier
-    rev: v4.0.0-alpha.8
-    hooks:
-      - id: prettier
-        language_version: system
-  - repo: https://github.com/PyCQA/isort
-    rev: 5.13.2
-    hooks:
-      - id: isort
-        additional_dependencies: [toml]
-        args: [--order-by-type]
-  - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v4.6.0
-    hooks:
-      - id: check-merge-conflict
-      - id: check-ast
-      - id: check-added-large-files
-      - id: end-of-file-fixer
-      - id: mixed-line-ending
-        args: [--fix=lf]
-      - id: trailing-whitespace
-      - id: check-docstring-first
-      - id: check-yaml
-      - id: check-toml
-  - repo: https://github.com/asottile/pyupgrade
-    rev: v3.16.0
-    hooks:
-      - id: pyupgrade
-        args: [--py3-plus, --py38-plus, --keep-runtime-typing]
-  - repo: https://github.com/asottile/blacken-docs
-    rev: 1.18.0
-    hooks:
-      - id: blacken-docs
-        additional_dependencies: [black==23.1.0]
-  - repo: https://github.com/rstcheck/rstcheck
-    rev: v6.2.0
-    hooks:
-      - id: rstcheck
-        additional_dependencies: [tomli]
-        args: [--config=pyproject.toml]
-  - repo: https://github.com/PyCQA/doc8
-    rev: v1.1.1
-    hooks:
-      - id: doc8
+      - id: pyproject-fmt
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    # Ruff version.
-    rev: v0.5.0
+    rev: v0.9.9
     hooks:
       - id: ruff
         args: [--fix, --exit-non-zero-on-fix]
+        files: ^(src|tests)/
+      - id: ruff-format
+        files: ^(src|tests)/

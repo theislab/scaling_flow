@@ -192,9 +192,7 @@ class SelfAttentionBlock(BaseModule):
         if not isinstance(self.qkv_dim, Sequence):
             self.qkv_dim = [self.qkv_dim]
         if len(self.num_heads) != len(self.qkv_dim):
-            raise ValueError(
-                "The number of specified layers should be the same for num_heads and qkv_dims."
-            )
+            raise ValueError("The number of specified layers should be the same for num_heads and qkv_dims.")
 
     @nn.compact
     def __call__(
@@ -371,9 +369,7 @@ class TokenAttentionPooling(BaseModule):
         """
         # add token
         token_shape = (len(x), 1)
-        class_token = nn.Embed(num_embeddings=1, features=x.shape[-1])(
-            jnp.int32(jnp.zeros(token_shape))
-        )
+        class_token = nn.Embed(num_embeddings=1, features=x.shape[-1])(jnp.int32(jnp.zeros(token_shape)))
         z = jnp.concatenate((class_token, x), axis=-2)
         token_mask = jnp.zeros((x.shape[0], 1, x.shape[1] + 1, x.shape[1] + 1))
         token_mask = token_mask.at[:, :, 0, :].set(1)
@@ -405,7 +401,7 @@ class ConditionEncoder(BaseModule):
     pooling
         Pooling method, should be one of:
 
-        - ``'mean'``: Aggregates combinations of covariates by the mean of their learned 
+        - ``'mean'``: Aggregates combinations of covariates by the mean of their learned
           embeddings.
         - ``'attention_token'``: Aggregates combinations of covariates by an attention mechanism
           with a token.
@@ -436,9 +432,7 @@ class ConditionEncoder(BaseModule):
     pooling: Literal["mean", "attention_token", "attention_seed"] = "attention_token"
     pooling_kwargs: dict[str, Any] = dc_field(default_factory=lambda: {})
     covariates_not_pooled: Sequence[str] = dc_field(default_factory=list)
-    layers_before_pool: Layers_t | Layers_separate_input_t = dc_field(
-        default_factory=lambda: []
-    )
+    layers_before_pool: Layers_t | Layers_separate_input_t = dc_field(default_factory=lambda: [])
     layers_after_pool: Layers_t = dc_field(default_factory=lambda: [])
     output_dropout: float = 0.0
     mask_value: float = 0.0
@@ -474,9 +468,7 @@ class ConditionEncoder(BaseModule):
             self.pool_module = SeedAttentionPooling(**self.pooling_kwargs)
 
         # modules after pooling
-        self.after_pool_modules = self._get_layers(
-            self.layers_after_pool, self.output_dim, self.output_dropout
-        )
+        self.after_pool_modules = self._get_layers(self.layers_after_pool, self.output_dim, self.output_dropout)
 
         # separate input layers for GENOT
         if self.genot_source_dim:
@@ -533,9 +525,7 @@ class ConditionEncoder(BaseModule):
 
             conditions_pooling_arr = jnp.concatenate(processed_inputs_pooling, axis=-1)
             conditions_not_pooled = (
-                jnp.concatenate(processed_inputs_other, axis=-1)
-                if self.covariates_not_pooled
-                else None
+                jnp.concatenate(processed_inputs_other, axis=-1) if self.covariates_not_pooled else None
             )
         else:
             # by default, no modules before pooling for covariates that are not pooled
@@ -567,29 +557,26 @@ class ConditionEncoder(BaseModule):
             else:
                 conditions = jnp.concatenate(list(conditions.values()), axis=-1)
                 conditions_pooling_arr = self._apply_modules(
-                    self.before_pool_modules, conditions, attention_mask, training  # type: ignore[arg-type]
+                    self.before_pool_modules,
+                    conditions,
+                    attention_mask,
+                    training,  # type: ignore[arg-type]
                 )
 
         # pooling
         pool_mask = mask if self.pooling == "mean" else attention_mask
-        conditions = self.pool_module(
-            conditions_pooling_arr, pool_mask, training=training
-        )
+        conditions = self.pool_module(conditions_pooling_arr, pool_mask, training=training)
         if self.covariates_not_pooled:
             conditions = jnp.concatenate([conditions, conditions_not_pooled], axis=-1)
 
         # apply modules after pooling
-        conditions = self._apply_modules(
-            self.after_pool_modules, conditions, None, training
-        )
+        conditions = self._apply_modules(self.after_pool_modules, conditions, None, training)
 
         if return_conditions_only or self.genot_source_dim == 0:
             return conditions
 
         # GENOT: apply cell data modules
-        genot_cell_data = self._apply_modules(
-            self.genot_source_modules, genot_cell_data, None, training
-        )
+        genot_cell_data = self._apply_modules(self.genot_source_modules, genot_cell_data, None, training)
         conditions = (
             jnp.concatenate(
                 [jnp.tile(conditions, (genot_cell_data.shape[0], 1)), genot_cell_data],
@@ -597,11 +584,7 @@ class ConditionEncoder(BaseModule):
             )
             if genot_cell_data.ndim == 2
             else jnp.expand_dims(
-                jnp.squeeze(
-                    jnp.concatenate(
-                        [conditions, jnp.expand_dims(genot_cell_data, 0)], axis=-1
-                    )
-                ),
+                jnp.squeeze(jnp.concatenate([conditions, jnp.expand_dims(genot_cell_data, 0)], axis=-1)),
                 0,
             )
         )
@@ -633,9 +616,7 @@ class ConditionEncoder(BaseModule):
                 modules.append(nn.Dropout(dropout_rate))
         return modules
 
-    def _get_masks(
-        self, conditions: dict[str, ArrayLike]
-    ) -> tuple[jnp.ndarray, jnp.ndarray]:
+    def _get_masks(self, conditions: dict[str, ArrayLike]) -> tuple[jnp.ndarray, jnp.ndarray]:
         """Get mask for padded conditions tensor."""
         # mask of shape (batch_size, set_size)
         mask = 1 - jnp.all(
@@ -681,9 +662,7 @@ class ConditionEncoder(BaseModule):
         """Create initial training state."""
         params = self.init(
             rng,
-            conditions={
-                k: jnp.empty((1, v.shape[1], v.shape[2])) for k, v in conditions.items()
-            },
+            conditions={k: jnp.empty((1, v.shape[1], v.shape[2])) for k, v in conditions.items()},
             training=False,
         )["params"]
         return train_state.TrainState.create(

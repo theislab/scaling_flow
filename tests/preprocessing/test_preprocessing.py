@@ -12,9 +12,7 @@ class TestPreprocessing:
             (["compound_name", "compound2_name"], "name"),
         ],
     )
-    def test_annotate_compounds(
-        self, adata_with_compounds: ad.AnnData, compound_key_and_type
-    ):
+    def test_annotate_compounds(self, adata_with_compounds: ad.AnnData, compound_key_and_type):
         import cfp
 
         cfp.pp.annotate_compounds(
@@ -40,9 +38,7 @@ class TestPreprocessing:
             ),
         ],
     )
-    def test_get_molecular_fingerprints(
-        self, adata_with_compounds: ad.AnnData, n_bits, compound_and_smiles_keys
-    ):
+    def test_get_molecular_fingerprints(self, adata_with_compounds: ad.AnnData, n_bits, compound_and_smiles_keys):
         import cfp
 
         uns_key_added = "compound_fingerprints"
@@ -57,25 +53,14 @@ class TestPreprocessing:
         )
 
         assert uns_key_added in adata_with_compounds.uns
-        assert (
-            next(iter(adata_with_compounds.uns[uns_key_added].values())).shape[0]
-            == n_bits
-        )
-        expected_compounds = (
-            adata_with_compounds.obs[compound_and_smiles_keys[0]]
-            .values.flatten()
-            .tolist()
-        )
+        assert next(iter(adata_with_compounds.uns[uns_key_added].values())).shape[0] == n_bits
+        expected_compounds = adata_with_compounds.obs[compound_and_smiles_keys[0]].values.flatten().tolist()
 
-        assert np.all(
-            [c in adata_with_compounds.uns[uns_key_added] for c in expected_compounds]
-        )
+        assert np.all([c in adata_with_compounds.uns[uns_key_added] for c in expected_compounds])
 
     @pytest.mark.parametrize("uns_key_added", ["compounds", "compounds_onehot"])
     @pytest.mark.parametrize("exclude_values", [None, "GW0742"])
-    def test_encode_onehot(
-        self, adata_with_compounds: ad.AnnData, uns_key_added, exclude_values
-    ):
+    def test_encode_onehot(self, adata_with_compounds: ad.AnnData, uns_key_added, exclude_values):
         import cfp
 
         cfp.pp.encode_onehot(
@@ -89,14 +74,8 @@ class TestPreprocessing:
         if exclude_values is None:
             expected_compounds = adata_with_compounds.obs["compound_name"].unique()
         else:
-            expected_compounds = np.setdiff1d(
-                adata_with_compounds.obs["compound_name"].unique(), exclude_values
-            )
+            expected_compounds = np.setdiff1d(adata_with_compounds.obs["compound_name"].unique(), exclude_values)
         assert uns_key_added in adata_with_compounds.uns
         assert len(adata_with_compounds.uns[uns_key_added]) == len(expected_compounds)
-        assert adata_with_compounds.uns[uns_key_added][expected_compounds[0]].shape[
-            0
-        ] == len(expected_compounds)
-        assert np.all(
-            [c in adata_with_compounds.uns[uns_key_added] for c in expected_compounds]
-        )
+        assert adata_with_compounds.uns[uns_key_added][expected_compounds[0]].shape[0] == len(expected_compounds)
+        assert np.all([c in adata_with_compounds.uns[uns_key_added] for c in expected_compounds])

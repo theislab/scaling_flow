@@ -6,11 +6,11 @@ from typing import Any
 
 import anndata as ad
 import pandas as pd
-import requests
 
 from cfp._logging import logger
 
 try:
+    import requests  # type: ignore[import-untyped]
     import torch
     from torch.utils.data import DataLoader
     from transformers import AutoTokenizer, EsmModel
@@ -84,9 +84,7 @@ class GeneInfo:
         if self.canonical_transcript_info:
             self.transcript_id = self.canonical_transcript_info["transcript_id"]
             self.display_name = self.canonical_transcript_info["display_name"]
-            self._is_protein_coding = (
-                self.canonical_transcript_info["biotype"] == "protein_coding"
-            )
+            self._is_protein_coding = self.canonical_transcript_info["biotype"] == "protein_coding"
 
     @property
     def is_protein_coding(self) -> bool:
@@ -138,9 +136,7 @@ def prot_sequence_from_ensembl(ensembl_gene_id: list[str]) -> pd.DataFrame:
     return df
 
 
-def order_to_batch_list(
-    unordered_list: list[Any], batch_idx: list[list[int]]
-) -> list[list[Any]]:
+def order_to_batch_list(unordered_list: list[Any], batch_idx: list[list[int]]) -> list[list[Any]]:
     ordered_list = []
     for batch in batch_idx:
         batch_iter = [unordered_list[i] for i in batch]
@@ -161,9 +157,7 @@ class BatchedDataset:
     def __getitem__(self, idx):
         return self.sequence_labels[idx], self.sequence_strs[idx]
 
-    def get_batch_indices(
-        self, toks_per_batch, extra_toks_per_seq=0
-    ) -> list[list[int]]:
+    def get_batch_indices(self, toks_per_batch, extra_toks_per_seq=0) -> list[list[int]]:
         sizes = [(len(s), i) for i, s in enumerate(self.sequence_strs)]
         sizes.sort()
         batches = []
@@ -206,7 +200,10 @@ def create_dataloader(
 
 
 def _get_esm_collate_fn(
-    tokenizer: Callable, max_length: int | None, truncation: bool, return_tensors: str  # type: ignore[type-arg]
+    tokenizer: Callable,
+    max_length: int | None,
+    truncation: bool,
+    return_tensors: str,  # type: ignore[type-arg]
 ) -> Callable:  # type: ignore[type-arg]
     def collate_fn(batch):
         # batch of tuples (gene_id, sequence)
@@ -224,9 +221,7 @@ def _get_esm_collate_fn(
     return collate_fn
 
 
-def get_model_and_tokenizer(
-    model_name: str, use_cuda: bool, cache_dir: None | str
-) -> tuple[EsmModel, AutoTokenizer]:
+def get_model_and_tokenizer(model_name: str, use_cuda: bool, cache_dir: None | str) -> tuple[EsmModel, AutoTokenizer]:
     model_path = os.path.join("facebook", model_name)
     model = EsmModel.from_pretrained(model_path, cache_dir=cache_dir, add_pooling_layer=False)
     model.eval()
@@ -284,9 +279,7 @@ def protein_features_from_genes(
         prot_names=to_emb["gene_id"].to_list(),
         sequences=to_emb["protein_sequence"].to_list(),
         toks_per_batch=toks_per_batch,
-        collate_fn=_get_esm_collate_fn(
-            tokenizer, max_length=trunc_len, truncation=truncation, return_tensors="pt"
-        ),
+        collate_fn=_get_esm_collate_fn(tokenizer, max_length=trunc_len, truncation=truncation, return_tensors="pt"),
     )
     results = {}
     for batch_metadata, batch in data_loader:

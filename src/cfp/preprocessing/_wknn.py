@@ -4,10 +4,10 @@ import anndata as ad
 import jax
 import numpy as np
 import pandas as pd
-from cfp._types import ArrayLike
 from scipy import sparse
 
 from cfp._logging import logger
+from cfp._types import ArrayLike
 
 __all__ = ["compute_wknn", "transfer_labels"]
 
@@ -21,9 +21,7 @@ def compute_wknn(
     uns_key_added: str = "wknn",
     query2ref: bool = True,
     ref2query: bool = False,
-    weighting_scheme: (
-        Literal["top_n", "jaccard", "jaccard_square"] | None
-    ) = "jaccard_square",
+    weighting_scheme: (Literal["top_n", "jaccard", "jaccard_square"] | None) = "jaccard_square",
     top_n: int | None = None,
     copy: bool = False,
 ) -> ad.AnnData | None:
@@ -65,7 +63,7 @@ def compute_wknn(
     Returns
     -------
         If ``copy`` is :obj:`True`, returns a new :class:`~anndata.AnnData` object with the
-        weighted k-nearest neighbors stored in :attr:`~anndata.AnnData.uns`. Otherwise, updates 
+        weighted k-nearest neighbors stored in :attr:`~anndata.AnnData.uns`. Otherwise, updates
         ``adata`` in place.
 
         Sets the following fields:
@@ -111,7 +109,7 @@ def transfer_labels(
     label_key : str
         Key in :attr:`~anndata.AnnData.obs` of ``ref_adata`` containing the labels
     wknn_key : str
-        Key in :attr:`~anndata.AnnData.uns` of ``ref_adata`` containing the weighted k-nearest 
+        Key in :attr:`~anndata.AnnData.uns` of ``ref_adata`` containing the weighted k-nearest
         neighbors graph
     copy : bool
         Return a copy of ``query_adata`` instead of updating it in place
@@ -119,7 +117,7 @@ def transfer_labels(
     Returns
     -------
         If ``copy`` is :obj:`True`, returns a new :class:`~anndata.AnnData` object with the
-        transferred labels stored in :attr:`~anndata.AnnData.obs`. Otherwise, updates ``adata`` in 
+        transferred labels stored in :attr:`~anndata.AnnData.obs`. Otherwise, updates ``adata`` in
         place.
 
         Sets the following fields:
@@ -171,9 +169,7 @@ def _nn2adj(
             "x": distances.flatten(),
         }
     )
-    adj = sparse.csr_matrix(
-        (np.repeat(1, df.shape[0]), (df["i"], df["j"])), shape=(n1, n2)
-    )
+    adj = sparse.csr_matrix((np.repeat(1, df.shape[0]), (df["i"], df["j"])), shape=(n1, n2))
 
     return adj
 
@@ -198,9 +194,7 @@ def _build_nn(
         model = NearestNeighbors(n_neighbors=k)
         model.fit(ref)
         distances, indices = model.kneighbors(query)
-        return _nn2adj(
-            distances=distances, indices=indices, n1=query.shape[0], n2=ref.shape[0]
-        )
+        return _nn2adj(distances=distances, indices=indices, n1=query.shape[0], n2=ref.shape[0])
 
     try:
         from pynndescent import NNDescent
@@ -212,9 +206,7 @@ def _build_nn(
     index = NNDescent(ref)
     indices, distances = index.query(query, k=k)
 
-    return _nn2adj(
-        distances=distances, indices=indices, n1=query.shape[0], n2=ref.shape[0]
-    )
+    return _nn2adj(distances=distances, indices=indices, n1=query.shape[0], n2=ref.shape[0])
 
 
 def _get_wknn(
@@ -223,9 +215,7 @@ def _get_wknn(
     k: int = 100,
     query2ref: bool = True,
     ref2query: bool = False,
-    weighting_scheme: (
-        Literal["top_n", "jaccard", "jaccard_square"] | None
-    ) = "jaccard_square",
+    weighting_scheme: (Literal["top_n", "jaccard", "jaccard_square"] | None) = "jaccard_square",
     top_n: int | None = None,
 ) -> sparse.csr_matrix:
     """
@@ -261,9 +251,7 @@ def _get_wknn(
     elif ref2query and query2ref:
         adj_knn = ((adj_r2q + adj_q2r.T) > 0) + 0
     else:
-        logger.warn(
-            "At least one of query2ref and ref2query should be True. Reset to default with both being True."
-        )
+        logger.warn("At least one of query2ref and ref2query should be True. Reset to default with both being True.")
         adj_knn = ((adj_r2q + adj_q2r.T) > 0) + 0
 
     adj_ref = _build_nn(ref=ref, k=k)

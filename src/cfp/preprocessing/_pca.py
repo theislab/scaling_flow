@@ -2,6 +2,7 @@ import anndata as ad
 import numpy as np
 import scanpy as sc
 from scipy.sparse import csr_matrix
+
 from cfp._types import ArrayLike
 
 __all__ = ["centered_pca", "reconstruct_pca", "project_pca"]
@@ -38,7 +39,7 @@ def centered_pca(
 
     Returns
     -------
-        If ``copy`` is :obj:`True`, returns a new :class:`~anndata.AnnData` object with the PCA 
+        If ``copy`` is :obj:`True`, returns a new :class:`~anndata.AnnData` object with the PCA
         results stored in :attr:`~anndata.AnnData.obsm`. Otherwise, updates ``adata`` in place.
 
         Sets the following fields:
@@ -82,9 +83,7 @@ def centered_pca(
             **kwargs,
         )
     else:
-        raise ValueError(
-            f"Invalid method: {method}. Valid options are 'scanpy' and 'rapids'."
-        )
+        raise ValueError(f"Invalid method: {method}. Valid options are 'scanpy' and 'rapids'.")
 
     if keep_centered_data:
         adata.layers["X_centered"] = csr_matrix(adata.layers["X_centered"])
@@ -111,7 +110,7 @@ def reconstruct_pca(
     query_adata
         An :class:`~anndata.AnnData` object with the query data.
     use_rep : str
-        Representation to use for PCA. If ``'X'``, uses :attr:`~anndata.AnnData.X`. Otherwise, uses 
+        Representation to use for PCA. If ``'X'``, uses :attr:`~anndata.AnnData.X`. Otherwise, uses
         ``adata.obsm[use_rep]``.
     ref_adata
         An :class:`~anndata.AnnData` object with the reference data containing
@@ -138,18 +137,14 @@ def reconstruct_pca(
         query_adata = query_adata.copy()
 
     if (ref_adata is None) and ((ref_means is None) or (ref_pcs is None)):
-        raise ValueError(
-            "Either `ref_adata` or `ref_means` and `ref_pcs` must be provided."
-        )
+        raise ValueError("Either `ref_adata` or `ref_means` and `ref_pcs` must be provided.")
 
     X = query_adata.X if use_rep == "X" else query_adata.obsm[use_rep]
     if ref_adata is not None:
         ref_means = ref_adata.varm["X_mean"]
         ref_pcs = ref_adata.varm["PCs"]
 
-    X_recon = np.array(
-        X @ np.transpose(np.array(ref_pcs)) + np.transpose(np.array(ref_means))
-    )
+    X_recon = np.array(X @ np.transpose(np.array(ref_pcs)) + np.transpose(np.array(ref_means)))
     query_adata.layers[layers_key_added] = X_recon
 
     if copy:
@@ -196,18 +191,14 @@ def project_pca(
         query_adata = query_adata.copy()
 
     if (ref_adata is None) and ((ref_means is None) or (ref_pcs is None)):
-        raise ValueError(
-            "Either `ref_adata` or `ref_means` and `ref_pcs` must be provided."
-        )
+        raise ValueError("Either `ref_adata` or `ref_means` and `ref_pcs` must be provided.")
 
     X = query_adata.X if layer in [None, "X"] else query_adata.layers[layer]
     if ref_adata is not None:
         ref_means = ref_adata.varm["X_mean"]
         ref_pcs = ref_adata.varm["PCs"]
 
-    query_adata.obsm[obsm_key_added] = np.array(
-        (X - np.transpose(np.array(ref_means))) @ np.array(ref_pcs)
-    )
+    query_adata.obsm[obsm_key_added] = np.array((X - np.transpose(np.array(ref_means))) @ np.array(ref_pcs))
 
     if copy:
         return query_adata

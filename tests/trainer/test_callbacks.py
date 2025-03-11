@@ -14,9 +14,7 @@ class TestCallbacks:
             ref_adata=adata_pca,
         )
 
-        reconstruction = decoded_metrics_callback.reconstruct_data(
-            adata_pca.obsm["X_pca"]
-        )
+        reconstruction = decoded_metrics_callback.reconstruct_data(adata_pca.obsm["X_pca"])
         assert reconstruction.shape == adata_pca.X.shape
         assert jnp.allclose(reconstruction, adata_pca.layers["counts"])
 
@@ -43,10 +41,6 @@ class TestCallbacks:
         )
 
         dict_to_reconstruct = {"dummy": out}
-        dict_adatas = jtu.tree_map(
-            vae_decoded_metrics_callback._create_anndata, dict_to_reconstruct
-        )
-        reconstructed_arrs = jtu.tree_map(
-            vae_decoded_metrics_callback.reconstruct_data, dict_adatas
-        )
+        dict_adatas = jtu.tree_map(vae_decoded_metrics_callback._create_anndata, dict_to_reconstruct)
+        reconstructed_arrs = jtu.tree_map(vae_decoded_metrics_callback.reconstruct_data, dict_adatas)
         assert reconstructed_arrs["dummy"].shape == adata.X.shape

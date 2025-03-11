@@ -6,8 +6,8 @@ import anndata as ad
 import jax.tree as jt
 import jax.tree_util as jtu
 import numpy as np
-from cfp._types import ArrayLike
 
+from cfp._types import ArrayLike
 from cfp.metrics._metrics import compute_e_distance, compute_r_squared, compute_scalar_mmd, compute_sinkhorn_div
 
 __all__ = [
@@ -30,8 +30,8 @@ metric_to_func: dict[str, Callable[[ArrayLike, ArrayLike], float | ArrayLike]] =
 }
 
 agg_fn_to_func: dict[str, Callable[[ArrayLike], float | ArrayLike]] = {
-    "mean": lambda x: np.mean(x, axis=0),  # type: ignore[arg-type]
-    "median": lambda x: np.median(x, axis=0),  # type: ignore[arg-type]
+    "mean": lambda x: np.mean(x, axis=0),
+    "median": lambda x: np.median(x, axis=0),
 }
 
 
@@ -157,15 +157,11 @@ class Metrics(ComputationCallback):
         metric_aggregations: list[Literal["mean", "median"]] = None,
     ):
         self.metrics = metrics
-        self.metric_aggregation = (
-            ["mean"] if metric_aggregations is None else metric_aggregations
-        )
+        self.metric_aggregation = ["mean"] if metric_aggregations is None else metric_aggregations
         for metric in metrics:
             # TODO: support custom callables as metrics
             if metric not in metric_to_func:
-                raise ValueError(
-                    f"Metric {metric} not supported. Supported metrics are {list(metric_to_func.keys())}"
-                )
+                raise ValueError(f"Metric {metric} not supported. Supported metrics are {list(metric_to_func.keys())}")
 
     def on_train_begin(self, *args: Any, **kwargs: Any) -> Any:
         """Called at the beginning of training."""
@@ -188,14 +184,10 @@ class Metrics(ComputationCallback):
         metrics = {}
         for metric in self.metrics:
             for k in validation_data.keys():
-                out = jtu.tree_map(
-                    metric_to_func[metric], validation_data[k], predicted_data[k]
-                )
+                out = jtu.tree_map(metric_to_func[metric], validation_data[k], predicted_data[k])
                 out_flattened = jt.flatten(out)[0]
                 for agg_fn in self.metric_aggregation:
-                    metrics[f"{k}_{metric}_{agg_fn}"] = agg_fn_to_func[agg_fn](
-                        out_flattened
-                    )
+                    metrics[f"{k}_{metric}_{agg_fn}"] = agg_fn_to_func[agg_fn](out_flattened)
 
         return metrics  # type: ignore[return-value]
 
@@ -225,7 +217,7 @@ class PCADecodedMetrics(Metrics):
         An :class:`~anndata.AnnData` object with the reference data containing
         ``adata.varm["X_mean"]`` and ``adata.varm["PCs"]``.
     metrics
-        List of metrics to compute. Supported metrics are ``"r_squared"``, ``"mmd"``, 
+        List of metrics to compute. Supported metrics are ``"r_squared"``, ``"mmd"``,
         ``"sinkhorn_div"``, and ``"e_distance"``.
     metric_aggregations
         List of aggregation functions to use for each metric. Supported aggregations are ``"mean"``
@@ -244,9 +236,7 @@ class PCADecodedMetrics(Metrics):
         super().__init__(metrics, metric_aggregations)
         self.pcs = ref_adata.varm["PCs"]
         self.means = ref_adata.varm["X_mean"]
-        self.reconstruct_data = lambda x: x @ np.transpose(self.pcs) + np.transpose(
-            self.means
-        )
+        self.reconstruct_data = lambda x: x @ np.transpose(self.pcs) + np.transpose(self.means)
         self.log_prefix = log_prefix
 
     def on_log_iteration(
@@ -266,9 +256,7 @@ class PCADecodedMetrics(Metrics):
         validation_data_decoded = jtu.tree_map(self.reconstruct_data, validation_data)
         predicted_data_decoded = jtu.tree_map(self.reconstruct_data, predicted_data)
 
-        metrics = super().on_log_iteration(
-            validation_data_decoded, predicted_data_decoded
-        )
+        metrics = super().on_log_iteration(validation_data_decoded, predicted_data_decoded)
         metrics = {f"{self.log_prefix}{k}": v for k, v in metrics.items()}
         return metrics
 
@@ -305,7 +293,7 @@ class VAEDecodedMetrics(Metrics):
         self.vae = vae
         self._adata_obs = adata.obs.copy()
         self._adata_n_vars = adata.n_vars
-        self.reconstruct_data = self.vae.get_reconstructed_expression
+        self.reconstruct_data = self.vae.get_reconstructed_expression  # type: ignore[attr-defined]
         self.log_prefix = log_prefix
 
     def on_log_iteration(
@@ -325,21 +313,14 @@ class VAEDecodedMetrics(Metrics):
         validation_data_in_anndata = jtu.tree_map(self._create_anndata, validation_data)
         predicted_data_in_anndata = jtu.tree_map(self._create_anndata, predicted_data)
 
-        validation_data_decoded = jtu.tree_map(
-            self.reconstruct_data, validation_data_in_anndata
-        )
-        predicted_data_decoded = jtu.tree_map(
-            self.reconstruct_data, predicted_data_in_anndata
-        )
+        validation_data_decoded = jtu.tree_map(self.reconstruct_data, validation_data_in_anndata)
+        predicted_data_decoded = jtu.tree_map(self.reconstruct_data, predicted_data_in_anndata)
 
-        metrics = super().on_log_iteration(
-            validation_data_decoded, predicted_data_decoded
-        )
+        metrics = super().on_log_iteration(validation_data_decoded, predicted_data_decoded)
         metrics = {f"{self.log_prefix}{k}": v for k, v in metrics.items()}
         return metrics
 
     def _create_anndata(self, data: ArrayLike) -> ad.AnnData:
-
         adata = ad.AnnData(
             X=np.empty((len(data), self._adata_n_vars)),
             obs=self._adata_obs[: len(data)],
@@ -384,17 +365,13 @@ class WandbLogger(LoggingCallback):
 
             self.wandb = wandb
         except ImportError:
-            raise ImportError(
-                "wandb is not installed, please install it via `pip install wandb`"
-            ) from None
+            raise ImportError("wandb is not installed, please install it via `pip install wandb`") from None
         try:
             import omegaconf
 
             self.omegaconf = omegaconf
         except ImportError:
-            raise ImportError(
-                "omegaconf is not installed, please install it via `pip install omegaconf`"
-            ) from None
+            raise ImportError("omegaconf is not installed, please install it via `pip install omegaconf`") from None
 
     def on_train_begin(self) -> Any:
         """Called at the beginning of training to initiate WandB logging"""
@@ -405,9 +382,7 @@ class WandbLogger(LoggingCallback):
             project=self.project,
             config=self.omegaconf.OmegaConf.to_container(config, resolve=True),
             dir=self.out_dir,
-            settings=self.wandb.Settings(
-                start_method=self.kwargs.pop("start_method", "thread")
-            ),
+            settings=self.wandb.Settings(start_method=self.kwargs.pop("start_method", "thread")),
         )
 
     def on_log_iteration(
@@ -430,8 +405,8 @@ class CallbackRunner:
     Parameters
     ----------
     callbacks
-        List of callbacks to run. Callbacks should be of type 
-        :class:`~cfp.training.ComputationCallback` or 
+        List of callbacks to run. Callbacks should be of type
+        :class:`~cfp.training.ComputationCallback` or
         :class:`~cfp.training.LoggingCallback`
 
     Returns
@@ -443,18 +418,13 @@ class CallbackRunner:
         self,
         callbacks: Sequence[BaseCallback],
     ) -> None:
-
         self.computation_callbacks: list[ComputationCallback] = [
             c for c in callbacks if isinstance(c, ComputationCallback)
         ]
-        self.logging_callbacks: list[LoggingCallback] = [
-            c for c in callbacks if isinstance(c, LoggingCallback)
-        ]
+        self.logging_callbacks: list[LoggingCallback] = [c for c in callbacks if isinstance(c, LoggingCallback)]
 
         if len(self.computation_callbacks) == 0 & len(self.logging_callbacks) != 0:
-            raise ValueError(
-                "No computation callbacks defined to compute metrics to log"
-            )
+            raise ValueError("No computation callbacks defined to compute metrics to log")
 
     def on_train_begin(self) -> Any:
         """Called at the beginning of training to initiate callbacks"""

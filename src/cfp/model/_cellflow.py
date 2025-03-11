@@ -16,8 +16,8 @@ from ott.neural.methods.flows import dynamics
 
 from cfp import _constants
 from cfp._logging import logger
-from cfp._types import Layers_separate_input_t, Layers_t, ArrayLike
-from cfp.data._data import ConditionData, ValidationData, TrainingData
+from cfp._types import ArrayLike, Layers_separate_input_t, Layers_t
+from cfp.data._data import ConditionData, TrainingData, ValidationData
 from cfp.data._dataloader import PredictionSampler, TrainSampler, ValidationSampler
 from cfp.data._datamanager import DataManager
 from cfp.model._utils import _write_predictions
@@ -47,7 +47,6 @@ class CellFlow:
     """
 
     def __init__(self, adata: ad.AnnData, solver: Literal["otfm", "genot"] = "otfm"):
-
         self._adata = adata
         self._solver_class = _otfm.OTFlowMatching if solver == "otfm" else _genot.GENOT
         self._dataloader: TrainSampler | None = None
@@ -131,9 +130,9 @@ class CellFlow:
             :attr:`~anndata.AnnData.obs` as columns ``drug_1`` and ``drug_2`` with three different
             drugs ``DrugA``, ``DrugB``, and ``DrugC``, and ``dose_1`` and ``dose_2`` for their
             dosages, respectively. We store the embeddings of the drugs in
-            :attr:`~anndata.AnnData.uns` under the key ``drug_embeddings``, while the dosage 
-            columns are numeric. Moreover, we have a covariate ``cell_type`` with values 
-            ``cell_typeA`` and ``cell_typeB``, with embeddings stored in 
+            :attr:`~anndata.AnnData.uns` under the key ``drug_embeddings``, while the dosage
+            columns are numeric. Moreover, we have a covariate ``cell_type`` with values
+            ``cell_typeA`` and ``cell_typeB``, with embeddings stored in
             :attr:`~anndata.AnnData.uns` under the key ``cell_type_embeddings``. Note that we then
             also have to set ``'split_covariates'`` as we assume we have an unperturbed population
             for each cell type.
@@ -180,10 +179,8 @@ class CellFlow:
             null_value=null_value,
         )
 
-        # TODO: rename to self.train_data
         self.train_data = self._dm.get_train_data(self.adata)
-
-        self._data_dim = self.train_data.cell_data.shape[-1]
+        self._data_dim = self.train_data.cell_data.shape[-1]  # type: ignore[union-attr]
 
     def prepare_validation_data(
         self,
@@ -230,9 +227,7 @@ class CellFlow:
         self,
         encode_conditions: bool = True,
         condition_embedding_dim: int = 32,
-        pooling: Literal[
-            "mean", "attention_token", "attention_seed"
-        ] = "attention_token",
+        pooling: Literal["mean", "attention_token", "attention_seed"] = "attention_token",
         pooling_kwargs: dict[str, Any] = types.MappingProxyType({}),
         time_encoder_dims: Sequence[int] = (1024, 1024, 1024),
         time_encoder_dropout: float = 0.0,
@@ -240,9 +235,7 @@ class CellFlow:
         hidden_dropout: float = 0.0,
         decoder_dims: Sequence[int] = (1024, 1024, 1024),
         decoder_dropout: float = 0.0,
-        layers_before_pool: Layers_separate_input_t | Layers_t = dc_field(
-            default_factory=lambda: []
-        ),
+        layers_before_pool: Layers_separate_input_t | Layers_t = dc_field(default_factory=lambda: []),
         layers_after_pool: Layers_t = dc_field(default_factory=lambda: []),
         cond_output_dropout: float = 0.0,
         condition_encoder_kwargs: dict[str, Any] | None = None,
@@ -395,18 +388,11 @@ class CellFlow:
           :class:`cfp.training.CellFlowTrainer`.
         """
         if self.train_data is None:
-            raise ValueError(
-                "Dataloader not initialized. Please call `prepare_data` first."
-            )
+            raise ValueError("Dataloader not initialized. Please call `prepare_data` first.")
 
         condition_encoder_kwargs = condition_encoder_kwargs or {}
-        if (
-            self._solver_class == _otfm.OTFlowMatching
-            and genot_source_layers is not None
-        ):
-            raise ValueError(
-                "For OTFlowMatching, 'genot_source_layers' must be `None`."
-            )
+        if self._solver_class == _otfm.OTFlowMatching and genot_source_layers is not None:
+            raise ValueError("For OTFlowMatching, 'genot_source_layers' must be `None`.")
         if self._solver_class == _genot.GENOT:
             condition_encoder_kwargs["genot_source_dim"] = self._data_dim
             if genot_source_layers is None:
@@ -419,9 +405,7 @@ class CellFlow:
                 )
             else:
                 condition_encoder_kwargs["genot_source_layers"] = genot_source_layers
-        covariates_not_pooled = (
-            [] if pool_sample_covariates else self._dm.sample_covariates
-        )
+        covariates_not_pooled = [] if pool_sample_covariates else self._dm.sample_covariates
         solver_kwargs = solver_kwargs or {}
         flow = flow or {"constant_noise": 0.0}
 
@@ -455,9 +439,7 @@ class CellFlow:
         elif flow == "bridge":
             flow = dynamics.BrownianBridge(noise)
         else:
-            raise NotImplementedError(
-                f"The key of `flow` must be `'constant_noise'` or `'bridge'` but found {flow}."
-            )
+            raise NotImplementedError(f"The key of `flow` must be `'constant_noise'` or `'bridge'` but found {flow}.")
 
         if self._solver_class == _otfm.OTFlowMatching:
             self._solver = self._solver_class(
@@ -482,9 +464,7 @@ class CellFlow:
                 **solver_kwargs,
             )
         else:
-            raise NotImplementedError(
-                f"Solver must be an instance of OTFlowMatching or GENOT, got {type(self.solver)}"
-            )
+            raise NotImplementedError(f"Solver must be an instance of OTFlowMatching or GENOT, got {type(self.solver)}")
         self._trainer = CellFlowTrainer(solver=self.solver)  # type: ignore[arg-type]
 
     def train(
@@ -530,14 +510,10 @@ class CellFlow:
             raise ValueError("Data not initialized. Please call `prepare_data` first.")
 
         if self.trainer is None:
-            raise ValueError(
-                "Model not initialized. Please call `prepare_model` first."
-            )
+            raise ValueError("Model not initialized. Please call `prepare_model` first.")
 
         self._dataloader = TrainSampler(data=self.train_data, batch_size=batch_size)
-        validation_loaders = {
-            k: ValidationSampler(v) for k, v in self.validation_data.items()
-        }
+        validation_loaders = {k: ValidationSampler(v) for k, v in self.validation_data.items()}
 
         self._solver = self.trainer.train(
             dataloader=self._dataloader,
@@ -567,7 +543,7 @@ class CellFlow:
         covariate_data
             Covariate data defining the condition to predict. This :class:`~pandas.DataFrame`
             should have the same columns as :attr:`~anndata.AnnData.obs` of
-            :attr:`cfp.model.CellFlow.adata`, and as registered in 
+            :attr:`cfp.model.CellFlow.adata`, and as registered in
             :attr:`cfp.model.CellFlow.data_manager`.
         sample_rep
             Key in :attr:`~anndata.AnnData.obsm` where the sample representation is stored or
@@ -616,7 +592,7 @@ class CellFlow:
                 )
         pred_data = self._dm.get_prediction_data(
             adata,
-            sample_rep=sample_rep,
+            sample_rep=sample_rep,  # type: ignore[arg-type]
             covariate_data=covariate_data,
             condition_id_key=condition_id_key,
         )
@@ -624,7 +600,11 @@ class CellFlow:
         batch = pred_loader.sample()
         src = batch["source"]
         condition = batch.get("condition", None)
-        out = jax.tree.map(functools.partial(self.solver.predict, **kwargs), src, condition)  # type: ignore[union-attr]
+        out = jax.tree.map(
+            functools.partial(self.solver.predict, **kwargs),
+            src,
+            condition,  # type: ignore[attr-defined]
+        )
         if key_added_prefix is None:
             return out
         if len(pred_data.control_to_perturbation) > 1:
@@ -674,9 +654,7 @@ class CellFlow:
             raise ValueError("Model not trained. Please call `train` first.")
 
         if not self._dm.is_conditional:
-            raise ValueError(
-                "Model is not conditional. Condition embeddings are not available."
-            )
+            raise ValueError("Model is not conditional. Condition embeddings are not available.")
 
         if hasattr(covariate_data, "condition_data"):
             cond_data = covariate_data
@@ -687,9 +665,7 @@ class CellFlow:
                 condition_id_key=condition_id_key,
             )
         else:
-            raise ValueError(
-                "Covariate data must be a `pandas.DataFrame` or an instance of `BaseData`."
-            )
+            raise ValueError("Covariate data must be a `pandas.DataFrame` or an instance of `BaseData`.")
 
         condition_embeddings: dict[str, ArrayLike] = {}
         n_conditions = len(next(iter(cond_data.condition_data.values())))
@@ -702,9 +678,7 @@ class CellFlow:
                 c_key = tuple(cov_combination[i] for i in range(len(cov_combination)))
             condition_embeddings[c_key] = self.solver.get_condition_embedding(condition)
 
-        df = pd.DataFrame.from_dict(
-            {k: v[0] for k, v in condition_embeddings.items()}  # type: ignore[index]
-        ).T
+        df = pd.DataFrame.from_dict({k: v[0] for k, v in condition_embeddings.items()}).T
 
         if condition_id_key:
             df.index.set_names([condition_id_key], inplace=True)
@@ -745,14 +719,10 @@ class CellFlow:
             if file_prefix is not None
             else f"{self.__class__.__name__}.pkl"
         )
-        file_dir = (
-            os.path.join(dir_path, file_name) if dir_path is not None else file_name
-        )
+        file_dir = os.path.join(dir_path, file_name) if dir_path is not None else file_name
 
         if not overwrite and os.path.exists(file_dir):
-            raise RuntimeError(
-                f"Unable to save to an existing file `{file_dir}` use `overwrite=True` to overwrite it."
-            )
+            raise RuntimeError(f"Unable to save to an existing file `{file_dir}` use `overwrite=True` to overwrite it.")
         with open(file_dir, "wb") as f:
             cloudpickle.dump(self, f)
 
@@ -774,19 +744,13 @@ class CellFlow:
         Loaded instance of the model.
         """
         # Check if filename is a directory
-        file_name = (
-            os.path.join(filename, f"{cls.__name__}.pkl")
-            if os.path.isdir(filename)
-            else filename
-        )
+        file_name = os.path.join(filename, f"{cls.__name__}.pkl") if os.path.isdir(filename) else filename
 
         with open(file_name, "rb") as f:
             model = cloudpickle.load(f)
 
         if type(model) is not cls:
-            raise TypeError(
-                f"Expected the model to be type of `{cls}`, found `{type(model)}`."
-            )
+            raise TypeError(f"Expected the model to be type of `{cls}`, found `{type(model)}`.")
         return model
 
     @property
@@ -833,17 +797,12 @@ class CellFlow:
     def train_data(self, data: TrainingData) -> None:
         """Set the training data."""
         if not isinstance(data, TrainingData):
-            raise ValueError(
-                f"Expected `data` to be an instance of `TrainingData`, found `{type(data)}`."
-            )
+            raise ValueError(f"Expected `data` to be an instance of `TrainingData`, found `{type(data)}`.")
         self._train_data = data
 
-
-    @velocity_field.setter
+    @velocity_field.setter  # type: ignore[attr-defined,no-redef]
     def velocity_field(self, vf: ConditionalVelocityField) -> None:
         """Set the velocity field."""
         if not isinstance(vf, ConditionalVelocityField):
-            raise ValueError(
-                f"Expected `vf` to be an instance of `ConditionalVelocityField`, found `{type(vf)}`."
-            )
+            raise ValueError(f"Expected `vf` to be an instance of `ConditionalVelocityField`, found `{type(vf)}`.")
         self._vf = vf

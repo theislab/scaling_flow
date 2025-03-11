@@ -102,9 +102,7 @@ class TestDataManager:
         if el_to_delete == "dosage_a":
             perturbation_covariates["dosage"] = ["dosage_b"]
 
-        with pytest.raises(
-            ValueError, match=r".*perturbation covariate groups must match.*"
-        ):
+        with pytest.raises(ValueError, match=r".*perturbation covariate groups must match.*"):
             _ = DataManager(
                 adata_perturbation,
                 sample_rep=sample_rep,
@@ -127,8 +125,7 @@ class TestDataManager:
         }
 
         adata_perturbation.obs.loc[
-            (~adata_perturbation.obs["control"])
-            & (adata_perturbation.obs["cell_type"] == "cell_line_a"),
+            (~adata_perturbation.obs["control"]) & (adata_perturbation.obs["cell_type"] == "cell_line_a"),
             "cell_type",
         ] = "cell_line_b"
 
@@ -181,16 +178,11 @@ class TestDataManager:
         train_data = dm.get_train_data(adata_perturbation)
         assert isinstance(train_data, TrainingData)
         assert isinstance(train_data, TrainingData)
-        assert (
-            (train_data.perturbation_covariates_mask == -1)
-            + (train_data.split_covariates_mask == -1)
-        ).all()
+        assert ((train_data.perturbation_covariates_mask == -1) + (train_data.split_covariates_mask == -1)).all()
         if split_covariates == []:
             assert train_data.n_controls == 1
         if split_covariates == ["cell_type"]:
-            assert train_data.n_controls == len(
-                adata_perturbation.obs["cell_type"].cat.categories
-            )
+            assert train_data.n_controls == len(adata_perturbation.obs["cell_type"].cat.categories)
 
         assert isinstance(train_data.condition_data, dict)
         assert isinstance(list(train_data.condition_data.values())[0], jax.Array)
@@ -199,8 +191,7 @@ class TestDataManager:
         if sample_covariates == [] and perturbation_covariates == {"drug": ("drug1",)}:
             assert (
                 train_data.n_perturbations
-                == (len(adata_perturbation.obs["drug1"].cat.categories) - 1)
-                * train_data.n_controls
+                == (len(adata_perturbation.obs["drug1"].cat.categories) - 1) * train_data.n_controls
             )
         assert isinstance(train_data.cell_data, jax.Array)
         assert isinstance(train_data.split_covariates_mask, jax.Array)
@@ -210,9 +201,7 @@ class TestDataManager:
         assert isinstance(train_data.control_to_perturbation, dict)
 
     @pytest.mark.parametrize("split_covariates", [[], ["cell_type"]])
-    @pytest.mark.parametrize(
-        "perturbation_covariates", perturbation_covariate_comb_args
-    )
+    @pytest.mark.parametrize("perturbation_covariates", perturbation_covariate_comb_args)
     @pytest.mark.parametrize("perturbation_covariate_reps", [{}, {"drug": "drug"}])
     def test_get_train_data_with_combinations(
         self,
@@ -236,17 +225,12 @@ class TestDataManager:
 
         train_data = dm.get_train_data(adata_perturbation)
 
-        assert (
-            (train_data.perturbation_covariates_mask == -1)
-            + (train_data.split_covariates_mask == -1)
-        ).all()
+        assert ((train_data.perturbation_covariates_mask == -1) + (train_data.split_covariates_mask == -1)).all()
 
         if split_covariates == []:
             assert train_data.n_controls == 1
         if split_covariates == ["cell_type"]:
-            assert train_data.n_controls == len(
-                adata_perturbation.obs["cell_type"].cat.categories
-            )
+            assert train_data.n_controls == len(adata_perturbation.obs["cell_type"].cat.categories)
 
         assert isinstance(train_data.condition_data, dict)
         assert isinstance(list(train_data.condition_data.values())[0], jax.Array)
@@ -255,28 +239,19 @@ class TestDataManager:
         for k in perturbation_covariates.keys():
             assert k in train_data.condition_data.keys()
             assert train_data.condition_data[k].ndim == 3
-            assert (
-                train_data.condition_data[k].shape[1]
-                == train_data.max_combination_length
-            )
+            assert train_data.condition_data[k].shape[1] == train_data.max_combination_length
             assert train_data.condition_data[k].shape[0] == train_data.n_perturbations
 
         for k, v in perturbation_covariate_reps.items():
             assert k in train_data.condition_data.keys()
-            assert (
-                train_data.condition_data[v].shape[1]
-                == train_data.max_combination_length
-            )
+            assert train_data.condition_data[v].shape[1] == train_data.max_combination_length
             assert train_data.condition_data[v].shape[0] == train_data.n_perturbations
             cov_key = perturbation_covariates[v][0]
             if cov_key == "drug_a":
                 cov_name = cov_key
             else:
                 cov_name = adata_perturbation.obs[cov_key].values[0]
-            assert (
-                train_data.condition_data[v].shape[2]
-                == adata_perturbation.uns[k][cov_name].shape[0]
-            )
+            assert train_data.condition_data[v].shape[2] == adata_perturbation.uns[k][cov_name].shape[0]
 
         assert isinstance(train_data.cell_data, jax.Array)
         assert isinstance(train_data.split_covariates_mask, jax.Array)
@@ -287,7 +262,6 @@ class TestDataManager:
 
     @pytest.mark.parametrize("max_combination_length", [0, 4])
     def test_max_combination_length(self, adata_perturbation, max_combination_length):
-
         sample_rep = "X"
         split_covariates = ["cell_type"]
         control_key = "control"
@@ -306,27 +280,17 @@ class TestDataManager:
 
         train_data = dm.get_train_data(adata_perturbation)
 
-        assert (
-            (train_data.perturbation_covariates_mask == -1)
-            + (train_data.split_covariates_mask == -1)
-        ).all()
+        assert ((train_data.perturbation_covariates_mask == -1) + (train_data.split_covariates_mask == -1)).all()
 
-        expected_max_combination_length = max(
-            max_combination_length, len(perturbation_covariates["drug"])
-        )
+        expected_max_combination_length = max(max_combination_length, len(perturbation_covariates["drug"]))
         assert dm._max_combination_length == expected_max_combination_length
-        assert (
-            train_data.condition_data["drug"].shape[1]
-            == expected_max_combination_length
-        )
+        assert train_data.condition_data["drug"].shape[1] == expected_max_combination_length
 
 
 class TestValidationData:
     @pytest.mark.parametrize("sample_rep", ["X", "X_pca"])
     @pytest.mark.parametrize("split_covariates", [[], ["cell_type"]])
-    @pytest.mark.parametrize(
-        "perturbation_covariates", perturbation_covariate_comb_args
-    )
+    @pytest.mark.parametrize("perturbation_covariates", perturbation_covariate_comb_args)
     @pytest.mark.parametrize("perturbation_covariate_reps", [{}, {"drug": "drug"}])
     def test_get_validation_data(
         self,
@@ -369,8 +333,7 @@ class TestValidationData:
         if sample_covariates == [] and perturbation_covariates == {"drug": ("drug1",)}:
             assert (
                 val_data.n_perturbations
-                == (len(adata_perturbation.obs["drug1"].cat.categories) - 1)
-                * val_data.n_controls
+                == (len(adata_perturbation.obs["drug1"].cat.categories) - 1) * val_data.n_controls
             )
 
     @pytest.mark.skip(reason="To discuss: why should it raise an error?")
@@ -405,9 +368,7 @@ class TestValidationData:
 class TestPredictionData:
     @pytest.mark.parametrize("sample_rep", ["X", "X_pca"])
     @pytest.mark.parametrize("split_covariates", [[], ["cell_type"]])
-    @pytest.mark.parametrize(
-        "perturbation_covariates", perturbation_covariate_comb_args
-    )
+    @pytest.mark.parametrize("perturbation_covariates", perturbation_covariate_comb_args)
     @pytest.mark.parametrize("perturbation_covariate_reps", [{}, {"drug": "drug"}])
     def test_get_prediction_data(
         self,
@@ -436,9 +397,7 @@ class TestPredictionData:
 
         adata_pred = adata_perturbation[:50].copy()
         adata_pred.obs["control"] = True
-        pred_data = dm.get_prediction_data(
-            adata_pred, covariate_data=adata_pred.obs, sample_rep=sample_rep
-        )
+        pred_data = dm.get_prediction_data(adata_pred, covariate_data=adata_pred.obs, sample_rep=sample_rep)
 
         assert isinstance(pred_data.cell_data, jax.Array)
         assert isinstance(pred_data.split_covariates_mask, jax.Array)
@@ -453,6 +412,5 @@ class TestPredictionData:
         if sample_covariates == [] and perturbation_covariates == {"drug": ("drug1",)}:
             assert (
                 pred_data.n_perturbations
-                == (len(adata_perturbation.obs["drug1"].cat.categories) - 1)
-                * pred_data.n_controls
+                == (len(adata_perturbation.obs["drug1"].cat.categories) - 1) * pred_data.n_controls
             )

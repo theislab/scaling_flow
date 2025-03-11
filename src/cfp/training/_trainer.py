@@ -34,9 +34,7 @@ class CellFlowTrainer:
         seed: int = 0,
     ):
         if not isinstance(solver, (_otfm.OTFlowMatching | _genot.GENOT)):
-            raise NotImplementedError(
-                f"Solver must be an instance of OTFlowMatching or GENOT, got {type(solver)}"
-            )
+            raise NotImplementedError(f"Solver must be an instance of OTFlowMatching or GENOT, got {type(solver)}")
 
         self.solver = solver
         self.rng_subsampling = np.random.default_rng(seed)
@@ -121,27 +119,20 @@ class CellFlowTrainer:
 
             if ((it - 1) % valid_freq == 0) and (it > 1):
                 # Get predictions from validation data
-                valid_true_data, valid_pred_data = self._validation_step(
-                    valid_loaders, mode="on_log_iteration"
-                )
+                valid_true_data, valid_pred_data = self._validation_step(valid_loaders, mode="on_log_iteration")
 
                 # Run callbacks
-                metrics = crun.on_log_iteration(valid_true_data, valid_pred_data)
+                metrics = crun.on_log_iteration(valid_true_data, valid_pred_data)  # type: ignore[arg-type]
                 self._update_logs(metrics)
 
                 # Update progress bar
                 mean_loss = np.mean(self.training_logs["loss"][-valid_freq:])
-                postfix_dict = {
-                    metric: round(self.training_logs[metric][-1], 3)
-                    for metric in monitor_metrics
-                }
+                postfix_dict = {metric: round(self.training_logs[metric][-1], 3) for metric in monitor_metrics}
                 postfix_dict["loss"] = round(mean_loss, 3)
                 pbar.set_postfix(postfix_dict)
 
         if num_iterations > 0:
-            valid_true_data, valid_pred_data = self._validation_step(
-                valid_loaders, mode="on_train_end"
-            )
+            valid_true_data, valid_pred_data = self._validation_step(valid_loaders, mode="on_train_end")
             metrics = crun.on_train_end(valid_true_data, valid_pred_data)
             self._update_logs(metrics)
 

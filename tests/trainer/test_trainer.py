@@ -47,9 +47,7 @@ class TestTrainer:
         assert cond_enc.shape == (1, 12)
 
     @pytest.mark.parametrize("use_validdata", [True, False])
-    def test_cellflow_trainer_with_callback(
-        self, dataloader, valid_loader, use_validdata
-    ):
+    def test_cellflow_trainer_with_callback(self, dataloader, valid_loader, use_validdata):
         opt = optax.adam(1e-3)
         vf = cfp.networks.ConditionalVelocityField(
             output_dim=5,

@@ -85,9 +85,7 @@ class ConditionalVelocityField(nn.Module):
     covariates_not_pooled: Sequence[str] = dc_field(default_factory=lambda: [])
     pooling: Literal["mean", "attention_token", "attention_seed"] = "attention_token"
     pooling_kwargs: dict[str, Any] = dc_field(default_factory=lambda: {})
-    layers_before_pool: Layers_separate_input_t | Layers_t = dc_field(
-        default_factory=lambda: []
-    )
+    layers_before_pool: Layers_separate_input_t | Layers_t = dc_field(default_factory=lambda: [])
     layers_after_pool: Layers_t = dc_field(default_factory=lambda: [])
     cond_output_dropout: float = 0.0
     mask_value: float = 0.0
@@ -118,9 +116,7 @@ class ConditionalVelocityField(nn.Module):
                 **self.condition_encoder_kwargs,
             )
 
-        self.layer_norm_condition = (
-            nn.LayerNorm() if self.layer_norm_before_concatenation else lambda x: x
-        )
+        self.layer_norm_condition = nn.LayerNorm() if self.layer_norm_before_concatenation else lambda x: x
 
         self.time_encoder = MLPBlock(
             dims=self.time_encoder_dims,
@@ -128,29 +124,21 @@ class ConditionalVelocityField(nn.Module):
             dropout_rate=self.time_encoder_dropout,
             act_last_layer=False,
         )
-        self.layer_norm_time = (
-            nn.LayerNorm() if self.layer_norm_before_concatenation else lambda x: x
-        )
+        self.layer_norm_time = nn.LayerNorm() if self.layer_norm_before_concatenation else lambda x: x
 
         self.x_encoder = MLPBlock(
             dims=self.hidden_dims,
             act_fn=self.act_fn,
             dropout_rate=self.hidden_dropout,
-            act_last_layer=(
-                False if self.linear_projection_before_concatenation else True
-            ),
+            act_last_layer=(False if self.linear_projection_before_concatenation else True),
         )
-        self.layer_norm_x = (
-            nn.LayerNorm() if self.layer_norm_before_concatenation else lambda x: x
-        )
+        self.layer_norm_x = nn.LayerNorm() if self.layer_norm_before_concatenation else lambda x: x
 
         self.decoder = MLPBlock(
             dims=self.decoder_dims,
             act_fn=self.act_fn,
             dropout_rate=self.decoder_dropout,
-            act_last_layer=(
-                False if self.linear_projection_before_concatenation else True
-            ),
+            act_last_layer=(False if self.linear_projection_before_concatenation else True),
         )
 
         self.output_layer = nn.Dense(self.output_dim)
@@ -214,14 +202,10 @@ class ConditionalVelocityField(nn.Module):
             Embedding of the condition.
         """
         if self.encode_conditions:
-            condition = self.condition_encoder(
-                condition, training=False, return_conditions_only=True
-            )
+            condition = self.condition_encoder(condition, training=False, return_conditions_only=True)
         else:
             condition = jnp.concatenate(list(condition.values()), axis=-1)
-            logger.warning(
-                "Condition encoder is not defined. Returning concatenated input as the embedding."
-            )
+            logger.warning("Condition encoder is not defined. Returning concatenated input as the embedding.")
         return condition
 
     def create_train_state(
@@ -255,39 +239,38 @@ class ConditionalVelocityField(nn.Module):
         if additional_cond_dim:
             cond[GENOT_CELL_KEY] = jnp.ones((1, additional_cond_dim))
         params = self.init(rng, t, x, cond, train=False)["params"]
-        return train_state.TrainState.create(
-            apply_fn=self.apply, params=params, tx=optimizer
-        )
+        return train_state.TrainState.create(apply_fn=self.apply, params=params, tx=optimizer)
 
     @property
     def output_dims(self):
         """Dimensions of the output layers."""
         return tuple(self.decoder_dims) + (self.output_dim,)
+
     @property
     def time_encoder(self):
         """The time encoder used."""
         return self._time_encoder
-    
+
     @time_encoder.setter
     def time_encoder(self, encoder):
         """Set the time encoder."""
         self._time_encoder = encoder
-    
+
     @property
     def x_encoder(self):
         """The x encoder used."""
         return self._x_encoder
-    
+
     @x_encoder.setter
     def x_encoder(self, encoder):
         """Set the x encoder."""
         self._x_encoder = encoder
-    
+
     @property
     def decoder(self):
         """The decoder used."""
         return self._decoder
-    
+
     @decoder.setter
     def decoder(self, decoder):
         """Set the decoder."""

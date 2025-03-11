@@ -1,8 +1,8 @@
 Model
 ~~~~~
-.. module:: cfp.model
+.. module:: cfp.datasets
 .. currentmodule:: cfp
 .. autosummary::
     :toctree: genapi
 
-    model.CellFlow
+    datasets.ineurons

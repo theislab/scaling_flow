@@ -55,7 +55,7 @@ class CFJaxVAE(JaxBaseModuleClass):
         input_dict = {"x": x}
         return input_dict
 
-    def inference(self, x: jnp.ndarray, n_samples: int = 1) -> dict:
+    def inference(self, x: jnp.ndarray, n_samples: int = 1) -> dict[str, jnp.ndarray]:
         """Run inference model."""
         mean, var = self.encoder(x, training=self.training)
         stddev = jnp.sqrt(var) + self.eps
@@ -84,7 +84,7 @@ class CFJaxVAE(JaxBaseModuleClass):
         }
         return input_dict
 
-    def generative(self, x, z, batch_index) -> dict:
+    def generative(self, x, z, batch_index) -> dict[str, jnp.ndarray]:
         """Run generative model."""
         # one hot adds an extra dimension
         batch = jax.nn.one_hot(batch_index, self.n_batch).squeeze(-2)
@@ -126,16 +126,13 @@ class CFJaxVAE(JaxBaseModuleClass):
 
         loss = jnp.mean(reconst_loss + weighted_kl_local)
 
-        return LossOutput(
-            loss=loss, reconstruction_loss=reconst_loss, kl_local=kl_divergence_z
-        )
+        return LossOutput(loss=loss, reconstruction_loss=reconst_loss, kl_local=kl_divergence_z)
 
     def get_jit_generative_fn(
         self,
         get_generative_input_kwargs: dict[str, Any] | None = None,
         generative_kwargs: dict[str, Any] | None = None,
     ):
-
         vars_in = {"params": self.params, **self.state}
         get_generative_input_kwargs = _get_dict_if_none(get_generative_input_kwargs)
         generative_kwargs = _get_dict_if_none(generative_kwargs)
@@ -143,9 +140,7 @@ class CFJaxVAE(JaxBaseModuleClass):
         # @jax.jit
         def _run_generative(rngs, array_dict, inference_outputs):
             module = self.clone()
-            generative_input = module._get_generative_input(
-                array_dict, inference_outputs
-            )
+            generative_input = module._get_generative_input(array_dict, inference_outputs)
             out = module.apply(
                 vars_in,
                 rngs=rngs,

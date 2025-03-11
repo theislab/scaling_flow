@@ -23,9 +23,7 @@ class TestWKNN:
         assert np.all(np.sum(adata_perturbation.uns["wknn"] > 0, axis=1) == n_neighbors)
 
     @pytest.mark.parametrize("weighting_scheme", ["top_n", "jaccard", "jaccard_square"])
-    def test_compute_wknn_weighting(
-        self, adata_perturbation: ad.AnnData, weighting_scheme
-    ):
+    def test_compute_wknn_weighting(self, adata_perturbation: ad.AnnData, weighting_scheme):
         import cfp
 
         n_neighbors = 50
@@ -46,18 +44,12 @@ class TestWKNN:
             adata_perturbation.n_obs,
         )
         if weighting_scheme == "top_n":
-            assert np.all(
-                np.sum(adata_perturbation.uns["wknn"] > 0, axis=1) <= n_neighbors
-            )
+            assert np.all(np.sum(adata_perturbation.uns["wknn"] > 0, axis=1) <= n_neighbors)
         else:
-            assert np.all(
-                np.sum(adata_perturbation.uns["wknn"] > 0, axis=1) == n_neighbors
-            )
+            assert np.all(np.sum(adata_perturbation.uns["wknn"] > 0, axis=1) == n_neighbors)
 
     @pytest.mark.parametrize("uns_key_added", ["wknn", "wknn2"])
-    def test_compute_wknn_key_added(
-        self, adata_perturbation: ad.AnnData, uns_key_added
-    ):
+    def test_compute_wknn_key_added(self, adata_perturbation: ad.AnnData, uns_key_added):
         import cfp
 
         n_neighbors = 50
@@ -75,9 +67,7 @@ class TestWKNN:
             adata_perturbation.n_obs,
             adata_perturbation.n_obs,
         )
-        assert np.all(
-            np.sum(adata_perturbation.uns[uns_key_added] > 0, axis=1) == n_neighbors
-        )
+        assert np.all(np.sum(adata_perturbation.uns[uns_key_added] > 0, axis=1) == n_neighbors)
 
     @pytest.mark.parametrize("label_key", ["drug1", "cell_type"])
     def test_transfer_labels(self, adata_perturbation: ad.AnnData, label_key):
@@ -100,7 +90,4 @@ class TestWKNN:
         assert f"{label_key}_transfer" in adata_perturbation.obs
         assert f"{label_key}_transfer_score" in adata_perturbation.obs
         assert adata_perturbation.obs[f"{label_key}_transfer"].dtype.name == "category"
-        assert (
-            adata_perturbation.obs[f"{label_key}_transfer_score"].dtype.name
-            == "float64"
-        )
+        assert adata_perturbation.obs[f"{label_key}_transfer_score"].dtype.name == "float64"

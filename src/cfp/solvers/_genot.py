@@ -64,12 +64,8 @@ class GENOT:
         *,
         source_dim: int,
         target_dim: int,
-        time_sampler: Callable[
-            [jax.Array, int], jnp.ndarray
-        ] = solver_utils.uniform_sampler,
-        latent_noise_fn: (
-            Callable[[jax.Array, tuple[int, ...]], jnp.ndarray] | None
-        ) = None,
+        time_sampler: Callable[[jax.Array, int], jnp.ndarray] = solver_utils.uniform_sampler,
+        latent_noise_fn: (Callable[[jax.Array, tuple[int, ...]], jnp.ndarray] | None) = None,
         **kwargs: Any,
     ):
         self._is_trained: bool = False
@@ -90,7 +86,6 @@ class GENOT:
         self.vf_step_fn = self._get_vf_step_fn()
 
     def _get_vf_step_fn(self) -> Callable:  #  type: ignore[type-arg]
-
         @jax.jit
         def vf_step_fn(
             rng: jax.Array,
@@ -101,7 +96,6 @@ class GENOT:
             latent: jnp.ndarray,
             conditions: dict[str, jnp.ndarray] | None,
         ):
-
             def loss_fn(
                 params: jnp.ndarray,
                 time: jnp.ndarray,
@@ -130,16 +124,16 @@ class GENOT:
                 return jnp.mean((v_t - u_t) ** 2)
 
             grad_fn = jax.value_and_grad(loss_fn)
-            loss, grads = grad_fn(
-                vf_state.params, time, source, target, latent, conditions, rng
-            )
+            loss, grads = grad_fn(vf_state.params, time, source, target, latent, conditions, rng)
 
             return loss, vf_state.apply_gradients(grads=grads)
 
         return vf_step_fn
 
     @staticmethod
-    def _prepare_data(batch: dict[str, jnp.ndarray]) -> tuple[
+    def _prepare_data(
+        batch: dict[str, jnp.ndarray],
+    ) -> tuple[
         tuple[ArrayLike, ArrayLike],
         tuple[ArrayLike | None, ...],
     ]:
@@ -152,9 +146,7 @@ class GENOT:
         elif src_lin is None and tgt_lin is None:  # quad
             src, tgt = src_quad, tgt_quad
             arrs = src_quad, tgt_quad
-        elif all(
-            arr is not None for arr in (src_lin, tgt_lin, src_quad, tgt_quad)
-        ):  # fused quad
+        elif all(arr is not None for arr in (src_lin, tgt_lin, src_quad, tgt_quad)):  # fused quad
             src = jnp.concatenate([src_lin, src_quad], axis=1)
             tgt = jnp.concatenate([tgt_lin, tgt_quad], axis=1)
             arrs = src_quad, tgt_quad, src_lin, tgt_lin
@@ -198,9 +190,7 @@ class GENOT:
         )
 
         src, tgt = src[src_ixs], tgt[tgt_ixs]
-        loss, self.vf_state = self.vf_step_fn(
-            rng_step_fn, self.vf_state, time, src, tgt, latent, condition
-        )
+        loss, self.vf_state = self.vf_step_fn(rng_step_fn, self.vf_state, time, src, tgt, latent, condition)
         return loss
 
     def get_condition_embedding(self, condition: dict[str, ArrayLike]) -> ArrayLike:
@@ -256,19 +246,13 @@ class GENOT:
         """
         kwargs.setdefault("dt0", None)
         kwargs.setdefault("solver", diffrax.Tsit5())
-        kwargs.setdefault(
-            "stepsize_controller", diffrax.PIDController(rtol=1e-5, atol=1e-5)
-        )
+        kwargs.setdefault("stepsize_controller", diffrax.PIDController(rtol=1e-5, atol=1e-5))
 
-        def vf(
-            t: jnp.ndarray, x: jnp.ndarray, cond: dict[str, jnp.ndarray] | None
-        ) -> jnp.ndarray:
+        def vf(t: jnp.ndarray, x: jnp.ndarray, cond: dict[str, jnp.ndarray] | None) -> jnp.ndarray:
             params = self.vf_state.params
             return self.vf_state.apply_fn({"params": params}, t, x, cond, train=False)
 
-        def solve_ode(
-            x: jnp.ndarray, condition: dict[str, jnp.ndarray], cell_data: jnp.ndarray
-        ) -> jnp.ndarray:
+        def solve_ode(x: jnp.ndarray, condition: dict[str, jnp.ndarray], cell_data: jnp.ndarray) -> jnp.ndarray:
             ode_term = diffrax.ODETerm(vf)
             condition[GENOT_CELL_KEY] = cell_data
             result = diffrax.diffeqsolve(
@@ -284,9 +268,9 @@ class GENOT:
         rng = utils.default_prng_key(rng)
         latent = self.latent_noise_fn(rng, (len(source), n_samples))
 
-        x_pred = jax.jit(
-            jax.vmap(jax.vmap(solve_ode, in_axes=[0, None, 0]), in_axes=[1, None, None])
-        )(latent, condition, source)
+        x_pred = jax.jit(jax.vmap(jax.vmap(solve_ode, in_axes=[0, None, 0]), in_axes=[1, None, None]))(
+            latent, condition, source
+        )
         return np.transpose(np.array(x_pred), (1, 2, 0))
 
     @property

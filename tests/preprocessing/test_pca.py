@@ -39,9 +39,7 @@ class TestPCA:
         import cfp
 
         cfp.pp.centered_pca(adata_pca, n_comps=50, copy=False)
-        cfp.pp.reconstruct_pca(
-            adata_pca, ref_means=adata_pca.varm["X_mean"], ref_pcs=adata_pca.varm["PCs"]
-        )
+        cfp.pp.reconstruct_pca(adata_pca, ref_means=adata_pca.varm["X_mean"], ref_pcs=adata_pca.varm["PCs"])
         assert "X_recon" in adata_pca.layers
 
     @pytest.mark.parametrize("obsm_key_added", ["X_pca", "X_pca_projected"])
@@ -49,10 +47,6 @@ class TestPCA:
         import cfp
 
         cfp.pp.centered_pca(adata_pca, n_comps=50, copy=False)
-        adata_pca_project = cfp.pp.project_pca(
-            adata_pca, ref_adata=adata_pca, obsm_key_added=obsm_key_added, copy=True
-        )
+        adata_pca_project = cfp.pp.project_pca(adata_pca, ref_adata=adata_pca, obsm_key_added=obsm_key_added, copy=True)
         assert obsm_key_added in adata_pca_project.obsm
-        assert np.allclose(
-            adata_pca_project.obsm[obsm_key_added], adata_pca.obsm["X_pca"]
-        )
+        assert np.allclose(adata_pca_project.obsm[obsm_key_added], adata_pca.obsm["X_pca"])

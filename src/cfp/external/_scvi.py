@@ -22,7 +22,6 @@ __all__ = ["CFJaxSCVI"]
 
 
 class CFJaxSCVI(JaxSCVI):
-
     _module_cls = CFJaxVAE
 
     def __init__(
@@ -58,7 +57,7 @@ class CFJaxSCVI(JaxSCVI):
         give_mean: bool = True,
         n_samples: int = 1,
         batch_size: int | None = None,
-    ) -> np.ndarray:
+    ) -> np.ndarray:  # type: ignore[type-arg]
         r"""Return the latent representation for each cell.
 
         This is denoted as :math:`z_n` in our manuscripts.
@@ -66,8 +65,8 @@ class CFJaxSCVI(JaxSCVI):
         Parameters
         ----------
         adata
-            :class:`~anndata.AnnData` object with equivalent structure to initial 
-            :class:`~anndata.AnnData` object. If `:obj:`None`, defaults to the 
+            :class:`~anndata.AnnData` object with equivalent structure to initial
+            :class:`~anndata.AnnData` object. If `:obj:`None`, defaults to the
             :class:`~anndata.AnnData` object used to initialize the model.
         indices
             Indices of cells in adata to use. If :obj:`None`, all cells are used.
@@ -76,7 +75,7 @@ class CFJaxSCVI(JaxSCVI):
         n_samples
             Number of samples to use for computing the latent representation.
         batch_size
-            Minibatch size for data loading into model. Defaults to 
+            Minibatch size for data loading into model. Defaults to
             :attr:`scvi.settings.ScviConfig.batch_size`.
 
         Returns
@@ -86,13 +85,9 @@ class CFJaxSCVI(JaxSCVI):
         self._check_if_trained(warn=False)
 
         adata = self._validate_anndata(adata)
-        scdl = self._make_data_loader(
-            adata=adata, indices=indices, batch_size=batch_size, iter_ndarray=True
-        )
+        scdl = self._make_data_loader(adata=adata, indices=indices, batch_size=batch_size, iter_ndarray=True)
 
-        jit_inference_fn = self.module.get_jit_inference_fn(
-            inference_kwargs={"n_samples": n_samples}
-        )
+        jit_inference_fn = self.module.get_jit_inference_fn(inference_kwargs={"n_samples": n_samples})
         latent = []
         for array_dict in scdl:
             out = jit_inference_fn(self.module.rngs, array_dict)
@@ -140,14 +135,12 @@ class CFJaxSCVI(JaxSCVI):
         reconstructed_expression
         """
         if batch_size is None:
-            batch_size = data.obsm[use_rep].shape[0]
+            batch_size = data.obsm[use_rep].shape[0]  # type: ignore[union-attr]
 
         self._check_if_trained(warn=False)
 
         data = self._validate_anndata(data)
-        scdl = self._make_data_loader(
-            adata=data, indices=indices, batch_size=batch_size, iter_ndarray=True
-        )
+        scdl = self._make_data_loader(adata=data, indices=indices, batch_size=batch_size, iter_ndarray=True)
 
         jit_generative_fn = self.module.get_jit_generative_fn()
         # Make dummy dict to conform with scVI functions
