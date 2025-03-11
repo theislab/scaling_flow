@@ -227,7 +227,7 @@ class DataManager:
             is stored or ``'X'`` to use :attr:`~anndata.AnnData.X`.
         covariate_data
             A :class:`~pandas.DataFrame` with columns defining the covariates as
-            in :meth:`cfp.model.CellFlow.prepare_data` and stored in 
+            in :meth:`cfp.model.CellFlow.prepare_data` and stored in
             :attr:`cfp.model.CellFlow.data_manager`.
         rep_dict
             Dictionary with representations of the covariates.
