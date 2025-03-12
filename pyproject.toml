@@ -3,13 +3,13 @@ build-backend = "hatchling.build"
 requires = [ "hatchling" ]
 
 [project]
-name = "cell-flow-perturbation"
-version = "0.0.1"
-description = "Modeling complex perturbations with flow matching and optimal transport"
+name = "cellflow"
+description = "Modeling complex perturbations with flow matching at single-cell resolution"
 readme = "README.md"
 license = { file = "LICENSE.md" }
 maintainers = [
   { name = "Dominik Klein" },
+  { name = "Selman Oezleyen" },
   { name = "Jonas Simon Fleck" },
   { name = "Daniil Bobrovskiy" },
   { name = "Guillaume Huguet" },
@@ -28,6 +28,7 @@ classifiers = [
   "Programming Language :: Python :: 3.12",
   "Programming Language :: Python :: 3.13",
 ]
+dynamic = [ "version" ]
 dependencies = [
   "adjusttext",
   "anndata",
