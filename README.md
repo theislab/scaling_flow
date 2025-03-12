@@ -3,12 +3,12 @@
 CellFlow - Modeling Complex Perturbations with Flow Matching
 =======================================================
 
-.. image:: docs/_static/img/light_mode_concept_revised.png
+.. image:: docs/_static/img/light_mode_cellflow.png
     :width: 800px
     :align: center
     :class: only-light
 
-.. image:: docs/_static/img/dark_mode_concept_revised.png
+.. image:: docs/_static/img/dark_mode_cellflow.png
     :width: 800px
     :align: center
     :class: only-dark
@@ -24,7 +24,7 @@ Example Applications
 - Modeling perturbed development of organisms
 - Cell fate engineering in the brain
 - Optimising organoid protocols
-- ... and more, check out the `documentation <https://moscot.readthedocs.io>`_ for more information.
+- ... and more, check out the `documentation <https://cellflow.readthedocs.io>`_ for more information.
 
 
 Installation
@@ -49,7 +49,7 @@ If you find a model useful for your research, please consider citing our preprin
     :target: https://codecov.io/gh/theislab/cellflow
     :alt: Coverage
 
-.. |PyPI| image:: https://img.shields.io/pypi/v/moscot.svg
+.. |PyPI| image:: https://img.shields.io/pypi/v/cellflow.svg
     :target: https://pypi.org/project/cellflow/
     :alt: PyPI
 
