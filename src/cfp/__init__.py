@@ -11,6 +11,7 @@ try:
     __maintainer__ = md.get("Maintainer-email", "")  # type: ignore[attr-defined]
 except ImportError:
     md = None
+    __version__ = "0.0.1"
     __author__ = "TODO"
 
 del metadata, md
