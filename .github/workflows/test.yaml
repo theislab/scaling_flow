@@ -60,12 +60,8 @@ jobs:
           tox -e py-${{ matrix.python }}
         env:
           PYTEST_ADDOPTS: -vv -n 2
-      - name: Upload coverage
-        uses: codecov/codecov-action@v3
+      - name: Upload coverage reports to Codecov
+        uses: codecov/codecov-action@v5
         with:
-          files: ./coverage.xml
-          flags: tests-${{ matrix.os }}-${{ matrix.python }}
-          name: unittests
-          env_vars: OS,PYTHON
-          fail_ci_if_error: false
-          verbose: true
+          token: ${{ secrets.CODECOV_TOKEN }}
+          slug: theislab/cell_flow_perturbation
