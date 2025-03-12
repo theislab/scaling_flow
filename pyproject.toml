@@ -7,7 +7,7 @@ name = "cellflow"
 version = "0.0.1"
 description = "Modeling complex perturbations with flow matching at single-cell resolution"
 readme = "README.md"
-license = "PolyForm Noncommercial License 1.0.0"
+license = { file = "LICENSE" }
 
 maintainers = [
   { name = "Dominik Klein" },
