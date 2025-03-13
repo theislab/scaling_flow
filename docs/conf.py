@@ -8,6 +8,7 @@
 import sys
 from datetime import datetime
 from pathlib import Path
+import importlib.metadata as ilm
 
 # If extensions (or modules to document with autodoc) are in another directory,
 # add these directories to sys.path here. If the directory is relative to the
@@ -20,7 +21,7 @@ sys.path.insert(0, str(Path(__file__).parent / "extensions"))
 
 project = cellflow.__name__
 author = "CellFlow team"
-version = cellflow.__version__
+version = ilm.version("cellflow")
 copyright = f"{datetime.now():%Y}, Theislab"
 
 # -- General configuration ---------------------------------------------------
