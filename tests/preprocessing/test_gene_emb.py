@@ -51,25 +51,21 @@ def adata_test_legacy():
     return adata
 
 
-def test_embedding(adata_with_ko):
-    adata = get_esm_embedding(adata_with_ko, gene_key="gene_target_", copy=True)
-    metadata = adata.uns["gene_embedding_metadata"]
-    assert Counter(metadata[metadata.is_protein_coding].gene_id.tolist()) == IS_PROT_CODING
-    gene_with_prot_seq = metadata[metadata.protein_sequence.notnull()].gene_id.tolist()
-    assert Counter(gene_with_prot_seq) == IS_PROT_CODING
+class TestGeneEmb:
+    def test_embedding(adata_with_ko):
+        adata = get_esm_embedding(adata_with_ko, gene_key="gene_target_", copy=True)
+        metadata = adata.uns["gene_embedding_metadata"]
+        assert Counter(metadata[metadata.is_protein_coding].gene_id.tolist()) == IS_PROT_CODING
+        gene_with_prot_seq = metadata[metadata.protein_sequence.notnull()].gene_id.tolist()
+        assert Counter(gene_with_prot_seq) == IS_PROT_CODING
 
-
-def test_legacy_emb(adata_test_legacy):
-    """Test if we can reproduce the original embeddings we used."""
-    adata = get_esm_embedding(adata_test_legacy, gene_key="gene", copy=True)
-    all_genes = adata.obs.gene.tolist()
-    for gene in all_genes:
-        emb = adata.uns["gene_embedding"][gene]
-        fname = f"{gene}_emb.pt"
-        legacy_emb = torch.load(os.path.join(ARTIFACTS_DIR, fname), map_location="cuda")
-        legacy_emb = legacy_emb["mean_representations"][36]
-        torch.allclose(emb, legacy_emb, atol=1e-2, rtol=1e-2)
-
-
-if __name__ == "__main__":
-    pytest.main([__file__])
+    def test_legacy_emb(adata_test_legacy):
+        """Test if we can reproduce the original embeddings we used."""
+        adata = get_esm_embedding(adata_test_legacy, gene_key="gene", copy=True)
+        all_genes = adata.obs.gene.tolist()
+        for gene in all_genes:
+            emb = adata.uns["gene_embedding"][gene]
+            fname = f"{gene}_emb.pt"
+            legacy_emb = torch.load(os.path.join(ARTIFACTS_DIR, fname))
+            legacy_emb = legacy_emb["mean_representations"][36]
+            assert torch.allclose(emb, legacy_emb, atol=1e-2, rtol=1e-2)
