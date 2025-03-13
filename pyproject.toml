@@ -1,12 +1,12 @@
 [build-system]
 build-backend = "hatchling.build"
-requires = [ "hatchling" ]
+requires = [ "hatch-vcs", "hatchling" ]
 
 [project]
 name = "cellflow"
 description = "Modeling complex perturbations with flow matching at single-cell resolution"
 readme = "README.md"
-license = "PolyForm Noncommercial License 1.0.0"
+license = "PolyForm-Noncommercial-1.0.0"
 maintainers = [
   { name = "Dominik Klein" },
   { name = "Selman Oezleyen" },
@@ -103,7 +103,7 @@ urls.Source = "https://github.com/theislab/cell_flow_perturbation"
 packages = [ 'src/cfp' ]
 
 [tool.hatch.version]
-source = "metadata"
+source = "vcs"
 fallback-version = "0.1.0"
 
 [tool.ruff]
