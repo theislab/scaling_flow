@@ -5,9 +5,9 @@ import pytest
 
 class TestPCA:
     def test_centered_pca(self, adata_pca: ad.AnnData):
-        import cfp
+        import cellflow
 
-        cfp.pp.centered_pca(adata_pca, n_comps=50, copy=False)
+        cellflow.pp.centered_pca(adata_pca, n_comps=50, copy=False)
         assert "X_pca" in adata_pca.obsm
         assert "PCs" in adata_pca.varm
         assert "X_mean" in adata_pca.varm
@@ -17,10 +17,10 @@ class TestPCA:
 
     @pytest.mark.parametrize("layers_key_added", ["X_recon", "X_rec"])
     def test_reconstruct_pca(self, adata_pca: ad.AnnData, layers_key_added):
-        import cfp
+        import cellflow
 
-        cfp.pp.centered_pca(adata_pca, n_comps=50, copy=False)
-        cfp.pp.reconstruct_pca(
+        cellflow.pp.centered_pca(adata_pca, n_comps=50, copy=False)
+        cellflow.pp.reconstruct_pca(
             adata_pca,
             ref_adata=adata_pca,
             use_rep="X_pca",
@@ -36,17 +36,19 @@ class TestPCA:
         )
 
     def test_reconstruct_pca_with_array_input(self, adata_pca: ad.AnnData):
-        import cfp
+        import cellflow
 
-        cfp.pp.centered_pca(adata_pca, n_comps=50, copy=False)
-        cfp.pp.reconstruct_pca(adata_pca, ref_means=adata_pca.varm["X_mean"], ref_pcs=adata_pca.varm["PCs"])
+        cellflow.pp.centered_pca(adata_pca, n_comps=50, copy=False)
+        cellflow.pp.reconstruct_pca(adata_pca, ref_means=adata_pca.varm["X_mean"], ref_pcs=adata_pca.varm["PCs"])
         assert "X_recon" in adata_pca.layers
 
     @pytest.mark.parametrize("obsm_key_added", ["X_pca", "X_pca_projected"])
     def test_project_pca(self, adata_pca: ad.AnnData, obsm_key_added):
-        import cfp
+        import cellflow
 
-        cfp.pp.centered_pca(adata_pca, n_comps=50, copy=False)
-        adata_pca_project = cfp.pp.project_pca(adata_pca, ref_adata=adata_pca, obsm_key_added=obsm_key_added, copy=True)
+        cellflow.pp.centered_pca(adata_pca, n_comps=50, copy=False)
+        adata_pca_project = cellflow.pp.project_pca(
+            adata_pca, ref_adata=adata_pca, obsm_key_added=obsm_key_added, copy=True
+        )
         assert obsm_key_added in adata_pca_project.obsm
         assert np.allclose(adata_pca_project.obsm[obsm_key_added], adata_pca.obsm["X_pca"])

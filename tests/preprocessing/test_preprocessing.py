@@ -13,9 +13,9 @@ class TestPreprocessing:
         ],
     )
     def test_annotate_compounds(self, adata_with_compounds: ad.AnnData, compound_key_and_type):
-        import cfp
+        import cellflow
 
-        cfp.pp.annotate_compounds(
+        cellflow.pp.annotate_compounds(
             adata_with_compounds,
             compound_keys=compound_key_and_type[0],
             query_id_type=compound_key_and_type[1],
@@ -39,11 +39,11 @@ class TestPreprocessing:
         ],
     )
     def test_get_molecular_fingerprints(self, adata_with_compounds: ad.AnnData, n_bits, compound_and_smiles_keys):
-        import cfp
+        import cellflow
 
         uns_key_added = "compound_fingerprints"
 
-        cfp.pp.get_molecular_fingerprints(
+        cellflow.pp.get_molecular_fingerprints(
             adata_with_compounds,
             compound_keys=compound_and_smiles_keys[0],
             smiles_keys=compound_and_smiles_keys[1],
@@ -61,9 +61,9 @@ class TestPreprocessing:
     @pytest.mark.parametrize("uns_key_added", ["compounds", "compounds_onehot"])
     @pytest.mark.parametrize("exclude_values", [None, "GW0742"])
     def test_encode_onehot(self, adata_with_compounds: ad.AnnData, uns_key_added, exclude_values):
-        import cfp
+        import cellflow
 
-        cfp.pp.encode_onehot(
+        cellflow.pp.encode_onehot(
             adata_with_compounds,
             covariate_keys="compound_name",
             uns_key_added=uns_key_added,

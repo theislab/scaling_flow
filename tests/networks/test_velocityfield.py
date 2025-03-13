@@ -3,7 +3,7 @@ import jax.numpy as jnp
 import optax
 import pytest
 
-import cfp
+import cellflow
 
 x_test = jnp.ones((10, 5)) * 10
 t_test = jnp.ones((10, 1))
@@ -22,7 +22,7 @@ class TestVelocityField:
         layer_norm_before_concatenation,
         linear_projection_before_concatenation,
     ):
-        vf = cfp.networks.ConditionalVelocityField(
+        vf = cellflow.networks.ConditionalVelocityField(
             output_dim=5,
             max_combination_length=2,
             condition_embedding_dim=12,

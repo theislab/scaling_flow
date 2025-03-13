@@ -1,15 +1,15 @@
 Installation
 ============
-:mod:`cfp` requires Python version >= 3.10 to run.
+:mod:`cellflow` requires Python version >= 3.10 to run.
 
 PyPI
 ----
-Install :mod:`cfp` by running::
+Install :mod:`cellflow` by running::
 
-    pip install cfp
+    pip install cellflow
 
 Development version
 -------------------
-To install :mod:`cfp` from `GitHub <https://github.com/theislab/cell_flow_perturbation>`_, run::
+To install :mod:`cellflow` from `GitHub <https://github.com/theislab/cell_flow_perturbation>`_, run::
 
     pip install git+https://github.com/theislab/cell_flow_perturbation.git@main

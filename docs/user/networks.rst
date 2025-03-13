@@ -1,7 +1,7 @@
 Networks
 ~~~~~~~~
-.. module:: cfp.networks
-.. currentmodule:: cfp
+.. module:: cellflow.networks
+.. currentmodule:: cellflow
 .. autosummary::
     :toctree: genapi
 

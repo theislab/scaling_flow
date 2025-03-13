@@ -1,7 +1,7 @@
 External
 ~~~~~~~~
-.. module:: cfp.external
-.. currentmodule:: cfp
+.. module:: cellflow.external
+.. currentmodule:: cellflow
 .. autosummary::
     :toctree: genapi
 

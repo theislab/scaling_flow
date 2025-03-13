@@ -1,10 +1,10 @@
 import pytest
 
-import cfp
+import cellflow
 
 
 def test_package_has_version():
-    assert cfp.__version__ is not None
+    assert cellflow.__version__ is not None
 
 
 @pytest.mark.skip(reason="This decorator should be removed when test passes.")

@@ -1,7 +1,7 @@
 Model
 ~~~~~
-.. module:: cfp.model
-.. currentmodule:: cfp
+.. module:: cellflow.model
+.. currentmodule:: cellflow
 .. autosummary::
     :toctree: genapi
 

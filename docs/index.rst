@@ -1,9 +1,9 @@
 
 CellFlow perturbation
 =====================
-.. module:: cfp
+.. module:: cellflow
 
-:mod:`cfp` is a framework for modeling perturbations in single cell genomics.
+:mod:`cellflow` is a framework for modeling perturbations in single cell genomics.
 
 
 .. grid:: 3
@@ -13,13 +13,13 @@ CellFlow perturbation
         :link: installation
         :link-type: doc
 
-        Learn how to install :mod:`cfp`.
+        Learn how to install :mod:`cellflow`.
 
     .. grid-item-card:: User API
         :link: user/index
         :link-type: doc
 
-        Find a detailed documentation of :mod:`cfp`.
+        Find a detailed documentation of :mod:`cellflow`.
 
 
     .. grid-item-card:: Manuscript

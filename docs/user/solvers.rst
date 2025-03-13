@@ -1,8 +1,8 @@
 Solvers
 ~~~~~~~
 
-.. module:: cfp.solvers
-.. currentmodule:: cfp
+.. module:: cellflow.solvers
+.. currentmodule:: cellflow
 .. autosummary::
     :toctree: genapi
 

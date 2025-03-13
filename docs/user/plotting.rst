@@ -1,7 +1,7 @@
 Plotting
 ~~~~~~~~
-.. module:: cfp.plotting
-.. currentmodule:: cfp
+.. module:: cellflow.plotting
+.. currentmodule:: cellflow
 .. autosummary::
     :toctree: genapi
 

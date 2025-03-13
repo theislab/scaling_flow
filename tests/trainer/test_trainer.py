@@ -4,9 +4,9 @@ import optax
 import pytest
 from ott.neural.methods.flows import dynamics
 
-import cfp
-from cfp.solvers import _otfm
-from cfp.utils import match_linear
+import cellflow
+from cellflow.solvers import _otfm
+from cellflow.utils import match_linear
 
 x_test = jnp.ones((10, 5)) * 10
 t_test = jnp.ones((10, 1))
@@ -18,7 +18,7 @@ class TestTrainer:
     @pytest.mark.parametrize("valid_freq", [10, 1])
     def test_cellflow_trainer(self, dataloader, valid_freq):
         opt = optax.adam(1e-3)
-        vf = cfp.networks.ConditionalVelocityField(
+        vf = cellflow.networks.ConditionalVelocityField(
             output_dim=5,
             max_combination_length=2,
             condition_embedding_dim=12,
@@ -34,7 +34,7 @@ class TestTrainer:
             rng=vf_rng,
         )
 
-        trainer = cfp.training.CellFlowTrainer(solver=model)
+        trainer = cellflow.training.CellFlowTrainer(solver=model)
         trainer.train(
             dataloader=dataloader,
             num_iterations=2,
@@ -49,7 +49,7 @@ class TestTrainer:
     @pytest.mark.parametrize("use_validdata", [True, False])
     def test_cellflow_trainer_with_callback(self, dataloader, valid_loader, use_validdata):
         opt = optax.adam(1e-3)
-        vf = cfp.networks.ConditionalVelocityField(
+        vf = cellflow.networks.ConditionalVelocityField(
             output_dim=5,
             max_combination_length=2,
             condition_embedding_dim=12,
@@ -66,9 +66,9 @@ class TestTrainer:
         )
 
         metric_to_compute = "e_distance"
-        metrics_callback = cfp.training.Metrics(metrics=[metric_to_compute])
+        metrics_callback = cellflow.training.Metrics(metrics=[metric_to_compute])
 
-        trainer = cfp.training.CellFlowTrainer(solver=model)
+        trainer = cellflow.training.CellFlowTrainer(solver=model)
         trainer.train(
             dataloader=dataloader,
             valid_loaders=valid_loader if use_validdata else None,

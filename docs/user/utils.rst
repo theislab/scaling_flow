@@ -1,7 +1,7 @@
 Utils
 ~~~~~
-.. module:: cfp.utils
-.. currentmodule:: cfp
+.. module:: cellflow.utils
+.. currentmodule:: cellflow
 .. autosummary::
     :toctree: genapi
 

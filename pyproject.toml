@@ -100,7 +100,7 @@ urls.Home-page = "https://github.com/theislab/cell_flow_perturbation"
 urls.Source = "https://github.com/theislab/cell_flow_perturbation"
 
 [tool.hatch.build.targets.wheel]
-packages = [ 'src/cfp' ]
+packages = [ 'src/cellflow' ]
 
 [tool.hatch.version]
 source = "vcs"
