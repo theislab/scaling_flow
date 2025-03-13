@@ -4,10 +4,9 @@ requires = [ "hatchling" ]
 
 [project]
 name = "cellflow"
-version = "0.0.1"
 description = "Modeling complex perturbations with flow matching at single-cell resolution"
 readme = "README.md"
-license = { file = "LICENSE" }
+license = "PolyForm Noncommercial License 1.0.0"
 maintainers = [
   { name = "Dominik Klein" },
   { name = "Selman Oezleyen" },
@@ -30,6 +29,7 @@ classifiers = [
   "Programming Language :: Python :: 3.13",
 ]
 
+dynamic = [ "version" ]
 dependencies = [
   "adjusttext",
   "anndata",
