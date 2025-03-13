@@ -19,7 +19,7 @@ sys.path.insert(0, str(Path(__file__).parent / "extensions"))
 # -- Project information -----------------------------------------------------
 
 project = cellflow.__name__
-author = cellflow.__author__
+author = "CellFlow team"
 version = cellflow.__version__
 copyright = f"{datetime.now():%Y}, Theislab"
 
