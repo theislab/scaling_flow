@@ -1,7 +1,7 @@
 User API
 ########
 
-.. module:: cfp.user
+.. module:: cellflow.user
 
 .. toctree::
     :maxdepth: 2

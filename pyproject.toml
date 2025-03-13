@@ -1,15 +1,15 @@
 [build-system]
 build-backend = "hatchling.build"
-requires = [ "hatchling" ]
+requires = [ "hatch-vcs", "hatchling" ]
 
 [project]
-name = "cell-flow-perturbation"
-version = "0.0.1"
-description = "Modeling complex perturbations with flow matching and optimal transport"
+name = "cellflow"
+description = "Modeling complex perturbations with flow matching at single-cell resolution"
 readme = "README.md"
-license = { file = "LICENSE.md" }
+license = "PolyForm-Noncommercial-1.0.0"
 maintainers = [
   { name = "Dominik Klein" },
+  { name = "Selman Oezleyen" },
   { name = "Jonas Simon Fleck" },
   { name = "Daniil Bobrovskiy" },
   { name = "Guillaume Huguet" },
@@ -28,6 +28,8 @@ classifiers = [
   "Programming Language :: Python :: 3.12",
   "Programming Language :: Python :: 3.13",
 ]
+
+dynamic = [ "version" ]
 dependencies = [
   "adjusttext",
   "anndata",
@@ -53,7 +55,6 @@ optional-dependencies.dev = [
   "sphinx-tippy",
   "sphinxcontrib-bibtex",
   "tox>=4",
-  "twine>=4.0.2",
 ]
 optional-dependencies.docs = [
   "docutils>=0.8,!=0.18.*,!=0.19.*",
@@ -92,12 +93,17 @@ optional-dependencies.test = [
   "pytest-xdist>=3",
   "scvi-tools",
 ]
+
 urls.Documentation = "https://cellflow.readthedocs.io/"
 urls.Home-page = "https://github.com/theislab/cell_flow_perturbation"
 urls.Source = "https://github.com/theislab/cell_flow_perturbation"
 
 [tool.hatch.build.targets.wheel]
-packages = [ 'src/cfp' ]
+packages = [ 'src/cellflow' ]
+
+[tool.hatch.version]
+source = "vcs"
+fallback-version = "0.1.0"
 
 [tool.ruff]
 line-length = 120

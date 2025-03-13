@@ -1,7 +1,7 @@
 Model
 ~~~~~
-.. module:: cfp.datasets
-.. currentmodule:: cfp
+.. module:: cellflow.datasets
+.. currentmodule:: cellflow
 .. autosummary::
     :toctree: genapi
 

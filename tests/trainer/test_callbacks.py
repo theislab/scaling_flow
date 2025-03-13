@@ -7,7 +7,7 @@ import pytest
 class TestCallbacks:
     @pytest.mark.parametrize("metrics", [["r_squared"]])
     def test_pca_reconstruction(self, adata_pca: ad.AnnData, metrics):
-        from cfp.training import PCADecodedMetrics
+        from cellflow.training import PCADecodedMetrics
 
         decoded_metrics_callback = PCADecodedMetrics(
             metrics=metrics,
@@ -22,8 +22,8 @@ class TestCallbacks:
     def test_vae_reconstruction(self, metrics):
         from scvi.data import synthetic_iid
 
-        from cfp.external import CFJaxSCVI
-        from cfp.training import VAEDecodedMetrics
+        from cellflow.external import CFJaxSCVI
+        from cellflow.training import VAEDecodedMetrics
 
         adata = synthetic_iid()
         CFJaxSCVI.setup_anndata(

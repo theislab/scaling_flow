@@ -3,7 +3,7 @@ import jax.numpy as jnp
 import optax
 import pytest
 
-import cfp
+import cellflow
 
 cond = {
     "pert1": jnp.ones((1, 3, 3)),
@@ -50,7 +50,7 @@ class TestConditionEncoder:
     @pytest.mark.parametrize("layers_before_pool", layers_before_pool)
     @pytest.mark.parametrize("layers_after_pool", layers_after_pool)
     def test_condition_encoder_init(self, pooling, covariates_not_pooled, layers_before_pool, layers_after_pool):
-        cond_encoder = cfp.networks.ConditionEncoder(
+        cond_encoder = cellflow.networks.ConditionEncoder(
             output_dim=5,
             pooling=pooling,
             covariates_not_pooled=covariates_not_pooled,

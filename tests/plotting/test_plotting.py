@@ -1,7 +1,7 @@
 import matplotlib.pyplot as plt
 import pytest
 
-from cfp.plotting import plot_condition_embedding
+from cellflow.plotting import plot_condition_embedding
 
 
 class TestCallbacks:

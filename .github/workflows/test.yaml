@@ -39,7 +39,7 @@ jobs:
       PYTHON: ${{ matrix.python }}
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Set up Python ${{ matrix.python }}
         uses: actions/setup-python@v4
         with:
@@ -60,6 +60,7 @@ jobs:
           tox -e py-${{ matrix.python }}
         env:
           PYTEST_ADDOPTS: -vv -n 2
+
       - name: Upload coverage reports to Codecov
         uses: codecov/codecov-action@v5
         with:

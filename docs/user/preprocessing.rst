@@ -1,7 +1,7 @@
 Preprocessing
 ~~~~~~~~~~~~~
-.. module:: cfp.preprocessing
-.. currentmodule:: cfp
+.. module:: cellflow.preprocessing
+.. currentmodule:: cellflow
 .. autosummary::
     :toctree: genapi
 

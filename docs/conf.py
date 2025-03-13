@@ -8,19 +8,20 @@
 import sys
 from datetime import datetime
 from pathlib import Path
+import importlib.metadata as ilm
 
 # If extensions (or modules to document with autodoc) are in another directory,
 # add these directories to sys.path here. If the directory is relative to the
 # documentation root, use os.path.abspath to make it absolute, like shown here.
-import cfp
+import cellflow
 
 sys.path.insert(0, str(Path(__file__).parent / "extensions"))
 
 # -- Project information -----------------------------------------------------
 
-project = cfp.__name__
-author = cfp.__author__
-version = cfp.__version__
+project = cellflow.__name__
+author = "CellFlow team"
+version = ilm.version("cellflow")
 copyright = f"{datetime.now():%Y}, Theislab"
 
 # -- General configuration ---------------------------------------------------
@@ -66,9 +67,9 @@ nitpick_ignore = [
 ]
 # TODO(michalk8): remove once typing has been cleaned-up
 nitpick_ignore_regex = [
-    (r"py:class", r"cfp\..*(K|B|O)"),
-    (r"py:class", r"cfp\._typing.*"),
-    (r"py:class", r"cfp\..*Protocol.*"),
+    (r"py:class", r"cellflow\..*(K|B|O)"),
+    (r"py:class", r"cellflow\._typing.*"),
+    (r"py:class", r"cellflow\..*Protocol.*"),
 ]
 
 

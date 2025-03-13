@@ -1,15 +1,22 @@
 Installation
 ============
-:mod:`cfp` requires Python version >= 3.10 to run.
+:mod:`cellflow` requires Python version >= 3.10 to run.
 
 PyPI
 ----
-Install :mod:`cfp` by running::
+Install :mod:`cellflow` by running::
 
-    pip install cfp
+    pip install cellflow-tools
+
+Installing `rapids-singlecell` and `cuml`:
+
+While it's not necessary to install :mod:`cellflow` with `rapids-singlecell` and `cuml`, 
+it is recommended to do so for faster preprocessing or downstream functions. 
+To install :mod:`cellflow` with `rapids-singlecell` and `cuml`, please refer to 
+`instructions how to install rapids <https://rapids-singlecell.readthedocs.io/en/latest/Installation.html>`_.
 
 Development version
 -------------------
-To install :mod:`cfp` from `GitHub <https://github.com/theislab/cell_flow_perturbation>`_, run::
+To install :mod:`cellflow` from `GitHub <https://github.com/theislab/CellFlow>`_, run::
 
-    pip install git+https://github.com/theislab/cell_flow_perturbation.git@main
+    pip install git+https://github.com/theislab/CellFlow.git@main

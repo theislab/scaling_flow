@@ -1,7 +1,7 @@
 Training
 ~~~~~~~~
-.. module:: cfp.training
-.. currentmodule:: cfp
+.. module:: cellflow.training
+.. currentmodule:: cellflow
 .. autosummary::
     :toctree: genapi
 

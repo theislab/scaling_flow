@@ -2,7 +2,7 @@ import jax
 import pandas as pd
 import pytest
 
-import cfp
+import cellflow
 
 perturbation_covariate_comb_args = [
     {"drug": ["drug1"]},
@@ -27,7 +27,7 @@ class TestCellFlow:
         perturbation_covariate_reps = {"drug": "drug"}
         condition_embedding_dim = 32
 
-        cf = cfp.model.CellFlow(adata_perturbation, solver=solver)
+        cf = cellflow.model.CellFlow(adata_perturbation, solver=solver)
         cf.prepare_data(
             sample_rep=sample_rep,
             control_key=control_key,
@@ -111,7 +111,7 @@ class TestCellFlow:
         perturbation_covariate_reps = {"drug": "drug"}
         condition_embedding_dim = 32
 
-        cf = cfp.model.CellFlow(adata_perturbation, solver=solver)
+        cf = cellflow.model.CellFlow(adata_perturbation, solver=solver)
         cf.prepare_data(
             sample_rep=sample_rep,
             control_key=control_key,
@@ -171,7 +171,7 @@ class TestCellFlow:
         n_conditions_on_log_iteration,
         n_conditions_on_train_end,
     ):
-        cf = cfp.model.CellFlow(adata_perturbation, solver=solver)
+        cf = cellflow.model.CellFlow(adata_perturbation, solver=solver)
         cf.prepare_data(
             sample_rep="X",
             control_key="control",
@@ -218,7 +218,7 @@ class TestCellFlow:
         n_conditions_on_train_end,
     ):
         # TODO(@MUCDK) after PR #33 check for larger n_conditions_on...
-        cf = cfp.model.CellFlow(adata_perturbation, solver=solver)
+        cf = cellflow.model.CellFlow(adata_perturbation, solver=solver)
         cf.prepare_data(
             sample_rep="X",
             control_key="control",
@@ -258,7 +258,7 @@ class TestCellFlow:
         assert cf._trainer is not None
 
         metric_to_compute = "r_squared"
-        metrics_callback = cfp.training.Metrics(metrics=[metric_to_compute])
+        metrics_callback = cellflow.training.Metrics(metrics=[metric_to_compute])
 
         cf.train(num_iterations=3, callbacks=[metrics_callback], valid_freq=1)
         assert cf._dataloader is not None
@@ -270,7 +270,7 @@ class TestCellFlow:
         adata_perturbation,
         solver,
     ):
-        cf = cfp.model.CellFlow(adata_perturbation, solver=solver)
+        cf = cellflow.model.CellFlow(adata_perturbation, solver=solver)
         cf.prepare_data(
             sample_rep="X",
             control_key="control",
@@ -320,7 +320,7 @@ class TestCellFlow:
             cf.predict(adata_pred_cell_type_2, sample_rep="X", covariate_data=cov_data_ct_1)
 
     def test_raise_otfm_genot_layers_passed(self, adata_perturbation):
-        cf = cfp.model.CellFlow(adata_perturbation, solver="otfm")
+        cf = cellflow.model.CellFlow(adata_perturbation, solver="otfm")
         cf.prepare_data(
             sample_rep="X",
             control_key="control",
@@ -359,7 +359,7 @@ class TestCellFlow:
         condition_embedding_dim = 32
         solver = "otfm"
 
-        cf = cfp.model.CellFlow(adata_perturbation, solver=solver)
+        cf = cellflow.model.CellFlow(adata_perturbation, solver=solver)
         cf.prepare_data(
             sample_rep=sample_rep,
             control_key=control_key,
