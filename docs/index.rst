@@ -36,3 +36,4 @@ CellFlow perturbation
     contributing
     references
     notebooks/index
+    datasets
