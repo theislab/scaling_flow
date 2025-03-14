@@ -6,10 +6,8 @@ from typing import TYPE_CHECKING
 
 import jax.numpy as jnp
 import numpy as np
-from scvi.model import JaxSCVI
 
 from cellflow._types import ArrayLike
-from cellflow.external._scvi_utils import CFJaxVAE
 
 if TYPE_CHECKING:
     from typing import Literal
@@ -20,8 +18,15 @@ logger = logging.getLogger(__name__)
 
 __all__ = ["CFJaxSCVI"]
 
+try:
+    from scvi.model import JaxSCVI
+except ImportError:
+    JaxSCVI = object
+
 
 class CFJaxSCVI(JaxSCVI):
+    from cellflow.external._scvi_utils import CFJaxVAE
+
     _module_cls = CFJaxVAE
 
     def __init__(
@@ -33,7 +38,10 @@ class CFJaxSCVI(JaxSCVI):
         gene_likelihood: Literal["nb", "poisson", "normal"] = "normal",
         **model_kwargs,
     ):
-        super().__init__(adata)
+        if JaxSCVI is not object:
+            super().__init__(adata)
+        else:
+            pass
 
         n_batch = self.summary_stats.n_batch
 
