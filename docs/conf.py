@@ -21,7 +21,7 @@ sys.path.insert(0, str(Path(__file__).parent / "extensions"))
 
 project = cellflow.__name__
 author = "CellFlow team"
-version = ilm.version("cellflow")
+version = ilm.version("cellflow-tools")
 copyright = f"{datetime.now():%Y}, Theislab"
 
 # -- General configuration ---------------------------------------------------
@@ -163,7 +163,7 @@ html_theme_options = {
     "footer_icons": [
         {
             "name": "GitHub",
-            "url": "https://github.com/theislab/cell_flow_perturbation",
+            "url": "https://github.com/theislab/cellflow",
             "html": "",
             "class": "fab fa-github",
         },

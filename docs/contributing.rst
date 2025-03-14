@@ -20,7 +20,7 @@ install them using pip:
 
 .. code-block:: bash
 
-    cd cell_flow_perturbation
+    cd cellflow
     pip install -e ".[dev,test,doc]"
 
 Code Style

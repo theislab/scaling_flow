@@ -95,8 +95,8 @@ optional-dependencies.test = [
 ]
 
 urls.Documentation = "https://cellflow.readthedocs.io/"
-urls.Home-page = "https://github.com/theislab/cell_flow_perturbation"
-urls.Source = "https://github.com/theislab/cell_flow_perturbation"
+urls.Home-page = "https://github.com/theislab/cellflow"
+urls.Source = "https://github.com/theislab/cellflow"
 
 [tool.hatch.build.targets.wheel]
 packages = [ 'src/cellflow' ]
@@ -165,8 +165,9 @@ addopts = [
 
 [tool.coverage.run]
 branch = true
-parallel = false
 source = [ "src/" ]
+concurrency = [ "multiprocessing" ]
+parallel = "true"
 
 [tool.coverage.report]
 exclude_lines = [
@@ -192,8 +193,8 @@ skip_missing_interpreters = true
 extras = test,pp,external,embedding
 pass_env = PYTEST_*,CI
 commands =
-    python -m pytest {tty:--color=yes} {posargs: \
-        --cov={env_site_packages_dir}{/}cell_flow_perturbation --cov-config={tox_root}{/}pyproject.toml \
+    coverage run -m pytest {tty:--color=yes} {posargs: \
+        --cov={env_site_packages_dir}{/}cellflow --cov-config={tox_root}{/}pyproject.toml \
         --no-cov-on-fail --cov-report=xml --cov-report=term-missing:skip-covered}
 
 [testenv:lint-code]
@@ -228,7 +229,7 @@ deps =
     leidenalg
 changedir = {tox_root}{/}docs
 commands =
-    python -m ipykernel install --user --name=cell_flow_perturbation
+    python -m ipykernel install --user --name=cellflow
     bash {tox_root}/.run_notebooks.sh {tox_root}{/}docs/notebooks
 
 [testenv:clean-docs]

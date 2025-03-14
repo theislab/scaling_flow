@@ -19,7 +19,7 @@ def set_plotting_vars(
     value: Any,
     override: bool = True,
 ) -> None:
-    uns_key = _constants.cellflow_KEY
+    uns_key = _constants.CELLFLOW_KEY
     adata.uns.setdefault(uns_key, {})
     if not override and key in adata.uns[uns_key]:
         raise KeyError(f"Data in `adata.uns[{uns_key!r}][{key!r}]` already exists, use `override=True`.")
