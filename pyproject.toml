@@ -165,8 +165,9 @@ addopts = [
 
 [tool.coverage.run]
 branch = true
-parallel = false
 source = [ "src/" ]
+concurrency = [ "multiprocessing" ]
+parallel = "true"
 
 [tool.coverage.report]
 exclude_lines = [
