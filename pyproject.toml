@@ -86,12 +86,14 @@ optional-dependencies.pp = [
   "rdkit",
 ]
 optional-dependencies.test = [
+  "cellflow-tools[embedding]",
+  "cellflow-tools[external]",
+  "cellflow-tools[pp]",
   "coverage[toml]>=7",
   "pytest",
   "pytest-cov>=6",
   "pytest-mock>=3.5",
   "pytest-xdist>=3",
-  "scvi-tools",
 ]
 
 urls.Documentation = "https://cellflow.readthedocs.io/"

@@ -83,7 +83,7 @@ class OTFlowMatching:
                     conditions,
                     rngs={"dropout": rng_dropout},
                 )
-                u_t = self.flow.compute_ut(t, source, target)
+                u_t = self.flow.compute_ut(t, x_t, source, target)
 
                 return jnp.mean((v_t - u_t) ** 2)
 
