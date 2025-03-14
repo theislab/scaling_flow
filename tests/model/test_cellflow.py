@@ -60,6 +60,8 @@ class TestCellFlow:
             adata_perturbation_pred,
             sample_rep=sample_rep,
             covariate_data=adata_perturbation_pred.obs,
+            max_steps=3,
+            throw=False,
         )
         assert isinstance(pred, dict)
         key, out = next(iter(pred.items()))
@@ -71,6 +73,8 @@ class TestCellFlow:
             sample_rep=sample_rep,
             covariate_data=adata_perturbation_pred.obs,
             key_added_prefix="MY_PREDICTION_",
+            max_steps=3,
+            throw=False,
         )
 
         assert pred_stored is None
@@ -84,6 +88,8 @@ class TestCellFlow:
                 sample_rep=sample_rep,
                 covariate_data=adata_perturbation_pred.obs,
                 n_samples=2,
+                max_steps=3,
+                throw=False,
             )
             assert isinstance(pred2, dict)
             out = next(iter(pred2.values()))
@@ -144,6 +150,8 @@ class TestCellFlow:
             adata_perturbation_pred,
             sample_rep=sample_rep,
             covariate_data=adata_perturbation_pred.obs,
+            max_steps=3,
+            throw=False,
         )
         assert isinstance(pred, dict)
         out = next(iter(pred.values()))
@@ -297,7 +305,7 @@ class TestCellFlow:
         adata_pred.obs["control"] = True
         covariate_data = adata_perturbation.obs.iloc[:3]
 
-        pred = cf.predict(adata_pred, sample_rep="X", covariate_data=covariate_data)
+        pred = cf.predict(adata_pred, sample_rep="X", covariate_data=covariate_data, max_steps=3, throw=False)
 
         assert isinstance(pred, dict)
         out = next(iter(pred.values()))
@@ -308,7 +316,7 @@ class TestCellFlow:
             ValueError,
             match=r".*If both `adata` and `covariate_data` are given, all samples in `adata` must be control samples*",
         ):
-            cf.predict(adata_pred, sample_rep="X", covariate_data=covariate_data)
+            cf.predict(adata_pred, sample_rep="X", covariate_data=covariate_data, max_steps=3, throw=False)
 
         with pytest.raises(
             ValueError,
@@ -317,7 +325,7 @@ class TestCellFlow:
             cov_data_ct_1 = covariate_data[covariate_data["cell_type"] == "cell_line_a"]
             adata_pred_cell_type_2 = adata_pred[adata_pred.obs["cell_type"] == "cell_line_b"]
             adata_pred_cell_type_2.obs["control"] = True
-            cf.predict(adata_pred_cell_type_2, sample_rep="X", covariate_data=cov_data_ct_1)
+            cf.predict(adata_pred_cell_type_2, sample_rep="X", covariate_data=cov_data_ct_1, max_steps=3, throw=False)
 
     def test_raise_otfm_genot_layers_passed(self, adata_perturbation):
         cf = cellflow.model.CellFlow(adata_perturbation, solver="otfm")
