@@ -1,7 +1,7 @@
-[![PyPI](https://img.shields.io/pypi/v/cellflow.svg)](https://pypi.org/project/cellflow/)
-[![Downloads](https://static.pepy.tech/badge/cell_flow_perturbation)](https://pepy.tech/project/cell_flow_perturbation)
-[![CI](https://img.shields.io/github/actions/workflow/status/theislab/cell_flow_perturbation/test.yml?branch=main)](https://github.com/theislab/cell_flow_perturbation/actions)
-[![Pre-commit](https://results.pre-commit.ci/badge/github/theislab/cell_flow_perturbation/main.svg)](https://results.pre-commit.ci/latest/github/theislab/cell_flow_perturbation/main)
+[![PyPI](https://img.shields.io/pypi/v/cellflow-tools.svg)](https://pypi.org/project/cellflow-tools/)
+[![Downloads](https://static.pepy.tech/badge/cellflow-tools)](https://pepy.tech/project/cellflow-tools)
+[![CI](https://img.shields.io/github/actions/workflow/status/theislab/cellflow/test.yml?branch=main)](https://github.com/theislab/cellflow/actions)
+[![Pre-commit](https://results.pre-commit.ci/badge/github/theislab/cellflow/main.svg)](https://results.pre-commit.ci/latest/github/theislab/cellflow/main)
 [![Codecov](https://codecov.io/gh/theislab/cell_flow_perturbation/branch/master/graph/badge.svg?token=Rgtm5Tsblo)](https://codecov.io/gh/theislab/cell_flow_perturbation)
 [![Docs](https://img.shields.io/readthedocs/cellflow)](https://cellflow.readthedocs.io/en/latest/)
 
@@ -12,10 +12,7 @@ CellFlow - Modeling Complex Perturbations with Flow Matching
 
 **CellFlow** is a framework for predicting phenotypic responses of complex perturbations at the single-cell level.
 
-.. image:: docs/_static/images/cellflow_light.png
-    :width: 800px
-    :align: center
-    :class: only-light
+![CellFlow](docs/_static/images/cellflow_light.png)
 
 
 ## Example Applications
