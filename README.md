@@ -29,13 +29,13 @@ Installation
 ------------
 Install **CellFlow** by running::
 
-    pip install cellflow
+    pip install cellflow-tools
 
 
 In order to install **CellFlow** in editable mode, run::
 
-    git clone https://github.com/theislab/cell_flow_perturbation
-    cd cfp
+    git clone https://github.com/theislab/cellflow
+    cd cellflow
     pip install -e .
 
 For further instructions how to install jax, please refer to https://github.com/google/jax.
