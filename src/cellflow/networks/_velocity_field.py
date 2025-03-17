@@ -159,52 +159,34 @@ class ConditionalVelocityField(nn.Module):
         self,
         t: jnp.ndarray,
         x: jnp.ndarray,
-        cond: dict[str, jnp.ndarray],
+        cond: dict[str, jnp.ndarray] | None = None,
+        cond_embedding: jnp.ndarray | None = None,
         train: bool = True,
-    ) -> jnp.ndarray:
-        """Forward pass through the neural vector field.
-
-        Parameters
-        ----------
-            t
-                Time of shape ``[batch, 1]``.
-            x
-                Data of shape ``[batch, ...]``.
-            condition
-                Condition dictionary, with condition names as keys and condition representations
-                of shape ``[batch, max_combination_length, condition_dim]`` as values.
-            train
-                If :obj:`True`, enables dropout for training.
-
-        Returns
-        -------
-            Output of the neural vector field of shape ``[batch, output_dim]``.
-        """
-        squeeze = x.ndim == 1
-        if self.encode_conditions:
+    ):
+        if cond_embedding is None:
+            if cond is None:
+                raise ValueError("Either cond or cond_embedding must be provided.")
             cond_mean, cond_logvar = self.condition_encoder(cond, training=train)
+            if self.condition_mode == "deterministic":
+                cond_embedding = cond_mean
+            else:
+                cond_embedding = cond_mean + jax.random.normal(
+                    self.make_rng("condition_encoder"), cond_mean.shape
+                ) * jnp.exp(0.5 * cond_logvar)
         else:
-            cond_mean = jnp.concatenate(list(cond.values()), axis=-1)
-            cond_logvar = jnp.zeros_like(cond)
-        if self.condition_encoder.condition_mode == "deterministic":
-            cond = cond_mean
-        else:
-            cond = cond_mean + jax.random.normal(self.make_rng("condition_encoder"), cond_mean.shape) * jnp.exp(
-                0.5 * cond_logvar
-            )
-        t = time_encoder.cyclical_time_encoder(t, n_freqs=self.time_freqs)
-        t = self.time_encoder(t, training=train)
-        x = self.x_encoder(x, training=train)
-        if squeeze:
-            cond = jnp.squeeze(cond)  # , 0)
-        elif cond.shape[0] != x.shape[0]:  # type: ignore[attr-defined]
-            cond = jnp.tile(cond, (x.shape[0], 1))
+            cond_mean, cond_logvar = None, None
 
-        t = self.layer_norm_time(t)
-        x = self.layer_norm_x(x)
-        cond = self.layer_norm_condition(cond)
+        t_encoded = time_encoder.cyclical_time_encoder(t, n_freqs=self.time_freqs)
+        t_encoded = self.time_encoder(t_encoded, training=train)
+        x_encoded = self.x_encoder(x, training=train)
 
-        concatenated = jnp.concatenate((t, x, cond), axis=-1)
+        t_encoded = self.layer_norm_time(t_encoded)
+        x_encoded = self.layer_norm_x(x_encoded)
+        cond_embedding = self.layer_norm_condition(cond_embedding)
+
+        concatenated = jnp.concatenate(
+            (t_encoded, x_encoded, jnp.tile(cond_embedding, (x_encoded.shape[0], 1))), axis=-1
+        )
         out = self.decoder(concatenated, training=train)
         return self.output_layer(out), cond_mean, cond_logvar
 
@@ -218,14 +200,16 @@ class ConditionalVelocityField(nn.Module):
 
         Returns
         -------
-            Embedding of the condition.
+            Learnt mean and log-variance of the condition embedding.
         """
         if self.encode_conditions:
-            condition = self.condition_encoder(condition, training=False, return_conditions_only=True)
+            condition_mean, condition_logvar = self.condition_encoder(
+                condition, training=False, return_conditions_only=True
+            )
         else:
             condition = jnp.concatenate(list(condition.values()), axis=-1)
             logger.warning("Condition encoder is not defined. Returning concatenated input as the embedding.")
-        return condition
+        return condition_mean, condition_logvar
 
     def create_train_state(
         self,

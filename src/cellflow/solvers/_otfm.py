@@ -139,65 +139,80 @@ class OTFlowMatching:
         )
         return loss
 
-    def get_condition_embedding(self, condition: dict[str, ArrayLike]) -> ArrayLike:
+    def get_condition_embedding(self, condition: dict[str, ArrayLike], return_as_numpy=True) -> ArrayLike:
         """Get learnt embeddings of the conditions.
 
         Parameters
         ----------
         condition
             Conditions to encode
+        return_as_numpy
+            Whether to return the embeddings as numpy arrays.
 
         Returns
         -------
-        Encoded conditions.
+        Mean and log-variance of encoded conditions.
         """
-        cond_embed = self.vf.apply(
+        cond_mean, cond_logvar = self.vf.apply(
             {"params": self.vf_state.params},
             condition,
             method="get_condition_embedding",
         )
-        return np.asarray(cond_embed)
+        if return_as_numpy:
+            return np.asarray(cond_mean), np.asarray(cond_logvar)
+        return cond_mean, cond_logvar
 
-    def predict(self, x: ArrayLike, condition: dict[str, ArrayLike], **kwargs: Any) -> ArrayLike:
-        """Predict the translated source ``'x'`` under condition ``'condition'``.
-
-        This function solves the ODE learnt with
-        the :class:`~cellflow.networks.ConditionalVelocityField`.
-
-        Parameters
-        ----------
-        x
-            Input data of shape [batch_size, ...].
-        condition
-            Condition of the input data of shape [batch_size, ...].
-        kwargs
-            Keyword arguments for :func:`diffrax.diffeqsolve`.
-
-        Returns
-        -------
-        The push-forward distribution of ``'x'`` under condition ``'condition'``.
-        """
+    def predict(
+        self,
+        x: ArrayLike,
+        condition: dict[str, ArrayLike],
+        rng: ArrayLike | None = None,
+        **kwargs: Any,
+    ) -> ArrayLike:
+        rng = rng if rng is not None else jax.random.PRNGKey(0)
         kwargs.setdefault("dt0", None)
         kwargs.setdefault("solver", diffrax.Tsit5())
         kwargs.setdefault("stepsize_controller", diffrax.PIDController(rtol=1e-5, atol=1e-5))
 
-        def vf(t: jnp.ndarray, x: jnp.ndarray, cond: dict[str, jnp.ndarray] | None) -> jnp.ndarray:
-            params = self.vf_state.params
-            return self.vf_state.apply_fn({"params": params}, t, x, cond, train=False)
+        params = self.vf_state.params
 
-        def solve_ode(x: jnp.ndarray, condition: jnp.ndarray | None) -> jnp.ndarray:
-            ode_term = diffrax.ODETerm(vf)
-            result = diffrax.diffeqsolve(
-                ode_term,
+        # Precompute condition embeddings (mean/logvar)
+        condition_mean, condition_logvar = self.get_condition_embedding(condition, return_as_numpy=False)
+
+        if self.condition_encoder_mode == "deterministic":
+            cond_embedding = condition_mean
+        else:
+            rng, rng_embed = jax.random.split(rng)
+            cond_embedding = condition_mean + jax.random.normal(rng_embed, condition_mean.shape) * jnp.exp(
+                0.5 * condition_logvar
+            )
+
+        def vf(t: float, y: jnp.ndarray, args: tuple) -> jnp.ndarray:
+            params, cond_embedding = args
+            t_array = jnp.array([[t]])
+            y_array = y[None, :]
+            preds, _, _ = self.vf.apply(
+                {"params": params},
+                t=t_array,
+                x=y_array,
+                cond_embedding=cond_embedding,
+                train=False,
+            )
+            return preds[0]
+
+        def solve_ode(y0: jnp.ndarray, args: tuple) -> jnp.ndarray:
+            term = diffrax.ODETerm(vf)
+            sol = diffrax.diffeqsolve(
+                term,
                 t0=0.0,
                 t1=1.0,
-                y0=x,
-                args=condition,
+                y0=y0,
+                args=args,
                 **kwargs,
             )
-            return result.ys[0]
+            return sol.ys[0]
 
-        x_pred = jax.jit(jax.vmap(solve_ode, in_axes=[0, None]))(x, condition)
+        x_pred = jax.jit(jax.vmap(solve_ode, in_axes=(0, None)))(x, (params, cond_embedding))
         return np.array(x_pred)
 
     @property
