@@ -48,6 +48,20 @@ class TestCellFlow:
             condition_encoder_kwargs["genot_source_layers"] = (({"dims": (32, 32)}),)
             condition_encoder_kwargs["genot_source_dim"] = 32
 
+        if regularization == 0.0 and condition_mode == "stochastic":
+            with pytest.raises(
+                ValueError,
+                match=r".*Stochastic condition embeddings require `regularization`>0*",
+            ):
+                cf.prepare_model(
+                    condition_mode=condition_mode,
+                    regularization=regularization,
+                    condition_embedding_dim=condition_embedding_dim,
+                    hidden_dims=(32, 32),
+                    decoder_dims=(32, 32),
+                    condition_encoder_kwargs=condition_encoder_kwargs,
+                )
+            return None
         cf.prepare_model(
             condition_mode=condition_mode,
             regularization=regularization,
@@ -106,10 +120,17 @@ class TestCellFlow:
             assert out.shape[2] == 2
 
         conds = adata_perturbation.obs.drop_duplicates(subset=["drug1", "drug2"])
-        cond_embed = cf.get_condition_embedding(conds, rep_dict=adata_perturbation.uns)
-        assert isinstance(cond_embed, pd.DataFrame)
-        assert cond_embed.shape[0] == conds.shape[0]
-        assert cond_embed.shape[1] == condition_embedding_dim
+        cond_embed_mean, cond_embed_var = cf.get_condition_embedding(conds, rep_dict=adata_perturbation.uns)
+        assert isinstance(cond_embed_mean, pd.DataFrame)
+        assert isinstance(cond_embed_var, pd.DataFrame)
+        assert cond_embed_mean.shape[0] == conds.shape[0]
+        assert cond_embed_mean.shape[1] == condition_embedding_dim
+        assert cond_embed_var.shape[0] == conds.shape[0]
+        assert cond_embed_var.shape[1] == condition_embedding_dim
+        assert cond_embed_mean.shape[0] == conds.shape[0]
+        assert cond_embed_mean.shape[1] == condition_embedding_dim
+        assert cond_embed_var.shape[0] == conds.shape[0]
+        assert cond_embed_var.shape[1] == condition_embedding_dim
 
     @pytest.mark.parametrize("solver", ["otfm", "genot"])
     @pytest.mark.parametrize("perturbation_covariate_reps", [{}, {"drug": "drug"}])
