@@ -26,6 +26,14 @@ class ConditionalVelocityField(nn.Module):
             Dimensionality of the output.
         max_combination_length
             Maximum number of covariates in a combination.
+        condition_mode
+            Mode of the encoder, should be one of:
+            - ``'deterministic'``: Learns condition encoding point-wise.
+            - ``'stochastic'``: Learns a Gaussian distribution for representing conditions.
+        regularization
+            Regularization strength in the latent space:
+            - For deterministic mode, it is the strength of the L2 regularization.
+            - For stochastic mode, it is the strength of the KL divergence regularization.
         encode_conditions
                 Processes the embedding of the perturbation conditions if :obj:`True`. If
                 :obj:`False`, directly inputs the embedding of the perturbation conditions to the
@@ -80,6 +88,8 @@ class ConditionalVelocityField(nn.Module):
 
     output_dim: int
     max_combination_length: int
+    condition_mode: Literal["deterministic", "stochastic"] = "deterministic"
+    regularization: float = 1.0
     encode_conditions: bool = True
     condition_embedding_dim: int = 32
     covariates_not_pooled: Sequence[str] = dc_field(default_factory=lambda: [])
@@ -105,6 +115,8 @@ class ConditionalVelocityField(nn.Module):
         """Initialize the network."""
         if self.encode_conditions:
             self.condition_encoder = ConditionEncoder(
+                condition_mode=self.condition_mode,
+                regularization=self.regularization,
                 output_dim=self.condition_embedding_dim,
                 pooling=self.pooling,
                 pooling_kwargs=self.pooling_kwargs,
@@ -177,7 +189,7 @@ class ConditionalVelocityField(nn.Module):
         else:
             cond_mean = jnp.concatenate(list(cond.values()), axis=-1)
             cond_logvar = jnp.zeros_like(cond)
-        if self.condition_encoder.mode == "deterministic":
+        if self.condition_encoder.condition_mode == "deterministic":
             cond = cond_mean
         else:
             cond = cond_mean + jax.random.normal(rng, cond_mean.shape) * jnp.exp(0.5 * cond_logvar)

@@ -16,11 +16,17 @@ perturbation_covariate_comb_args = [
 
 class TestCellFlow:
     @pytest.mark.parametrize("solver", ["otfm", "genot"])
+    @pytest.mark.parametrize("condition_mode", ["deterministic", "stochastic"])
+    @pytest.mark.parametrize("regularization", [0.0, 0.1])
     def test_cellflow_solver(
         self,
         adata_perturbation,
         solver,
+        condition_mode,
+        regularization,
     ):
+        if solver == "genot" and ((condition_mode == "stochastic") or (regularization > 0.0)):
+            return None
         sample_rep = "X"
         control_key = "control"
         perturbation_covariates = {"drug": ["drug1", "drug2"]}
@@ -43,6 +49,8 @@ class TestCellFlow:
             condition_encoder_kwargs["genot_source_dim"] = 32
 
         cf.prepare_model(
+            condition_mode=condition_mode,
+            regularization=regularization,
             condition_embedding_dim=condition_embedding_dim,
             hidden_dims=(32, 32),
             decoder_dims=(32, 32),

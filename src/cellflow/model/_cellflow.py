@@ -226,6 +226,8 @@ class CellFlow:
     def prepare_model(
         self,
         encode_conditions: bool = True,
+        condition_mode: Literal["deterministic", "stochastic"] = "deterministic",
+        regularization: float = 0.0,
         condition_embedding_dim: int = 32,
         pooling: Literal["mean", "attention_token", "attention_seed"] = "attention_token",
         pooling_kwargs: dict[str, Any] = types.MappingProxyType({}),
@@ -390,6 +392,12 @@ class CellFlow:
         if self.train_data is None:
             raise ValueError("Dataloader not initialized. Please call `prepare_data` first.")
 
+        if condition_mode == "stochastic":
+            if not encode_conditions:
+                raise ValueError("Stochastic condition embeddings require encoding conditions.")
+            if regularization == 0.0:
+                raise ValueError("Stochastic condition embeddings require `regularization`>0.")
+
         condition_encoder_kwargs = condition_encoder_kwargs or {}
         if self._solver_class == _otfm.OTFlowMatching and genot_source_layers is not None:
             raise ValueError("For OTFlowMatching, 'genot_source_layers' must be `None`.")
@@ -412,6 +420,8 @@ class CellFlow:
         self.vf = ConditionalVelocityField(
             output_dim=self._data_dim,
             max_combination_length=self.train_data.max_combination_length,
+            condition_mode=condition_mode,
+            regularization=regularization,
             encode_conditions=encode_conditions,
             condition_embedding_dim=condition_embedding_dim,
             covariates_not_pooled=covariates_not_pooled,

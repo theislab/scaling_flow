@@ -50,8 +50,8 @@ class OTFlowMatching:
     ):
         self._is_trained: bool = False
         self.vf = vf
-        self.condition_encoder_mode = self.vf.condition_encoder.mode
-        self.condition_encoder_regularization = self.vf.condition_encoder.regularization
+        self.condition_encoder_mode = self.vf.condition_mode
+        self.condition_encoder_regularization = self.vf.regularization
         self.flow = flow
         self.time_sampler = time_sampler
         self.match_fn = jax.jit(match_fn)

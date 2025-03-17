@@ -398,7 +398,7 @@ class ConditionEncoder(BaseModule):
     ----------
     output_dim
         Dimensionality of the output.
-    mode
+    condition_mode
         Mode of the encoder, should be one of:
         - ``'deterministic'``: Learns condition encoding point-wise.
         - ``'stochastic'``: Learns a Gaussian distribution for representing conditions.
@@ -441,7 +441,7 @@ class ConditionEncoder(BaseModule):
     """
 
     output_dim: int
-    mode: Literal["deterministic", "stochastic"] = "deterministic"
+    condition_mode: Literal["deterministic", "stochastic"] = "deterministic"
     regularization: float = 0.0
     decoder: bool = False
     pooling: Literal["mean", "attention_token", "attention_seed"] = "attention_token"
@@ -486,7 +486,7 @@ class ConditionEncoder(BaseModule):
         # modules after pooling
         self.after_pool_modules_mean = self._get_layers(self.layers_after_pool, self.output_dim, self.output_dropout)
 
-        if self.mode == "stochastic":
+        if self.condition_mode == "stochastic":
             self.after_pool_modules_var = self._get_layers(self.layers_after_pool, self.output_dim, self.output_dropout)
 
         # separate input layers for GENOT
@@ -503,7 +503,7 @@ class ConditionEncoder(BaseModule):
         rng: jax.Array,
         training: bool = True,
         return_conditions_only=False,
-    ) -> jnp.ndarray:
+    ) -> tuple[jnp.ndarray, jnp.ndarray]:
         """
         Apply the set encoder.
 
@@ -520,7 +520,7 @@ class ConditionEncoder(BaseModule):
 
         Returns
         -------
-        Encoded conditions of shape ``(batch_size, output_dim)``.
+        Mean and log-variance of conditions of shape ``(batch_size, output_dim)``.
         """
         genot_cell_data = conditions.get(GENOT_CELL_KEY, None)
         if genot_cell_data is not None:
@@ -594,7 +594,7 @@ class ConditionEncoder(BaseModule):
         # apply modules after pooling
         conditions = self._apply_modules(self.after_pool_modules_mean, conditions, None, training)
 
-        if self.mode == "stochastic":
+        if self.condition_mode == "stochastic":
             conditions_logvar = self._apply_modules(self.after_pool_modules_var, conditions, None, training)
         else:
             conditions_logvar = jnp.zeros_like(conditions)
