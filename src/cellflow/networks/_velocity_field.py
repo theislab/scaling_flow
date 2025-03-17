@@ -157,7 +157,6 @@ class ConditionalVelocityField(nn.Module):
 
     def __call__(
         self,
-        rng: jnp.ndarray,
         t: jnp.ndarray,
         x: jnp.ndarray,
         cond: dict[str, jnp.ndarray],
@@ -167,8 +166,6 @@ class ConditionalVelocityField(nn.Module):
 
         Parameters
         ----------
-            rng
-                Random number generator.
             t
                 Time of shape ``[batch, 1]``.
             x
@@ -192,7 +189,9 @@ class ConditionalVelocityField(nn.Module):
         if self.condition_encoder.condition_mode == "deterministic":
             cond = cond_mean
         else:
-            cond = cond_mean + jax.random.normal(rng, cond_mean.shape) * jnp.exp(0.5 * cond_logvar)
+            cond = cond_mean + jax.random.normal(self.make_rng("condition_encoder"), cond_mean.shape) * jnp.exp(
+                0.5 * cond_logvar
+            )
         t = time_encoder.cyclical_time_encoder(t, n_freqs=self.time_freqs)
         t = self.time_encoder(t, training=train)
         x = self.x_encoder(x, training=train)
@@ -258,7 +257,10 @@ class ConditionalVelocityField(nn.Module):
         }
         if additional_cond_dim:
             cond[GENOT_CELL_KEY] = jnp.ones((1, additional_cond_dim))
-        params = self.init(rng, t, x, cond, train=False)["params"]
+        condition_encoder_rng = jax.random.split(rng, 1)[0]
+        params = self.init(
+            {"params": rng, "condition_encoder": condition_encoder_rng}, t=t, x=x, cond=cond, train=False
+        )["params"]
         return train_state.TrainState.create(apply_fn=self.apply, params=params, tx=optimizer)
 
     @property

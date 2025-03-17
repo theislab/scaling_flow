@@ -76,14 +76,14 @@ class OTFlowMatching:
                 conditions: dict[str, jnp.ndarray] | None,
                 rng: jax.Array,
             ) -> jnp.ndarray:
-                rng_flow, rng_dropout = jax.random.split(rng, 2)
+                rng_flow, rng_encoder, rng_dropout = jax.random.split(rng, 3)
                 x_t = self.flow.compute_xt(rng_flow, t, source, target)
                 v_t, mean_cond, logvar_cond = vf_state.apply_fn(
                     {"params": params},
                     t,
                     x_t,
                     conditions,
-                    rngs={"dropout": rng_dropout},
+                    rngs={"dropout": rng_dropout, "condition_encoder": rng_encoder},
                 )
                 u_t = self.flow.compute_ut(t, x_t, source, target)
                 flow_matching_loss = jnp.mean((v_t - u_t) ** 2)

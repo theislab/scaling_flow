@@ -500,7 +500,6 @@ class ConditionEncoder(BaseModule):
     def __call__(
         self,
         conditions: dict[str, jnp.ndarray],
-        rng: jax.Array,
         training: bool = True,
         return_conditions_only=False,
     ) -> tuple[jnp.ndarray, jnp.ndarray]:
@@ -511,8 +510,6 @@ class ConditionEncoder(BaseModule):
         ----------
         conditions : dict[str, jnp.ndarray]
             Dictionary of batch of conditions of shape ``(batch_size, set_size, condition_dim)``.
-        rng:
-            Random number generator.
         training : bool
             Whether the model is in training mode.
         return_conditions_only : bool
