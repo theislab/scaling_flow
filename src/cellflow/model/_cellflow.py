@@ -277,7 +277,7 @@ class CellFlow:
         regularization
             Regularization strength in the latent space:
             - For deterministic mode, it is the strength of the L2 regularization.
-            - For stochastic mode, it is the strength of the KL divergence regularization.
+            - For stochastic mode, it is the strength of the VAE regularization.
         pooling
             Pooling method, should be one of:
 
@@ -406,6 +406,9 @@ class CellFlow:
                 raise ValueError("Stochastic condition embeddings require encoding conditions.")
             if regularization == 0.0:
                 raise ValueError("Stochastic condition embeddings require `regularization`>0.")
+
+        if self.solver == "genot" and condition_mode == "stochastic":
+            raise ValueError("Stochastic condition embeddings are not yet supported for GENOT.")
 
         condition_encoder_kwargs = condition_encoder_kwargs or {}
         if self._solver_class == _otfm.OTFlowMatching and genot_source_layers is not None:

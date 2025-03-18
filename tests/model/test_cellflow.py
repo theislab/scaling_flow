@@ -48,6 +48,20 @@ class TestCellFlow:
             condition_encoder_kwargs["genot_source_layers"] = (({"dims": (32, 32)}),)
             condition_encoder_kwargs["genot_source_dim"] = 32
 
+        if solver == "genot" and condition_mode == "stochastic":
+            with pytest.raises(
+                ValueError,
+                match=r".*Stochastic condition embeddings are not yet supported for GENOT.*",
+            ):
+                cf.prepare_model(
+                    condition_mode=condition_mode,
+                    regularization=regularization,
+                    condition_embedding_dim=condition_embedding_dim,
+                    hidden_dims=(32, 32),
+                    decoder_dims=(32, 32),
+                    condition_encoder_kwargs=condition_encoder_kwargs,
+                )
+            return None
         if regularization == 0.0 and condition_mode == "stochastic":
             with pytest.raises(
                 ValueError,
@@ -188,11 +202,12 @@ class TestCellFlow:
         assert out.shape[1] == cf._data_dim
 
         covs = adata_perturbation.obs.drop_duplicates(subset=["drug1"])
-        cond_embed = cf.get_condition_embedding(covariate_data=covs, rep_dict=adata_perturbation.uns)
-
-        assert isinstance(cond_embed, pd.DataFrame)
-        assert cond_embed.shape[0] == len(covs)
-        assert cond_embed.shape[1] == condition_embedding_dim
+        out = cf.get_condition_embedding(covariate_data=covs, rep_dict=adata_perturbation.uns)
+        assert isinstance(out, tuple)
+        assert isinstance(out[0], pd.DataFrame)
+        assert isinstance(out[1], pd.DataFrame)
+        assert out[0].shape[0] == len(covs)
+        assert out[0].shape[1] == condition_embedding_dim
 
     @pytest.mark.parametrize("split_covariates", [[], ["cell_type"]])
     @pytest.mark.parametrize("perturbation_covariates", perturbation_covariate_comb_args)
@@ -302,10 +317,14 @@ class TestCellFlow:
         assert f"val_{metric_to_compute}_mean" in cf._trainer.training_logs
 
     @pytest.mark.parametrize("solver", ["otfm", "genot"])
+    @pytest.mark.parametrize("condition_mode", ["deterministic", "stochastic"])
+    @pytest.mark.parametrize("regularization", [0.0, 0.1])
     def test_cellflow_predict(
         self,
         adata_perturbation,
         solver,
+        condition_mode,
+        regularization,
     ):
         cf = cellflow.model.CellFlow(adata_perturbation, solver=solver)
         cf.prepare_data(
@@ -322,6 +341,8 @@ class TestCellFlow:
             condition_encoder_kwargs["genot_source_dim"] = 32
 
         cf.prepare_model(
+            condition_mode=condition_mode,
+            regularization=regularization,
             condition_embedding_dim=32,
             hidden_dims=(32, 32),
             decoder_dims=(32, 32),
@@ -381,10 +402,14 @@ class TestCellFlow:
     )
     @pytest.mark.parametrize("split_covariates", [None, ["cell_type"]])
     @pytest.mark.parametrize("perturbation_covariates", perturbation_covariate_comb_args)
+    @pytest.mark.parametrize("condition_mode", ["deterministic", "stochastic"])
+    @pytest.mark.parametrize("regularization", [0.0, 0.1])
     def test_cellflow_get_condition_embedding(
         self,
         adata_perturbation,
         sample_covariate_and_reps,
+        condition_mode,
+        regularization,
         split_covariates,
         perturbation_covariates,
     ):
@@ -409,7 +434,22 @@ class TestCellFlow:
         assert isinstance(cf._dm.perturb_covar_keys, list)
         assert hasattr(cf, "_data_dim")
 
+        if condition_mode == "stochastic" and regularization == 0.0:
+            with pytest.raises(
+                ValueError,
+                match=r".*Stochastic condition embeddings require `regularization`>0*",
+            ):
+                cf.prepare_model(
+                    condition_mode=condition_mode,
+                    regularization=regularization,
+                    condition_embedding_dim=condition_embedding_dim,
+                    hidden_dims=(32, 32),
+                    decoder_dims=(32, 32),
+                )
+            return None
         cf.prepare_model(
+            condition_mode=condition_mode,
+            regularization=regularization,
             condition_embedding_dim=condition_embedding_dim,
             hidden_dims=(32, 32),
             decoder_dims=(32, 32),
@@ -420,20 +460,26 @@ class TestCellFlow:
         assert cf._dataloader is not None
 
         conds = adata_perturbation.obs.drop_duplicates(subset=cf._dm.perturb_covar_keys)
-        cond_embed = cf.get_condition_embedding(conds, rep_dict=adata_perturbation.uns)
-        assert isinstance(cond_embed, pd.DataFrame)
-        assert cond_embed.shape[0] == conds.shape[0]
-        assert cond_embed.shape[1] == condition_embedding_dim
+        out = cf.get_condition_embedding(conds, rep_dict=adata_perturbation.uns)
+        assert isinstance(out, tuple)
+        assert isinstance(out[0], pd.DataFrame)
+        assert isinstance(out[1], pd.DataFrame)
+        assert out[0].shape[0] == conds.shape[0]
+        assert out[0].shape[1] == condition_embedding_dim
 
         # Test if condition_id_key works
         condition_id_key = "condition_id"
         conds[condition_id_key] = range(len(conds))
         conds[condition_id_key] = "cond_" + conds[condition_id_key].astype(str)
-        cond_embed = cf.get_condition_embedding(
-            conds, rep_dict=adata_perturbation.uns, condition_id_key=condition_id_key
-        )
-        assert isinstance(cond_embed, pd.DataFrame)
-        assert cond_embed.shape[0] == conds.shape[0]
-        assert cond_embed.index.name == condition_id_key
+        out = cf.get_condition_embedding(conds, rep_dict=adata_perturbation.uns, condition_id_key=condition_id_key)
+        assert isinstance(out, tuple)
+        assert isinstance(out[0], pd.DataFrame)
+        assert out[0].shape[0] == out[0].shape[0]
+        assert out[0].index.name == condition_id_key
         cond_id_vals = conds[condition_id_key].values
-        assert cond_embed.index.isin(cond_id_vals).all()
+        assert out[0].index.isin(cond_id_vals).all()
+        assert isinstance(out[1], pd.DataFrame)
+        assert out[1].shape[0] == out[1].shape[0]
+        assert out[1].index.name == condition_id_key
+        cond_id_vals = conds[condition_id_key].values
+        assert out[1].index.isin(cond_id_vals).all()
