@@ -269,6 +269,15 @@ class CellFlow:
             ``'condition_encoder_kwargs'``, ``'pooling'``, ``'pooling_kwargs'``,
             ``'layers_before_pool'``, ``'layers_after_pool'``, ``'cond_output_dropout'``
             are ignored.
+        condition_mode
+            Mode of the encoder, should be one of:
+
+            - ``'deterministic'``: Learns condition encoding point-wise.
+            - ``'stochastic'``: Learns a Gaussian distribution for representing conditions.
+        regularization
+            Regularization strength in the latent space:
+            - For deterministic mode, it is the strength of the L2 regularization.
+            - For stochastic mode, it is the strength of the KL divergence regularization.
         pooling
             Pooling method, should be one of:
 

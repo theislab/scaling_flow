@@ -400,10 +400,12 @@ class ConditionEncoder(BaseModule):
         Dimensionality of the output.
     condition_mode
         Mode of the encoder, should be one of:
+
         - ``'deterministic'``: Learns condition encoding point-wise.
         - ``'stochastic'``: Learns a Gaussian distribution for representing conditions.
     regularization
         Regularization strength in the latent space:
+
         - For deterministic mode, it is the strength of the L2 regularization.
         - For stochastic mode, it is the strength of the KL divergence regularization.
     decoder
