@@ -64,6 +64,7 @@ class OTFlowMatching:
         def vf_step_fn(
             rng: jax.Array,
             vf_state: train_state.TrainState,
+            time: jnp.ndarray,
             source: jnp.ndarray,
             target: jnp.ndarray,
             conditions: dict[str, jnp.ndarray] | None,
@@ -94,11 +95,8 @@ class OTFlowMatching:
                 )
                 return flow_matching_loss + encoder_loss
 
-            batch_size = len(source)
-            key_t, key_model = jax.random.split(rng, 2)
-            t = self.time_sampler(key_t, batch_size)
             grad_fn = jax.value_and_grad(loss_fn)
-            loss, grads = grad_fn(vf_state.params, t, source, target, conditions, key_model)
+            loss, grads = grad_fn(vf_state.params, time, source, target, conditions, rng)
             return vf_state.apply_gradients(grads=grads), loss
 
         return vf_step_fn
@@ -124,7 +122,10 @@ class OTFlowMatching:
         """
         src, tgt = batch["src_cell_data"], batch["tgt_cell_data"]
         condition = batch.get("condition")
-        rng_resample, rng_step_fn = jax.random.split(rng, 2)
+        rng_resample, rng_time, rng_step_fn = jax.random.split(rng, 3)
+        n = src.shape[0]
+        time = self.time_sampler(rng_time, n)
+
         if self.match_fn is not None:
             tmat = self.match_fn(src, tgt)
             src_ixs, tgt_ixs = solver_utils.sample_joint(rng_resample, tmat)
@@ -133,6 +134,7 @@ class OTFlowMatching:
         self.vf_state, loss = self.vf_step_fn(
             rng_step_fn,
             self.vf_state,
+            time,
             src,
             tgt,
             condition,
@@ -174,9 +176,6 @@ class OTFlowMatching:
         kwargs.setdefault("solver", diffrax.Tsit5())
         kwargs.setdefault("stepsize_controller", diffrax.PIDController(rtol=1e-5, atol=1e-5))
 
-        params = self.vf_state.params
-
-        # Precompute condition embeddings (mean/logvar)
         condition_mean, condition_logvar = self.get_condition_embedding(condition, return_as_numpy=False)
 
         if self.condition_encoder_mode == "deterministic":
@@ -188,31 +187,32 @@ class OTFlowMatching:
             )
 
         def vf(t: float, y: jnp.ndarray, args: tuple) -> jnp.ndarray:
-            params, cond_embedding = args
+            cond_embedding = args[0]
+            params = self.vf_state.params
             t_array = jnp.array([[t]])
             y_array = y[None, :]
             preds, _, _ = self.vf.apply(
                 {"params": params},
                 t=t_array,
-                x=y_array,
+                x_t=y_array,
                 cond_embedding=cond_embedding,
                 train=False,
             )
             return preds[0]
 
-        def solve_ode(y0: jnp.ndarray, args: tuple) -> jnp.ndarray:
+        def solve_ode(x_0: jnp.ndarray, args: tuple) -> jnp.ndarray:
             term = diffrax.ODETerm(vf)
             sol = diffrax.diffeqsolve(
                 term,
                 t0=0.0,
                 t1=1.0,
-                y0=y0,
+                y0=x_0,
                 args=args,
                 **kwargs,
             )
             return sol.ys[0]
 
-        x_pred = jax.jit(jax.vmap(solve_ode, in_axes=(0, None)))(x, (params, cond_embedding))
+        x_pred = jax.jit(jax.vmap(solve_ode, in_axes=(0, None)))(x, (cond_embedding,))
         return np.array(x_pred)
 
     @property

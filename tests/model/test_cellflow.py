@@ -3,6 +3,7 @@ import pandas as pd
 import pytest
 
 import cellflow
+from cellflow.networks import _velocity_field
 
 perturbation_covariate_comb_args = [
     {"drug": ["drug1"]},
@@ -32,6 +33,7 @@ class TestCellFlow:
         perturbation_covariates = {"drug": ["drug1", "drug2"]}
         perturbation_covariate_reps = {"drug": "drug"}
         condition_embedding_dim = 32
+        vf_kwargs = {"genot_source_dims": (32, 32), "genot_source_dropout": 0.1} if solver == "genot" else None
 
         cf = cellflow.model.CellFlow(adata_perturbation, solver=solver)
         cf.prepare_data(
@@ -43,25 +45,6 @@ class TestCellFlow:
         assert cf.train_data is not None
         assert hasattr(cf, "_data_dim")
 
-        condition_encoder_kwargs = {}
-        if solver == "genot":
-            condition_encoder_kwargs["genot_source_layers"] = (({"dims": (32, 32)}),)
-            condition_encoder_kwargs["genot_source_dim"] = 32
-
-        if solver == "genot" and condition_mode == "stochastic":
-            with pytest.raises(
-                ValueError,
-                match=r".*Stochastic condition embeddings are not yet supported for GENOT.*",
-            ):
-                cf.prepare_model(
-                    condition_mode=condition_mode,
-                    regularization=regularization,
-                    condition_embedding_dim=condition_embedding_dim,
-                    hidden_dims=(32, 32),
-                    decoder_dims=(32, 32),
-                    condition_encoder_kwargs=condition_encoder_kwargs,
-                )
-            return None
         if regularization == 0.0 and condition_mode == "stochastic":
             with pytest.raises(
                 ValueError,
@@ -73,7 +56,7 @@ class TestCellFlow:
                     condition_embedding_dim=condition_embedding_dim,
                     hidden_dims=(32, 32),
                     decoder_dims=(32, 32),
-                    condition_encoder_kwargs=condition_encoder_kwargs,
+                    vf_kwargs=vf_kwargs,
                 )
             return None
         cf.prepare_model(
@@ -82,7 +65,7 @@ class TestCellFlow:
             condition_embedding_dim=condition_embedding_dim,
             hidden_dims=(32, 32),
             decoder_dims=(32, 32),
-            condition_encoder_kwargs=condition_encoder_kwargs,
+            vf_kwargs=vf_kwargs,
         )
         assert cf._trainer is not None
 
@@ -159,6 +142,7 @@ class TestCellFlow:
         perturbation_covariates = {"drug": ["drug1"]}
         perturbation_covariate_reps = {"drug": "drug"}
         condition_embedding_dim = 32
+        vf_kwargs = {"genot_source_dims": (32, 32), "genot_source_dropout": 0.1} if solver == "genot" else None
 
         cf = cellflow.model.CellFlow(adata_perturbation, solver=solver)
         cf.prepare_data(
@@ -170,19 +154,20 @@ class TestCellFlow:
         assert cf.train_data is not None
         assert hasattr(cf, "_data_dim")
 
-        condition_encoder_kwargs = {}
-        if solver == "genot":
-            condition_encoder_kwargs["genot_source_layers"] = (({"dims": (32, 32)}),)
-            condition_encoder_kwargs["genot_source_dim"] = 32
-
         cf.prepare_model(
             condition_embedding_dim=condition_embedding_dim,
             hidden_dims=(32, 32),
             decoder_dims=(32, 32),
-            condition_encoder_kwargs=condition_encoder_kwargs,
+            vf_kwargs=vf_kwargs,
         )
         assert cf._trainer is not None
 
+        vector_field_class = (
+            _velocity_field.ConditionalVelocityField
+            if solver == "otfm"
+            else _velocity_field.GENOTConditionalVelocityField
+        )
+        assert cf._vf_class == vector_field_class
         cf.train(num_iterations=3)
         assert cf._dataloader is not None
 
@@ -211,7 +196,6 @@ class TestCellFlow:
 
     @pytest.mark.parametrize("split_covariates", [[], ["cell_type"]])
     @pytest.mark.parametrize("perturbation_covariates", perturbation_covariate_comb_args)
-    @pytest.mark.parametrize("solver", ["otfm", "genot"])
     @pytest.mark.parametrize("n_conditions_on_log_iteration", [None, 0, 2])
     @pytest.mark.parametrize("n_conditions_on_train_end", [None, 0, 2])
     def test_cellflow_val_data_loading(
@@ -269,7 +253,7 @@ class TestCellFlow:
         n_conditions_on_log_iteration,
         n_conditions_on_train_end,
     ):
-        # TODO(@MUCDK) after PR #33 check for larger n_conditions_on...
+        vf_kwargs = {"genot_source_dims": (32, 32), "genot_source_dropout": 0.1} if solver == "genot" else None
         cf = cellflow.model.CellFlow(adata_perturbation, solver=solver)
         cf.prepare_data(
             sample_rep="X",
@@ -305,7 +289,7 @@ class TestCellFlow:
             condition_embedding_dim=32,
             hidden_dims=(32, 32),
             decoder_dims=(32, 32),
-            condition_encoder_kwargs=condition_encoder_kwargs,
+            vf_kwargs=vf_kwargs,
         )
         assert cf._trainer is not None
 
@@ -335,10 +319,7 @@ class TestCellFlow:
             split_covariates=["cell_type"],
         )
 
-        condition_encoder_kwargs = {}
-        if solver == "genot":
-            condition_encoder_kwargs["genot_source_layers"] = (({"dims": (32, 32)}),)
-            condition_encoder_kwargs["genot_source_dim"] = 32
+        vf_kwargs = {"genot_source_dims": (32, 32), "genot_source_dropout": 0.1} if solver == "genot" else None
 
         cf.prepare_model(
             condition_mode=condition_mode,
@@ -346,7 +327,7 @@ class TestCellFlow:
             condition_embedding_dim=32,
             hidden_dims=(32, 32),
             decoder_dims=(32, 32),
-            condition_encoder_kwargs=condition_encoder_kwargs,
+            vf_kwargs=vf_kwargs,
         )
 
         cf.train(num_iterations=3)
@@ -377,7 +358,8 @@ class TestCellFlow:
             adata_pred_cell_type_2.obs["control"] = True
             cf.predict(adata_pred_cell_type_2, sample_rep="X", covariate_data=cov_data_ct_1, max_steps=3, throw=False)
 
-    def test_raise_otfm_genot_layers_passed(self, adata_perturbation):
+    def test_raise_otfm_vf_kwargs_passed(self, adata_perturbation):
+        vf_kwargs = {"genot_source_dims": (32, 32), "genot_source_dropouts": 0.1}
         cf = cellflow.model.CellFlow(adata_perturbation, solver="otfm")
         cf.prepare_data(
             sample_rep="X",
@@ -387,13 +369,13 @@ class TestCellFlow:
         )
         with pytest.raises(
             ValueError,
-            match=r".*For OTFlowMatching, 'genot_source_layers' must be `None`.'*",
+            match=r".*For `solver='otfm'`, `vf_kwargs` must be `None`.*",
         ):
             cf.prepare_model(
                 condition_embedding_dim=32,
                 hidden_dims=(32, 32),
                 decoder_dims=(32, 32),
-                genot_source_layers=({"layer_type": "mlp", "dims": (32, 32)},),
+                vf_kwargs=vf_kwargs,
             )
 
     @pytest.mark.parametrize(

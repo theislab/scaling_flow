@@ -21,7 +21,7 @@ from cellflow.data._data import ConditionData, TrainingData, ValidationData
 from cellflow.data._dataloader import PredictionSampler, TrainSampler, ValidationSampler
 from cellflow.data._datamanager import DataManager
 from cellflow.model._utils import _write_predictions
-from cellflow.networks._velocity_field import ConditionalVelocityField
+from cellflow.networks import _velocity_field
 from cellflow.plotting import _utils
 from cellflow.solvers import _genot, _otfm
 from cellflow.training._callbacks import BaseCallback
@@ -49,12 +49,17 @@ class CellFlow:
     def __init__(self, adata: ad.AnnData, solver: Literal["otfm", "genot"] = "otfm"):
         self._adata = adata
         self._solver_class = _otfm.OTFlowMatching if solver == "otfm" else _genot.GENOT
+        self._vf_class = (
+            _velocity_field.ConditionalVelocityField
+            if solver == "otfm"
+            else _velocity_field.GENOTConditionalVelocityField
+        )
         self._dataloader: TrainSampler | None = None
         self._trainer: CellFlowTrainer | None = None
         self._validation_data: dict[str, ValidationData] = {}
         self._solver: _otfm.OTFlowMatching | _genot.GENOT | None = None
         self._condition_dim: int | None = None
-        self._vf: ConditionalVelocityField | None = None
+        self._vf: _velocity_field.ConditionalVelocityField | _velocity_field.GENOTConditionalVelocityField | None = None
 
     def prepare_data(
         self,
@@ -250,7 +255,7 @@ class CellFlow:
         optimizer: optax.GradientTransformation = optax.adam(1e-4),
         layer_norm_before_concatenation: bool = False,
         linear_projection_before_concatenation: bool = False,
-        genot_source_layers: Layers_t | None = None,
+        vf_kwargs: dict[str, Any] | None = None,
         seed=0,
     ) -> None:
         """Prepare the model for training.
@@ -371,19 +376,15 @@ class CellFlow:
         linear_projection_before_concatenation
             If :obj:`True`, applies a linear projection before concatenating
             the embedded time, embedded data.
-        genot_source_layers
-            Only relevant if ``'solver'`` is ``'genot'``, otherwise ignored.
-            Layers processing the cell data serving as an additional condition to the
-            model (see :cite:`klein:23`). Should be of the same form as ``'layers_after_pool'``,
-            i.e. a :class:`tuple` with each element a :class:`dict` with keys:
+        vf_kwargs
+            Additional keyword arguments for the solver-specific vector field.
+            For instance, when ``'solver==genot'``, the following keyword argument can be passed:
 
-                - ``'layer_type'`` of type :class:`str` indicating the type of the layer, can be
-                  ``'mlp'`` or ``'self_attention'``.
-                - Further keyword arguments for the layer type :class:`cellflow.networks.MLPBlock` or
-                  :class:`cellflow.networks.SelfAttentionBlock`.
+                - ``'genot_source_dims'`` of type :class:`tuple` with the dimensions
+                  of the :class:`cellflow.networks.MLPBlock` processing the source cell.
+                - ``'genot_source_dropout'`` of type :class:`float` indicating the dropout rate
+                  for the source cell processing.
 
-            If :obj:`None`, defaults to an :class:`cellflow.networks.MLPBlock` with 3 layers of
-            :math:`1024` hidden units and a dropout rate of :math:`0.0`.
         seed
             Random seed.
 
@@ -407,29 +408,23 @@ class CellFlow:
             if regularization == 0.0:
                 raise ValueError("Stochastic condition embeddings require `regularization`>0.")
 
-        if self.solver == "genot" and condition_mode == "stochastic":
-            raise ValueError("Stochastic condition embeddings are not yet supported for GENOT.")
-
         condition_encoder_kwargs = condition_encoder_kwargs or {}
-        if self._solver_class == _otfm.OTFlowMatching and genot_source_layers is not None:
-            raise ValueError("For OTFlowMatching, 'genot_source_layers' must be `None`.")
+        if self._solver_class == _otfm.OTFlowMatching and vf_kwargs is not None:
+            raise ValueError("For `solver='otfm'`, `vf_kwargs` must be `None`.")
         if self._solver_class == _genot.GENOT:
-            condition_encoder_kwargs["genot_source_dim"] = self._data_dim
-            if genot_source_layers is None:
-                condition_encoder_kwargs["genot_source_layers"] = (
-                    {
-                        "layer_type": "mlp",
-                        "dims": [1024, 1024, 1024],
-                        "dropout_rate": 0.0,
-                    },
-                )
+            if vf_kwargs is None:
+                vf_kwargs = {"genot_source_dims": [1024, 1024, 1024], "genot_source_dropout": 0.0}
             else:
-                condition_encoder_kwargs["genot_source_layers"] = genot_source_layers
+                assert isinstance(vf_kwargs, dict)
+                assert "genot_source_dims" in vf_kwargs
+                assert "genot_source_dropout" in vf_kwargs
+        else:
+            vf_kwargs = {}
         covariates_not_pooled = [] if pool_sample_covariates else self._dm.sample_covariates
         solver_kwargs = solver_kwargs or {}
         flow = flow or {"constant_noise": 0.0}
 
-        self.vf = ConditionalVelocityField(
+        self.vf = self._vf_class(
             output_dim=self._data_dim,
             max_combination_length=self.train_data.max_combination_length,
             condition_mode=condition_mode,
@@ -453,6 +448,7 @@ class CellFlow:
             decoder_dropout=decoder_dropout,
             layer_norm_before_concatenation=layer_norm_before_concatenation,
             linear_projection_before_concatenation=linear_projection_before_concatenation,
+            **vf_kwargs,
         )
 
         flow, noise = next(iter(flow.items()))
@@ -814,7 +810,9 @@ class CellFlow:
         return self._dm
 
     @property
-    def velocity_field(self) -> ConditionalVelocityField | None:
+    def velocity_field(
+        self,
+    ) -> _velocity_field.ConditionalVelocityField | _velocity_field.GENOTConditionalVelocityField | None:
         """The conditional velocity field."""
         return self._vf
 
@@ -831,8 +829,8 @@ class CellFlow:
         self._train_data = data
 
     @velocity_field.setter  # type: ignore[attr-defined,no-redef]
-    def velocity_field(self, vf: ConditionalVelocityField) -> None:
+    def velocity_field(self, vf: _velocity_field.ConditionalVelocityField) -> None:
         """Set the velocity field."""
-        if not isinstance(vf, ConditionalVelocityField):
+        if not isinstance(vf, _velocity_field.ConditionalVelocityField):
             raise ValueError(f"Expected `vf` to be an instance of `ConditionalVelocityField`, found `{type(vf)}`.")
         self._vf = vf
