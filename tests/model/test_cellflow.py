@@ -101,12 +101,11 @@ class TestCellFlow:
             assert "MY_PREDICTION_" + str(key) in adata_perturbation_pred.obsm
 
         if solver == "genot":
-            assert "MY_PREDICTION_" + str(key) + "_0" in adata_perturbation_pred.obsm
+            assert "MY_PREDICTION_" + str(key) in adata_perturbation_pred.obsm
             pred2 = cf.predict(
                 adata_perturbation_pred,
                 sample_rep=sample_rep,
                 covariate_data=adata_perturbation_pred.obs,
-                n_samples=2,
                 max_steps=3,
                 throw=False,
             )
@@ -114,7 +113,6 @@ class TestCellFlow:
             out = next(iter(pred2.values()))
             assert out.shape[0] == adata_perturbation.n_obs
             assert out.shape[1] == cf._data_dim
-            assert out.shape[2] == 2
 
         conds = adata_perturbation.obs.drop_duplicates(subset=["drug1", "drug2"])
         cond_embed_mean, cond_embed_var = cf.get_condition_embedding(conds, rep_dict=adata_perturbation.uns)
@@ -203,11 +201,10 @@ class TestCellFlow:
         adata_perturbation,
         split_covariates,
         perturbation_covariates,
-        solver,
         n_conditions_on_log_iteration,
         n_conditions_on_train_end,
     ):
-        cf = cellflow.model.CellFlow(adata_perturbation, solver=solver)
+        cf = cellflow.model.CellFlow(adata_perturbation)
         cf.prepare_data(
             sample_rep="X",
             control_key="control",

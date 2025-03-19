@@ -15,7 +15,6 @@ import pandas as pd
 from ott.neural.methods.flows import dynamics
 
 from cellflow import _constants
-from cellflow._logging import logger
 from cellflow._types import ArrayLike, Layers_separate_input_t, Layers_t
 from cellflow.data._data import ConditionData, TrainingData, ValidationData
 from cellflow.data._dataloader import PredictionSampler, TrainSampler, ValidationSampler
@@ -549,7 +548,6 @@ class CellFlow:
         sample_rep: str | None = None,
         condition_id_key: str | None = None,
         key_added_prefix: str | None = None,
-        n_samples: int = 1,
         **kwargs: Any,
     ) -> dict[str, ArrayLike] | None:
         """Predict perturbation responses.
@@ -573,9 +571,6 @@ class CellFlow:
             If not :obj:`None`, prefix to store the prediction in :attr:`~anndata.AnnData.obsm`.
             If :obj:`None`, the predictions are not stored, and the predictions are returned as a
             :class:`dict`.
-        n_samples
-            Number of perturbed cells to generate for each single cell in the control population.
-            Only possible to get multiple samples if ``'solver'`` is ``'genot'``.
         kwargs
             Keyword arguments for the predict function, i.e.
             :meth:`cellflow.solvers.OTFlowMatching.predict` or :meth:`cellflow.solvers.GENOT.predict`.
@@ -592,13 +587,6 @@ class CellFlow:
         if sample_rep is None:
             sample_rep = self._dm.sample_rep
 
-        if n_samples > 1:
-            if not isinstance(self.solver, _genot.GENOT):
-                logger.warning(
-                    "Multiple samples can only be generated if the solver is `genot`, setting `n_samples` to 1."
-                )
-                n_samples = 1
-            kwargs["n_samples"] = n_samples
         if adata is not None and covariate_data is not None:
             if self._dm.control_key not in adata.obs.columns:
                 raise ValueError(

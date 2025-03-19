@@ -52,7 +52,7 @@ class GENOT:
         target space with a ``(rng, shape) -> noise`` signature.
         If :obj:`None`, multivariate normal distribution is used.
     kwargs
-        Keyword arguments for TODO
+        Keyword arguments.
     """
 
     def __init__(
