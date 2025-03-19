@@ -393,9 +393,7 @@ def _get_layers(
     """Get modules from layer parameters."""
     modules = []
     if isinstance(layers, Sequence):
-        print("layers is ", layers)
         for layer in layers:
-            print("layer is ", layer)
             layer = dict(layer)
             layer_type = layer.pop("layer_type", "mlp")
             if layer_type == "mlp":
