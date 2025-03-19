@@ -175,6 +175,7 @@ class OTFlowMatching:
         kwargs.setdefault("dt0", None)
         kwargs.setdefault("solver", diffrax.Tsit5())
         kwargs.setdefault("stepsize_controller", diffrax.PIDController(rtol=1e-5, atol=1e-5))
+        kwargs.setdefault("max_steps", 20000)
 
         condition_mean, condition_logvar = self.get_condition_embedding(condition, return_as_numpy=False)
 
