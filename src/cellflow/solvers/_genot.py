@@ -7,7 +7,7 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 from flax.training import train_state
-from ott import utils
+from ott import utils as ott_utils
 from ott.neural.methods.flows import dynamics
 from ott.neural.networks import velocity_field
 from ott.solvers import utils as solver_utils
@@ -250,7 +250,7 @@ class GENOT:
         kwargs.setdefault("solver", diffrax.Tsit5())
         kwargs.setdefault("stepsize_controller", diffrax.PIDController(rtol=1e-5, atol=1e-5))
 
-        rng = np.random.default_rng(0) if rng is None else rng
+        rng = ott_utils.default_prng_key(rng) if rng is None else rng
         condition_mean, condition_logvar = self.get_condition_embedding(condition, return_as_numpy=False)
 
         if self.condition_encoder_mode == "deterministic":
@@ -288,7 +288,7 @@ class GENOT:
             )
             return sol.ys[0]
 
-        rng = utils.default_prng_key(rng)
+        rng = ott_utils.default_prng_key(rng)
         latent = self.latent_noise_fn(rng, (len(x),))
 
         x_pred = jax.jit(jax.vmap(solve_ode, in_axes=(0, (0, None))))(latent, (x[:, None], cond_embedding))
