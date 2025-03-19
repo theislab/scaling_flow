@@ -236,9 +236,9 @@ class ConditionalVelocityField(nn.Module):
             pert_cov: jnp.ones((1, self.max_combination_length, condition.shape[-1]))
             for pert_cov, condition in conditions.items()
         }
-        condition_encoder_rng = jax.random.split(rng, 1)[0]
+        params_rng, condition_encoder_rng = jax.random.split(rng, 2)
         params = self.init(
-            {"params": rng, "condition_encoder": condition_encoder_rng}, t=t, x_t=x_t, cond=cond, train=False
+            {"params": params_rng, "condition_encoder": condition_encoder_rng}, t=t, x_t=x_t, cond=cond, train=False
         )["params"]
         return train_state.TrainState.create(apply_fn=self.apply, params=params, tx=optimizer)
 
@@ -492,8 +492,13 @@ class GENOTConditionalVelocityField(ConditionalVelocityField):
             pert_cov: jnp.ones((1, self.max_combination_length, condition.shape[-1]))
             for pert_cov, condition in conditions.items()
         }
-        condition_encoder_rng = jax.random.split(rng, 1)[0]
+        params_rng, condition_encoder_rng = jax.random.split(rng, 2)
         params = self.init(
-            {"params": rng, "condition_encoder": condition_encoder_rng}, t=t, x_t=x_t, x_0=x_0, cond=cond, train=False
+            {"params": params_rng, "condition_encoder": condition_encoder_rng},
+            t=t,
+            x_t=x_t,
+            x_0=x_0,
+            cond=cond,
+            train=False,
         )["params"]
         return train_state.TrainState.create(apply_fn=self.apply, params=params, tx=optimizer)
