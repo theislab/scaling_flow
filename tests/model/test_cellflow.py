@@ -317,7 +317,18 @@ class TestCellFlow:
         )
 
         vf_kwargs = {"genot_source_dims": (32, 32), "genot_source_dropout": 0.1} if solver == "genot" else None
-
+        if condition_mode == "stochastic" and regularization == 0.0:
+            with pytest.raises(
+                ValueError,
+                match=r".*Stochastic condition embeddings require `regularization`>0*",
+            ):
+                cf.prepare_model(
+                    condition_mode=condition_mode,
+                    regularization=regularization,
+                    hidden_dims=(32, 32),
+                    decoder_dims=(32, 32),
+                )
+            return None
         cf.prepare_model(
             condition_mode=condition_mode,
             regularization=regularization,

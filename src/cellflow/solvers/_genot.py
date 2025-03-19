@@ -250,6 +250,7 @@ class GENOT:
         kwargs.setdefault("solver", diffrax.Tsit5())
         kwargs.setdefault("stepsize_controller", diffrax.PIDController(rtol=1e-5, atol=1e-5))
 
+        rng = np.random.default_rng(0) if rng is None else rng
         condition_mean, condition_logvar = self.get_condition_embedding(condition, return_as_numpy=False)
 
         if self.condition_encoder_mode == "deterministic":
