@@ -1,5 +1,4 @@
 import jax.tree_util as jtu
-import numpy as np
 import pytest
 
 import cellflow
