@@ -57,8 +57,6 @@ class ConditionEncoder(nn_utils.BaseModule):
         Layers after pooling.
     layers_decoder
         Layers for the decoder. Only relevant if ``'decoder'=True``.
-    output_dropout
-        Dropout rate for the output layer.
     mask_value
         Value for masked elements used in input conditions.
     """
@@ -99,12 +97,12 @@ class ConditionEncoder(nn_utils.BaseModule):
 
         # modules after pooling
         self.after_pool_modules_mean = nn_utils._get_layers(
-            self.layers_after_pool, self.output_dim, self.output_dropout
+            self.layers_after_pool, self.output_dim
         )
 
         if self.condition_mode == "stochastic":
             self.after_pool_modules_var = nn_utils._get_layers(
-                self.layers_after_pool, self.output_dim, self.output_dropout
+                self.layers_after_pool, self.output_dim
             )
 
     def __call__(

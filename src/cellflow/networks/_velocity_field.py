@@ -122,12 +122,12 @@ class ConditionalVelocityField(nn.Module):
                 pooling_kwargs=self.pooling_kwargs,
                 layers_before_pool=self.layers_before_pool,
                 layers_after_pool=self.layers_after_pool,
-                output_dropout=self.cond_output_dropout,
                 covariates_not_pooled=self.covariates_not_pooled,
                 mask_value=self.mask_value,
                 **self.condition_encoder_kwargs,
             )
 
+        self.layer_cond_output_dropout = nn.Dropout(rate=self.cond_output_dropout)
         self.layer_norm_condition = nn.LayerNorm() if self.layer_norm_before_concatenation else lambda x: x
 
         self.time_encoder = MLPBlock(
@@ -175,6 +175,8 @@ class ConditionalVelocityField(nn.Module):
                 ) * jnp.exp(0.5 * cond_logvar)
         else:
             cond_mean, cond_logvar = None, None
+
+        cond_embedding = self.layer_cond_output_dropout(cond_embedding, deterministic=not train)
 
         t_encoded = time_encoder.cyclical_time_encoder(t, n_freqs=self.time_freqs)
         t_encoded = self.time_encoder(t_encoded, training=train)

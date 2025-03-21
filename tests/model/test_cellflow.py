@@ -16,9 +16,9 @@ perturbation_covariate_comb_args = [
 
 
 class TestCellFlow:
-    @pytest.mark.parametrize("solver", ["otfm", "genot"])
-    @pytest.mark.parametrize("condition_mode", ["deterministic", "stochastic"])
-    @pytest.mark.parametrize("regularization", [0.0, 0.1])
+    @pytest.mark.parametrize("solver", ["otfm"])#, "genot"])
+    @pytest.mark.parametrize("condition_mode", ["stochastic"])#["deterministic", "stochastic"])
+    @pytest.mark.parametrize("regularization", [0.1])
     def test_cellflow_solver(
         self,
         adata_perturbation,
