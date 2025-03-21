@@ -548,6 +548,7 @@ class CellFlow:
         sample_rep: str | None = None,
         condition_id_key: str | None = None,
         key_added_prefix: str | None = None,
+        rng: ArrayLike | None = None,
         **kwargs: Any,
     ) -> dict[str, ArrayLike] | None:
         """Predict perturbation responses.
@@ -571,6 +572,10 @@ class CellFlow:
             If not :obj:`None`, prefix to store the prediction in :attr:`~anndata.AnnData.obsm`.
             If :obj:`None`, the predictions are not stored, and the predictions are returned as a
             :class:`dict`.
+        rng
+            Random number generator. If :obj:`None` and :attr:`cellflow.model.CellFlow.conditino_mode`
+            is ``'stochastic'``, the condition vector will be the mean of the learnt distributions,
+            otherwise samples from the distribution.
         kwargs
             Keyword arguments for the predict function, i.e.
             :meth:`cellflow.solvers.OTFlowMatching.predict` or :meth:`cellflow.solvers.GENOT.predict`.
@@ -607,7 +612,7 @@ class CellFlow:
         src = batch["source"]
         condition = batch.get("condition", None)
         out = jax.tree.map(
-            functools.partial(self.solver.predict, **kwargs),
+            functools.partial(self.solver.predict, rng=rng, **kwargs),
             src,
             condition,  # type: ignore[attr-defined]
         )

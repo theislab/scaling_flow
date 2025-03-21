@@ -7,11 +7,11 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 from flax.training import train_state
-from ott import utils as ott_utils
 from ott.neural.methods.flows import dynamics
 from ott.neural.networks import velocity_field
 from ott.solvers import utils as solver_utils
 
+from cellflow import utils
 from cellflow._types import ArrayLike
 from cellflow.model._utils import _multivariate_normal
 
@@ -249,12 +249,13 @@ class GENOT:
         kwargs.setdefault("dt0", None)
         kwargs.setdefault("solver", diffrax.Tsit5())
         kwargs.setdefault("stepsize_controller", diffrax.PIDController(rtol=1e-5, atol=1e-5))
-        kwargs.setdefault("max_steps", 20000)
+        kwargs.setdefault("max_steps", 100000)
 
-        rng = ott_utils.default_prng_key(rng) if rng is None else rng
+        use_mean = True if rng is None else False
+        rng = utils.default_prng_key(rng) if rng is None else rng
         condition_mean, condition_logvar = self.get_condition_embedding(condition, return_as_numpy=False)
 
-        if self.condition_encoder_mode == "deterministic":
+        if self.condition_encoder_mode == "deterministic" or use_mean:
             cond_embedding = condition_mean
         else:
             rng, rng_embed = jax.random.split(rng)
@@ -289,7 +290,6 @@ class GENOT:
             )
             return sol.ys[0]
 
-        rng = ott_utils.default_prng_key(rng)
         latent = self.latent_noise_fn(rng, (len(x),))
 
         x_pred = jax.jit(jax.vmap(solve_ode, in_axes=(0, (0, None))))(latent, (x[:, None], cond_embedding))

@@ -9,6 +9,7 @@ from flax.training import train_state
 from ott.neural.methods.flows import dynamics
 from ott.solvers import utils as solver_utils
 
+from cellflow import utils
 from cellflow._types import ArrayLike
 from cellflow.networks._velocity_field import ConditionalVelocityField
 
@@ -175,11 +176,13 @@ class OTFlowMatching:
         kwargs.setdefault("dt0", None)
         kwargs.setdefault("solver", diffrax.Tsit5())
         kwargs.setdefault("stepsize_controller", diffrax.PIDController(rtol=1e-5, atol=1e-5))
-        kwargs.setdefault("max_steps", 20000)
+        kwargs.setdefault("max_steps", 100000)
 
+        use_mean = True if rng is None else False
+        rng = utils.default_prng_key(rng) if rng is None else rng
         condition_mean, condition_logvar = self.get_condition_embedding(condition, return_as_numpy=False)
 
-        if self.condition_encoder_mode == "deterministic":
+        if self.condition_encoder_mode == "deterministic" or use_mean:
             cond_embedding = condition_mean
         else:
             rng, rng_embed = jax.random.split(rng)
