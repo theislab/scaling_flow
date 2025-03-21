@@ -123,7 +123,7 @@ class GENOT:
                 encoder_loss = self.condition_encoder_regularization * (
                     condition_mean_regularization + condition_var_regularization
                 )
-        
+
                 return flow_matching_loss + encoder_loss
 
             grad_fn = jax.value_and_grad(loss_fn)

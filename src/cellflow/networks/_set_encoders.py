@@ -96,14 +96,10 @@ class ConditionEncoder(nn_utils.BaseModule):
             self.pool_module = nn_utils.SeedAttentionPooling(**self.pooling_kwargs)
 
         # modules after pooling
-        self.after_pool_modules_mean = nn_utils._get_layers(
-            self.layers_after_pool, self.output_dim
-        )
+        self.after_pool_modules_mean = nn_utils._get_layers(self.layers_after_pool, self.output_dim)
 
         if self.condition_mode == "stochastic":
-            self.after_pool_modules_var = nn_utils._get_layers(
-                self.layers_after_pool, self.output_dim
-            )
+            self.after_pool_modules_var = nn_utils._get_layers(self.layers_after_pool, self.output_dim)
 
     def __call__(
         self,
