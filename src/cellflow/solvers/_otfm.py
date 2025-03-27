@@ -165,58 +165,46 @@ class OTFlowMatching:
             return np.asarray(cond_mean), np.asarray(cond_logvar)
         return cond_mean, cond_logvar
 
-    def predict(
-        self,
-        x: ArrayLike,
-        condition: dict[str, ArrayLike],
-        rng: ArrayLike | None = None,
-        **kwargs: Any,
-    ) -> ArrayLike:
-        rng = rng if rng is not None else jax.random.PRNGKey(0)
+    def predict(self, x: ArrayLike, condition: dict[str, ArrayLike], **kwargs: Any) -> ArrayLike:
+        """Predict the translated source ``'x'`` under condition ``'condition'``.
+
+        This function solves the ODE learnt with
+        the :class:`~cellflow.networks.ConditionalVelocityField`.
+
+        Parameters
+        ----------
+        x
+            Input data of shape [batch_size, ...].
+        condition
+            Condition of the input data of shape [batch_size, ...].
+        kwargs
+            Keyword arguments for :func:`diffrax.diffeqsolve`.
+
+        Returns
+        -------
+        The push-forward distribution of ``'x'`` under condition ``'condition'``.
+        """
         kwargs.setdefault("dt0", None)
         kwargs.setdefault("solver", diffrax.Tsit5())
         kwargs.setdefault("stepsize_controller", diffrax.PIDController(rtol=1e-5, atol=1e-5))
-        kwargs.setdefault("max_steps", 100000)
 
-        use_mean = True if rng is None else False
-        rng = utils.default_prng_key(rng) if rng is None else rng
-        condition_mean, condition_logvar = self.get_condition_embedding(condition, return_as_numpy=False)
-
-        if self.condition_encoder_mode == "deterministic" or use_mean:
-            cond_embedding = condition_mean
-        else:
-            rng, rng_embed = jax.random.split(rng)
-            cond_embedding = condition_mean + jax.random.normal(rng_embed, condition_mean.shape) * jnp.exp(
-                0.5 * condition_logvar
-            )
-
-        def vf(t: float, y: jnp.ndarray, args: tuple) -> jnp.ndarray:
-            cond_embedding = args[0]
+        def vf(t: jnp.ndarray, x: jnp.ndarray, cond: dict[str, jnp.ndarray] | None) -> jnp.ndarray:
             params = self.vf_state.params
-            t_array = jnp.array([[t]])
-            y_array = y[None, :]
-            preds, _, _ = self.vf.apply(
-                {"params": params},
-                t=t_array,
-                x_t=y_array,
-                cond_embedding=cond_embedding,
-                train=False,
-            )
-            return preds[0]
+            return self.vf_state.apply_fn({"params": params}, t, x, cond, train=False)
 
-        def solve_ode(x_0: jnp.ndarray, args: tuple) -> jnp.ndarray:
-            term = diffrax.ODETerm(vf)
-            sol = diffrax.diffeqsolve(
-                term,
+        def solve_ode(x: jnp.ndarray, condition: jnp.ndarray | None) -> jnp.ndarray:
+            ode_term = diffrax.ODETerm(vf)
+            result = diffrax.diffeqsolve(
+                ode_term,
                 t0=0.0,
                 t1=1.0,
-                y0=x_0,
-                args=args,
+                y0=x,
+                args=condition,
                 **kwargs,
             )
-            return sol.ys[0]
+            return result.ys[0]
 
-        x_pred = jax.jit(jax.vmap(solve_ode, in_axes=(0, None)))(x, (cond_embedding,))
+        x_pred = jax.jit(jax.vmap(solve_ode, in_axes=[0, None]))(x, condition)
         return np.array(x_pred)
 
     @property

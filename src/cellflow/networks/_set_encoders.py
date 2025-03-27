@@ -193,7 +193,7 @@ class ConditionEncoder(nn_utils.BaseModule):
             conditions_logvar = nn_utils._apply_modules(self.after_pool_modules_var, conditions, None, training)
         else:
             conditions_logvar = jnp.zeros_like(conditions)
-        return conditions, conditions_logvar
+        return conditions
 
     def create_train_state(
         self,

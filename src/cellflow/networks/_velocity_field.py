@@ -166,15 +166,13 @@ class ConditionalVelocityField(nn.Module):
         if cond_embedding is None:
             if cond is None:
                 raise ValueError("Either cond or cond_embedding must be provided.")
-            cond_mean, cond_logvar = self.condition_encoder(cond, training=train)
+            cond_mean = self.condition_encoder(cond, training=train)
             if self.condition_mode == "deterministic":
                 cond_embedding = cond_mean
             else:
-                cond_embedding = cond_mean + jax.random.normal(
-                    self.make_rng("condition_encoder"), cond_mean.shape
-                ) * jnp.exp(0.5 * cond_logvar)
+                raise ValueError("Stochastic condition encoding is not supported.")
         else:
-            cond_mean, cond_logvar = None, None
+            cond_mean = None
 
         cond_embedding = self.layer_cond_output_dropout(cond_embedding, deterministic=not train)
 
@@ -190,7 +188,7 @@ class ConditionalVelocityField(nn.Module):
             (t_encoded, x_encoded, jnp.tile(cond_embedding, (x_encoded.shape[0], 1))), axis=-1
         )
         out = self.decoder(concatenated, training=train)
-        return self.output_layer(out), cond_mean, cond_logvar
+        return self.output_layer(out)
 
     def get_condition_embedding(self, condition: dict[str, jnp.ndarray]) -> jnp.ndarray:
         """Get the embedding of the condition.
@@ -205,11 +203,11 @@ class ConditionalVelocityField(nn.Module):
             Learnt mean and log-variance of the condition embedding.
         """
         if self.encode_conditions:
-            condition_mean, condition_logvar = self.condition_encoder(condition, training=False)
+            condition_mean = self.condition_encoder(condition, training=False)
         else:
             condition = jnp.concatenate(list(condition.values()), axis=-1)
             logger.warning("Condition encoder is not defined. Returning concatenated input as the embedding.")
-        return condition_mean, condition_logvar
+        return condition_mean
 
     def create_train_state(
         self,
@@ -441,13 +439,11 @@ class GENOTConditionalVelocityField(ConditionalVelocityField):
         if cond_embedding is None:
             if cond is None:
                 raise ValueError("Either cond or cond_embedding must be provided.")
-            cond_mean, cond_logvar = self.condition_encoder(cond, training=train)
+            cond_mean = self.condition_encoder(cond, training=train)
             if self.condition_mode == "deterministic":
                 cond_embedding = cond_mean
             else:
-                cond_embedding = cond_mean + jax.random.normal(
-                    self.make_rng("condition_encoder"), cond_mean.shape
-                ) * jnp.exp(0.5 * cond_logvar)
+                raise ValueError("Stochastic condition encoding is not supported.")
         else:
             cond_mean, cond_logvar = None, None
 
