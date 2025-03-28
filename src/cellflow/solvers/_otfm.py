@@ -9,7 +9,6 @@ from flax.training import train_state
 from ott.neural.methods.flows import dynamics
 from ott.solvers import utils as solver_utils
 
-from cellflow import utils
 from cellflow._types import ArrayLike
 from cellflow.networks._velocity_field import ConditionalVelocityField
 
@@ -89,12 +88,12 @@ class OTFlowMatching:
                 )
                 u_t = self.flow.compute_ut(t, x_t, source, target)
                 flow_matching_loss = jnp.mean((v_t - u_t) ** 2)
-                #condition_mean_regularization = 0.5 * jnp.mean(mean_cond**2)
-                #condition_var_regularization = -0.5 * jnp.mean(1 + logvar_cond - jnp.exp(logvar_cond))
-                #encoder_loss = self.condition_encoder_regularization * (
+                # condition_mean_regularization = 0.5 * jnp.mean(mean_cond**2)
+                # condition_var_regularization = -0.5 * jnp.mean(1 + logvar_cond - jnp.exp(logvar_cond))
+                # encoder_loss = self.condition_encoder_regularization * (
                 #    condition_mean_regularization + condition_var_regularization
-                #)
-                return flow_matching_loss #+ encoder_loss
+                # )
+                return flow_matching_loss  # + encoder_loss
 
             grad_fn = jax.value_and_grad(loss_fn)
             loss, grads = grad_fn(vf_state.params, time, source, target, conditions, rng)
