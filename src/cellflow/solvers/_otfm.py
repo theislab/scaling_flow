@@ -80,7 +80,7 @@ class OTFlowMatching:
             ) -> jnp.ndarray:
                 rng_flow, rng_encoder, rng_dropout = jax.random.split(rng, 3)
                 x_t = self.flow.compute_xt(rng_flow, t, source, target)
-                v_t, mean_cond, logvar_cond = vf_state.apply_fn(
+                v_t = vf_state.apply_fn(
                     {"params": params},
                     t,
                     x_t,
@@ -89,12 +89,12 @@ class OTFlowMatching:
                 )
                 u_t = self.flow.compute_ut(t, x_t, source, target)
                 flow_matching_loss = jnp.mean((v_t - u_t) ** 2)
-                condition_mean_regularization = 0.5 * jnp.mean(mean_cond**2)
-                condition_var_regularization = -0.5 * jnp.mean(1 + logvar_cond - jnp.exp(logvar_cond))
-                encoder_loss = self.condition_encoder_regularization * (
-                    condition_mean_regularization + condition_var_regularization
-                )
-                return flow_matching_loss + encoder_loss
+                #condition_mean_regularization = 0.5 * jnp.mean(mean_cond**2)
+                #condition_var_regularization = -0.5 * jnp.mean(1 + logvar_cond - jnp.exp(logvar_cond))
+                #encoder_loss = self.condition_encoder_regularization * (
+                #    condition_mean_regularization + condition_var_regularization
+                #)
+                return flow_matching_loss #+ encoder_loss
 
             grad_fn = jax.value_and_grad(loss_fn)
             loss, grads = grad_fn(vf_state.params, time, source, target, conditions, rng)

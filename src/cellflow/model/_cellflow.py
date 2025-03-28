@@ -612,7 +612,7 @@ class CellFlow:
         src = batch["source"]
         condition = batch.get("condition", None)
         out = jax.tree.map(
-            functools.partial(self.solver.predict, rng=rng, **kwargs),
+            functools.partial(self.solver.predict, **kwargs),
             src,
             condition,  # type: ignore[attr-defined]
         )
