@@ -162,7 +162,7 @@ class ConditionalVelocityField(nn.Module):
         cond: dict[str, jnp.ndarray],
         encoder_noise: jnp.ndarray,
         train: bool = True,
-    ):
+    ) -> tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray]:
         squeeze = x_t.ndim == 1
         if not self.encode_conditions:
             cond_embedding = jnp.concatenate(list(cond.values()), axis=-1)
@@ -171,9 +171,6 @@ class ConditionalVelocityField(nn.Module):
             if self.condition_mode == "deterministic":
                 cond_embedding = cond_mean
             else:
-                print("cond_mean", cond_mean.shape)
-                print("cond_logvar", cond_logvar.shape)
-                print("encoder_noise", encoder_noise.shape)
                 cond_embedding = cond_mean + encoder_noise * jnp.exp(cond_logvar / 2.0)
 
         cond_embedding = self.layer_cond_output_dropout(cond_embedding, deterministic=not train)
@@ -193,7 +190,7 @@ class ConditionalVelocityField(nn.Module):
 
         concatenated = jnp.concatenate((t_encoded, x_encoded, cond_embedding), axis=-1)
         out = self.decoder(concatenated, training=train)
-        return self.output_layer(out)
+        return self.output_layer(out), cond_mean, cond_logvar
 
     def get_condition_embedding(self, condition: dict[str, jnp.ndarray]) -> tuple[jnp.ndarray, jnp.ndarray]:
         """Get the embedding of the condition.
