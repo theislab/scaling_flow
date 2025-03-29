@@ -171,6 +171,9 @@ class ConditionalVelocityField(nn.Module):
             if self.condition_mode == "deterministic":
                 cond_embedding = cond_mean
             else:
+                print("cond_mean", cond_mean.shape)
+                print("cond_logvar", cond_logvar.shape)
+                print("encoder_noise", encoder_noise.shape)
                 cond_embedding = cond_mean + encoder_noise * jnp.exp(cond_logvar / 2.0)
 
         cond_embedding = self.layer_cond_output_dropout(cond_embedding, deterministic=not train)

@@ -67,14 +67,16 @@ class OTFlowMatching:
             time: jnp.ndarray,
             source: jnp.ndarray,
             target: jnp.ndarray,
-            conditions: dict[str, jnp.ndarray] | None,
+            conditions: dict[str, jnp.ndarray],
+            encoder_noise: jnp.ndarray,
         ) -> tuple[Any, Any]:
             def loss_fn(
                 params: jnp.ndarray,
                 t: jnp.ndarray,
                 source: jnp.ndarray,
                 target: jnp.ndarray,
-                conditions: dict[str, jnp.ndarray] | None,
+                conditions: dict[str, jnp.ndarray],
+                encoder_noise: jnp.ndarray,
                 rng: jax.Array,
             ) -> jnp.ndarray:
                 rng_flow, rng_encoder, rng_dropout = jax.random.split(rng, 3)
@@ -84,7 +86,7 @@ class OTFlowMatching:
                     t,
                     x_t,
                     conditions,
-                    encoder_noise=jax.random.normal(rng_encoder, (self.vf.condition_embedding_dim, 1)),
+                    encoder_noise=encoder_noise,
                     rngs={"dropout": rng_dropout, "condition_encoder": rng_encoder},
                 )
                 u_t = self.flow.compute_ut(t, x_t, source, target)
@@ -97,7 +99,7 @@ class OTFlowMatching:
                 return flow_matching_loss  # + encoder_loss
 
             grad_fn = jax.value_and_grad(loss_fn)
-            loss, grads = grad_fn(vf_state.params, time, source, target, conditions, rng)
+            loss, grads = grad_fn(vf_state.params, time, source, target, conditions, encoder_noise, rng)
             return vf_state.apply_gradients(grads=grads), loss
 
         return vf_step_fn
@@ -123,9 +125,11 @@ class OTFlowMatching:
         """
         src, tgt = batch["src_cell_data"], batch["tgt_cell_data"]
         condition = batch.get("condition")
-        rng_resample, rng_time, rng_step_fn = jax.random.split(rng, 3)
+        rng_resample, rng_time, rng_step_fn, rng_encoder_noise = jax.random.split(rng, 4)
         n = src.shape[0]
         time = self.time_sampler(rng_time, n)
+        encoder_noise = jax.random.normal(rng_encoder_noise, (n, self.vf.condition_embedding_dim))
+        # TODO: test whether it's better to sample the same noise for all samples or different ones
 
         if self.match_fn is not None:
             tmat = self.match_fn(src, tgt)
@@ -139,6 +143,7 @@ class OTFlowMatching:
             src,
             tgt,
             condition,
+            encoder_noise,
         )
         return loss
 
@@ -189,7 +194,7 @@ class OTFlowMatching:
         kwargs.setdefault("stepsize_controller", diffrax.PIDController(rtol=1e-5, atol=1e-5))
 
         rng = jax.random.PRNGKey(0)  # TODO: adapt
-        encoder_noise = jax.random.normal(rng, (self.vf.condition_embedding_dim, 1))
+        encoder_noise = jax.random.normal(rng, (1, self.vf.condition_embedding_dim))
 
         def vf(t: jnp.ndarray, x: jnp.ndarray, args: tuple[dict[str, jnp.ndarray], jnp.ndarray]) -> jnp.ndarray:
             params = self.vf_state.params
