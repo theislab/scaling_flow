@@ -95,6 +95,7 @@ class GENOT:
             target: jnp.ndarray,
             latent: jnp.ndarray,
             conditions: dict[str, jnp.ndarray] | None,
+            encoder_noise: jnp.ndarray,
         ):
             def loss_fn(
                 params: jnp.ndarray,
@@ -103,6 +104,7 @@ class GENOT:
                 target: jnp.ndarray,
                 latent: jnp.ndarray,
                 condition: dict[str, jnp.ndarray] | None,
+                encoder_noise: jnp.ndarray,
                 rng: jax.Array,
             ) -> jnp.ndarray:
                 rng_flow, rng_encoder, rng_dropout = jax.random.split(rng, 3)
@@ -113,21 +115,20 @@ class GENOT:
                     x_t,
                     source,
                     condition,
+                    encoder_noise=encoder_noise,
                     rngs={"dropout": rng_dropout, "condition_encoder": rng_encoder},
                 )
-                u_t = self.flow.compute_ut(t, x_t, latent, target)
-
+                u_t = self.flow.compute_ut(t, x_t, source, target)
                 flow_matching_loss = jnp.mean((v_t - u_t) ** 2)
                 condition_mean_regularization = 0.5 * jnp.mean(mean_cond**2)
                 condition_var_regularization = -0.5 * jnp.mean(1 + logvar_cond - jnp.exp(logvar_cond))
                 encoder_loss = self.condition_encoder_regularization * (
                     condition_mean_regularization + condition_var_regularization
                 )
-
                 return flow_matching_loss + encoder_loss
 
             grad_fn = jax.value_and_grad(loss_fn)
-            loss, grads = grad_fn(vf_state.params, time, source, target, latent, conditions, rng)
+            loss, grads = grad_fn(vf_state.params, time, source, target, latent, conditions, encoder_noise, rng)
 
             return loss, vf_state.apply_gradients(grads=grads)
 
@@ -177,14 +178,16 @@ class GENOT:
         -------
         Loss value.
         """
-        rng = jax.random.split(rng, 5)
-        rng, rng_resample, rng_noise, rng_time, rng_step_fn = rng
+        rng = jax.random.split(rng, 6)
+        rng, rng_resample, rng_noise, rng_time, rng_step_fn, rng_encoder_noise = rng
 
         condition = batch.get("condition")
         (src, tgt), matching_data = self._prepare_data(batch)
         n = src.shape[0]
         time = self.time_sampler(rng_time, n)
         latent = self.latent_noise_fn(rng_noise, (n,))
+        encoder_noise = jax.random.normal(rng_encoder_noise, (n, self.vf.condition_embedding_dim))
+        # TODO: test whether it's better to sample the same noise for all samples or different ones
 
         tmat = self.data_match_fn(*matching_data)
         src_ixs, tgt_ixs = solver_utils.sample_joint(
@@ -193,7 +196,9 @@ class GENOT:
         )
 
         src, tgt = src[src_ixs], tgt[tgt_ixs]
-        loss, self.vf_state = self.vf_step_fn(rng_step_fn, self.vf_state, time, src, tgt, latent, condition)
+        loss, self.vf_state = self.vf_step_fn(
+            rng_step_fn, self.vf_state, time, src, tgt, latent, condition, encoder_noise
+        )
         return loss
 
     def get_condition_embedding(self, condition: dict[str, ArrayLike], return_as_numpy=True) -> ArrayLike:
@@ -225,6 +230,7 @@ class GENOT:
         x: ArrayLike,
         condition: dict[str, ArrayLike] | None = None,
         rng: ArrayLike | None = None,
+        rng_genot: ArrayLike | None = None,
         **kwargs: Any,
     ) -> ArrayLike | tuple[ArrayLike, diffrax.Solution]:
         """Generate the push-forward of ``'source'`` under condition ``'condition'``.
@@ -239,7 +245,11 @@ class GENOT:
         condition
             Condition of the input data of shape [batch_size, ...].
         rng
-            Random generate used to sample from the latent distribution.
+            Random number generator to sample from the latent distribution,
+            only used if ``'condition_mode'='stochastic'``. If :obj:`None`, the
+            mean embedding is used.
+        rng_genot
+            Random generate used to sample from the latent distribution in cell space.
         kwargs
             Keyword arguments for :func:`diffrax.diffeqsolve`.
 
@@ -250,50 +260,34 @@ class GENOT:
         kwargs.setdefault("dt0", None)
         kwargs.setdefault("solver", diffrax.Tsit5())
         kwargs.setdefault("stepsize_controller", diffrax.PIDController(rtol=1e-5, atol=1e-5))
-        kwargs.setdefault("max_steps", 100000)
 
-        use_mean = True if rng is None else False
-        rng = utils.default_prng_key(rng) if rng is None else rng
-        condition_mean, condition_logvar = self.get_condition_embedding(condition, return_as_numpy=False)
+        noise_dim = (1, self.vf.condition_embedding_dim)
+        use_mean = rng is None or self.condition_encoder_mode == "deterministic"
+        rng = utils.default_prng_key(rng)
+        encoder_noise = jnp.zeros(noise_dim) if use_mean else jax.random.normal(rng, noise_dim)
+        rng_genot = utils.default_prng_key(rng_genot)
+        latent = self.latent_noise_fn(rng_genot, (x.shape[0],))
 
-        if self.condition_encoder_mode == "deterministic" or use_mean:
-            cond_embedding = condition_mean
-        else:
-            rng, rng_embed = jax.random.split(rng)
-            cond_embedding = condition_mean + jax.random.normal(rng_embed, condition_mean.shape) * jnp.exp(
-                0.5 * condition_logvar
-            )
-
-        def vf(t: float, y: jnp.ndarray, args: tuple) -> jnp.ndarray:
-            x_0, cond_embedding = args
+        def vf(t: float, x: jnp.ndarray, args: tuple[dict[str, jnp.ndarray], jnp.ndarray]) -> jnp.ndarray:
             params = self.vf_state.params
-            t_array = jnp.array([[t]])
-            y_array = y[None, :]
-            preds, _, _ = self.vf.apply(
-                {"params": params},
-                t=t_array,
-                x_t=y_array,
-                x_0=x_0,
-                cond_embedding=cond_embedding,
-                train=False,
-            )
-            return preds[0]
+            x_0, condition, encoder_noise = args
+            return self.vf_state.apply_fn({"params": params}, t, x, x_0, condition, encoder_noise, train=False)[0]
 
-        def solve_ode(latent: jnp.ndarray, args: tuple) -> jnp.ndarray:
+        def solve_ode(
+            latent: jnp.ndarray, x: jnp.ndarray, condition: dict[str, jnp.ndarray], encoder_noise: jnp.ndarray
+        ) -> jnp.ndarray:
             term = diffrax.ODETerm(vf)
             sol = diffrax.diffeqsolve(
                 term,
                 t0=0.0,
                 t1=1.0,
                 y0=latent,
-                args=args,
+                args=(x, condition, encoder_noise),
                 **kwargs,
             )
             return sol.ys[0]
 
-        latent = self.latent_noise_fn(rng, (len(x),))
-
-        x_pred = jax.jit(jax.vmap(solve_ode, in_axes=(0, (0, None))))(latent, (x[:, None], cond_embedding))
+        x_pred = jax.jit(jax.vmap(solve_ode, in_axes=[0, 0, None, None]))(latent, x, condition, encoder_noise)
         return np.array(x_pred)
 
     @property

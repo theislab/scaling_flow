@@ -400,7 +400,7 @@ class GENOTConditionalVelocityField(ConditionalVelocityField):
                 mask_value=self.mask_value,
                 **self.condition_encoder_kwargs,
             )
-
+        self.layer_cond_output_dropout = nn.Dropout(rate=self.cond_output_dropout)
         self.layer_norm_condition = nn.LayerNorm() if self.layer_norm_before_concatenation else lambda x: x
 
         self.time_encoder = MLPBlock(
@@ -444,12 +444,16 @@ class GENOTConditionalVelocityField(ConditionalVelocityField):
         encoder_noise: jnp.ndarray,
         train: bool = True,
     ):
-        cond_mean, cond_logvar = self.condition_encoder(cond, training=train)
-        if self.condition_mode == "deterministic":
-            cond_embedding = cond_mean
+        squeeze = x_t.ndim == 1
+        if not self.encode_conditions:
+            cond_embedding = jnp.concatenate(list(cond.values()), axis=-1)
         else:
-            cond_embedding = cond_mean + encoder_noise * jnp.exp(cond_logvar / 2.0)
-
+            cond_mean, cond_logvar = self.condition_encoder(cond, training=train)
+            if self.condition_mode == "deterministic":
+                cond_embedding = cond_mean
+            else:
+                cond_embedding = cond_mean + encoder_noise * jnp.exp(cond_logvar / 2.0)
+        cond_embedding = self.layer_cond_output_dropout(cond_embedding, deterministic=not train)
         t_encoded = time_encoder.cyclical_time_encoder(t, n_freqs=self.time_freqs)
         t_encoded = self.time_encoder(t_encoded, training=train)
         x_encoded = self.x_encoder(x_t, training=train)
@@ -460,9 +464,12 @@ class GENOTConditionalVelocityField(ConditionalVelocityField):
         x_0_encoded = self.layer_norm_x_0(x_0_encoded)
         cond_embedding = self.layer_norm_condition(cond_embedding)
 
-        concatenated = jnp.concatenate(
-            (t_encoded, x_encoded, x_0_encoded, jnp.tile(cond_embedding, (x_encoded.shape[0], 1))), axis=-1
-        )
+        if squeeze:
+            cond_embedding = jnp.squeeze(cond_embedding)  # , 0)
+        elif cond_embedding.shape[0] != x_t.shape[0]:  # type: ignore[attr-defined]
+            cond_embedding = jnp.tile(cond_embedding, (x_t.shape[0], 1))
+
+        concatenated = jnp.concatenate((t_encoded, x_encoded, x_0_encoded, cond_embedding), axis=-1)
         out = self.decoder(concatenated, training=train)
         return self.output_layer(out), cond_mean, cond_logvar
 

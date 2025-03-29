@@ -9,6 +9,7 @@ from flax.training import train_state
 from ott.neural.methods.flows import dynamics
 from ott.solvers import utils as solver_utils
 
+from cellflow import utils
 from cellflow._types import ArrayLike
 from cellflow.networks._velocity_field import ConditionalVelocityField
 
@@ -69,7 +70,7 @@ class OTFlowMatching:
             target: jnp.ndarray,
             conditions: dict[str, jnp.ndarray],
             encoder_noise: jnp.ndarray,
-        ) -> tuple[Any, Any]:
+        ):
             def loss_fn(
                 params: jnp.ndarray,
                 t: jnp.ndarray,
@@ -170,7 +171,9 @@ class OTFlowMatching:
             return np.asarray(cond_mean), np.asarray(cond_logvar)
         return cond_mean, cond_logvar
 
-    def predict(self, x: ArrayLike, condition: dict[str, ArrayLike], **kwargs: Any) -> ArrayLike:
+    def predict(
+        self, x: ArrayLike, condition: dict[str, ArrayLike], rng: jax.Array | None = None, **kwargs: Any
+    ) -> ArrayLike:
         """Predict the translated source ``'x'`` under condition ``'condition'``.
 
         This function solves the ODE learnt with
@@ -182,6 +185,10 @@ class OTFlowMatching:
             Input data of shape [batch_size, ...].
         condition
             Condition of the input data of shape [batch_size, ...].
+        rng
+            Random number generator to sample from the latent distribution,
+            only used if ``'condition_mode'='stochastic'``. If :obj:`None`, the
+            mean embedding is used.
         kwargs
             Keyword arguments for :func:`diffrax.diffeqsolve`.
 
@@ -193,15 +200,17 @@ class OTFlowMatching:
         kwargs.setdefault("solver", diffrax.Tsit5())
         kwargs.setdefault("stepsize_controller", diffrax.PIDController(rtol=1e-5, atol=1e-5))
 
-        rng = jax.random.PRNGKey(0)  # TODO: adapt
-        encoder_noise = jax.random.normal(rng, (1, self.vf.condition_embedding_dim))
+        noise_dim = (1, self.vf.condition_embedding_dim)
+        use_mean = rng is None or self.condition_encoder_mode == "deterministic"
+        rng = utils.default_prng_key(rng)
+        encoder_noise = jnp.zeros(noise_dim) if use_mean else jax.random.normal(rng, noise_dim)
 
         def vf(t: jnp.ndarray, x: jnp.ndarray, args: tuple[dict[str, jnp.ndarray], jnp.ndarray]) -> jnp.ndarray:
             params = self.vf_state.params
             condition, encoder_noise = args
             return self.vf_state.apply_fn({"params": params}, t, x, condition, encoder_noise, train=False)[0]
 
-        def solve_ode(x: jnp.ndarray, condition: jnp.ndarray | None, encoder_noise: jnp.ndarray) -> jnp.ndarray:
+        def solve_ode(x: jnp.ndarray, condition: dict[str, jnp.ndarray], encoder_noise: jnp.ndarray) -> jnp.ndarray:
             ode_term = diffrax.ODETerm(vf)
             result = diffrax.diffeqsolve(
                 ode_term,
