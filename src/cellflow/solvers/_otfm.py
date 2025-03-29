@@ -84,6 +84,7 @@ class OTFlowMatching:
                     t,
                     x_t,
                     conditions,
+                    encoder_noise=jax.random.normal(rng_encoder, (self.vf.condition_embedding_dim, 1)),
                     rngs={"dropout": rng_dropout, "condition_encoder": rng_encoder},
                 )
                 u_t = self.flow.compute_ut(t, x_t, source, target)
@@ -187,23 +188,27 @@ class OTFlowMatching:
         kwargs.setdefault("solver", diffrax.Tsit5())
         kwargs.setdefault("stepsize_controller", diffrax.PIDController(rtol=1e-5, atol=1e-5))
 
-        def vf(t: jnp.ndarray, x: jnp.ndarray, cond: dict[str, jnp.ndarray] | None) -> jnp.ndarray:
-            params = self.vf_state.params
-            return self.vf_state.apply_fn({"params": params}, t, x, cond, train=False)
+        rng = jax.random.PRNGKey(0)  # TODO: adapt
+        encoder_noise = jax.random.normal(rng, (self.vf.condition_embedding_dim, 1))
 
-        def solve_ode(x: jnp.ndarray, condition: jnp.ndarray | None) -> jnp.ndarray:
+        def vf(t: jnp.ndarray, x: jnp.ndarray, args: tuple[dict[str, jnp.ndarray], jnp.ndarray]) -> jnp.ndarray:
+            params = self.vf_state.params
+            condition, encoder_noise = args
+            return self.vf_state.apply_fn({"params": params}, t, x, condition, encoder_noise, train=False)
+
+        def solve_ode(x: jnp.ndarray, condition: jnp.ndarray | None, encoder_noise: jnp.ndarray) -> jnp.ndarray:
             ode_term = diffrax.ODETerm(vf)
             result = diffrax.diffeqsolve(
                 ode_term,
                 t0=0.0,
                 t1=1.0,
                 y0=x,
-                args=condition,
+                args=(condition, encoder_noise),
                 **kwargs,
             )
             return result.ys[0]
 
-        x_pred = jax.jit(jax.vmap(solve_ode, in_axes=[0, None]))(x, condition)
+        x_pred = jax.jit(jax.vmap(solve_ode, in_axes=[0, None, None]))(x, condition, encoder_noise)
         return np.array(x_pred)
 
     @property

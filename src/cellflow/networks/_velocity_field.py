@@ -159,23 +159,19 @@ class ConditionalVelocityField(nn.Module):
         self,
         t: jnp.ndarray,
         x_t: jnp.ndarray,
-        cond: dict[str, jnp.ndarray] | None = None,
-        cond_embedding: jnp.ndarray | None = None,
+        cond: dict[str, jnp.ndarray],
+        encoder_noise: jnp.ndarray,
         train: bool = True,
     ):
         squeeze = x_t.ndim == 1
         if not self.encode_conditions:
-            cond = jnp.concatenate(list(cond.values()), axis=-1)
-        elif cond_embedding is None:
-            if cond is None:
-                raise ValueError("Either cond or cond_embedding must be provided.")
-            cond_mean = self.condition_encoder(cond, training=train)
+            cond_embedding = jnp.concatenate(list(cond.values()), axis=-1)
+        else:
+            cond_mean, cond_logvar = self.condition_encoder(cond, training=train)
             if self.condition_mode == "deterministic":
                 cond_embedding = cond_mean
             else:
-                raise ValueError("Stochastic condition encoding is not supported.")
-        else:
-            cond_mean = None
+                cond_embedding = cond_mean + encoder_noise * jnp.exp(cond_logvar / 2.0)
 
         cond_embedding = self.layer_cond_output_dropout(cond_embedding, deterministic=not train)
 
@@ -196,7 +192,7 @@ class ConditionalVelocityField(nn.Module):
         out = self.decoder(concatenated, training=train)
         return self.output_layer(out)
 
-    def get_condition_embedding(self, condition: dict[str, jnp.ndarray]) -> jnp.ndarray:
+    def get_condition_embedding(self, condition: dict[str, jnp.ndarray]) -> tuple[jnp.ndarray, jnp.ndarray]:
         """Get the embedding of the condition.
 
         Parameters
@@ -209,11 +205,11 @@ class ConditionalVelocityField(nn.Module):
             Learnt mean and log-variance of the condition embedding.
         """
         if self.encode_conditions:
-            condition_mean = self.condition_encoder(condition, training=False)
+            condition_mean, condition_logvar = self.condition_encoder(condition, training=False)
         else:
             condition = jnp.concatenate(list(condition.values()), axis=-1)
             logger.warning("Condition encoder is not defined. Returning concatenated input as the embedding.")
-        return condition_mean
+        return condition_mean, condition_logvar
 
     def create_train_state(
         self,
@@ -238,13 +234,19 @@ class ConditionalVelocityField(nn.Module):
             The training state.
         """
         t, x_t = jnp.ones((1, 1)), jnp.ones((1, input_dim))
+        encoder_noise = jnp.ones((1, self.condition_embedding_dim))
         cond = {
             pert_cov: jnp.ones((1, self.max_combination_length, condition.shape[-1]))
             for pert_cov, condition in conditions.items()
         }
         params_rng, condition_encoder_rng = jax.random.split(rng, 2)
         params = self.init(
-            {"params": params_rng, "condition_encoder": condition_encoder_rng}, t=t, x_t=x_t, cond=cond, train=False
+            {"params": params_rng, "condition_encoder": condition_encoder_rng},
+            t=t,
+            x_t=x_t,
+            cond=cond,
+            encoder_noise=encoder_noise,
+            train=False,
         )["params"]
         return train_state.TrainState.create(apply_fn=self.apply, params=params, tx=optimizer)
 
@@ -438,20 +440,15 @@ class GENOTConditionalVelocityField(ConditionalVelocityField):
         t: jnp.ndarray,
         x_t: jnp.ndarray,
         x_0: jnp.ndarray,
-        cond: dict[str, jnp.ndarray] | None = None,
-        cond_embedding: jnp.ndarray | None = None,
+        cond: dict[str, jnp.ndarray],
+        encoder_noise: jnp.ndarray,
         train: bool = True,
     ):
-        if cond_embedding is None:
-            if cond is None:
-                raise ValueError("Either cond or cond_embedding must be provided.")
-            cond_mean = self.condition_encoder(cond, training=train)
-            if self.condition_mode == "deterministic":
-                cond_embedding = cond_mean
-            else:
-                raise ValueError("Stochastic condition encoding is not supported.")
+        cond_mean, cond_logvar = self.condition_encoder(cond, training=train)
+        if self.condition_mode == "deterministic":
+            cond_embedding = cond_mean
         else:
-            cond_mean, cond_logvar = None, None
+            cond_embedding = cond_mean + encoder_noise * jnp.exp(cond_logvar / 2.0)
 
         t_encoded = time_encoder.cyclical_time_encoder(t, n_freqs=self.time_freqs)
         t_encoded = self.time_encoder(t_encoded, training=train)
@@ -492,6 +489,7 @@ class GENOTConditionalVelocityField(ConditionalVelocityField):
             The training state.
         """
         t, x_t, x_0 = jnp.ones((1, 1)), jnp.ones((1, input_dim)), jnp.ones((1, input_dim))
+        encoder_noise = jnp.ones((1, self.condition_embedding_dim))
         cond = {
             pert_cov: jnp.ones((1, self.max_combination_length, condition.shape[-1]))
             for pert_cov, condition in conditions.items()
@@ -503,6 +501,7 @@ class GENOTConditionalVelocityField(ConditionalVelocityField):
             x_t=x_t,
             x_0=x_0,
             cond=cond,
+            encoder_noise=encoder_noise,
             train=False,
         )["params"]
         return train_state.TrainState.create(apply_fn=self.apply, params=params, tx=optimizer)
