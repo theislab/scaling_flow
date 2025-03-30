@@ -94,9 +94,12 @@ class OTFlowMatching:
                 flow_matching_loss = jnp.mean((v_t - u_t) ** 2)
                 condition_mean_regularization = 0.5 * jnp.mean(mean_cond**2)
                 condition_var_regularization = -0.5 * jnp.mean(1 + logvar_cond - jnp.exp(logvar_cond))
-                encoder_loss = self.condition_encoder_regularization * (
-                    condition_mean_regularization + condition_var_regularization
-                )
+                if self.condition_encoder_mode == "stochastic":
+                    encoder_loss = condition_mean_regularization + condition_var_regularization
+                elif (self.condition_encoder_mode == "deterministic") and (self.condition_encoder_regularization > 0):
+                    encoder_loss = condition_mean_regularization
+                else:
+                    encoder_loss = 0.0
                 return flow_matching_loss + encoder_loss
 
             grad_fn = jax.value_and_grad(loss_fn)
