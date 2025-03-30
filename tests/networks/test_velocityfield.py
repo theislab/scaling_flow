@@ -43,8 +43,9 @@ class TestVelocityField:
         assert vf.output_dims == decoder_dims + (5,)
 
         vf_rng = jax.random.PRNGKey(111)
-        vf_rng, apply_rng = jax.random.split(vf_rng)
+        vf_rng, apply_rng, encoder_noise_rng = jax.random.split(vf_rng, 3)
         opt = optax.adam(1e-3)
+        encoder_noise = jax.random.normal(encoder_noise_rng, (x_test.shape[0], vf.condition_embedding_dim))
         vf_state = vf.create_train_state(rng=vf_rng, optimizer=opt, input_dim=5, conditions=cond)
         if isinstance(vf, _velocity_field.GENOTConditionalVelocityField):
             out, out_mean, out_logvar = vf_state.apply_fn(
@@ -53,12 +54,19 @@ class TestVelocityField:
                 x_test,
                 x_0_test,
                 cond,
+                encoder_noise,
                 train=True,
                 rngs={"condition_encoder": apply_rng},
             )
         elif isinstance(vf, _velocity_field.ConditionalVelocityField):
             out, out_mean, out_logvar = vf_state.apply_fn(
-                {"params": vf_state.params}, t_test, x_test, cond, train=True, rngs={"condition_encoder": apply_rng}
+                {"params": vf_state.params},
+                t_test,
+                x_test,
+                cond,
+                encoder_noise,
+                train=True,
+                rngs={"condition_encoder": apply_rng},
             )
         else:
             raise ValueError("Invalid velocity field class.")

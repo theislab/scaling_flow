@@ -827,3 +827,8 @@ class CellFlow:
         if not isinstance(vf, _velocity_field.ConditionalVelocityField):
             raise ValueError(f"Expected `vf` to be an instance of `ConditionalVelocityField`, found `{type(vf)}`.")
         self._vf = vf
+
+    @property
+    def condition_mode(self) -> Literal["deterministic", "stochastic"]:
+        """The mode of the encoder."""
+        return self.velocity_field.condition_mode

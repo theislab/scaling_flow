@@ -203,6 +203,8 @@ class ConditionalVelocityField(nn.Module):
         Returns
         -------
             Learnt mean and log-variance of the condition embedding.
+            If :attr:`cellflow.model.CellFlow.condition_mode` is ``'deterministic'``, the log-variance
+            is set to zero.
         """
         if self.encode_conditions:
             condition_mean, condition_logvar = self.condition_encoder(condition, training=False)
@@ -228,6 +230,8 @@ class ConditionalVelocityField(nn.Module):
                 Optimizer.
             input_dim
                 Dimensionality of the velocity field.
+            conditions
+                Conditions describing the perturbation.
 
         Returns
         -------
@@ -343,8 +347,10 @@ class GENOTConditionalVelocityField(ConditionalVelocityField):
             Dimensions of the output layers.
         decoder_dropout
             Dropout rate for the output layers.
-        genot_source_layers
-            TODO
+        genot_source_dims
+            Dimensions of the layers processing the source cells.
+        genot_source_dropout
+            Dropout rate for the layers processing the source cells.
         layer_norm_before_concatenation
             If :obj:`True`, applies layer normalization before concatenating
             the embedded time, embedded data, and condition embeddings.
@@ -490,6 +496,8 @@ class GENOTConditionalVelocityField(ConditionalVelocityField):
                 Optimizer.
             input_dim
                 Dimensionality of the velocity field.
+            conditions
+                Conditions describing the perturbation.
 
         Returns
         -------
