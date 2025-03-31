@@ -232,29 +232,29 @@ class CellFlow:
         encode_conditions: bool = True,
         condition_mode: Literal["deterministic", "stochastic"] = "deterministic",
         regularization: float = 0.0,
-        condition_embedding_dim: int = 32,
         pooling: Literal["mean", "attention_token", "attention_seed"] = "attention_token",
         pooling_kwargs: dict[str, Any] = types.MappingProxyType({}),
-        time_encoder_dims: Sequence[int] = (1024, 1024, 1024),
-        time_encoder_dropout: float = 0.0,
-        hidden_dims: Sequence[int] = (1024, 1024, 1024),
-        hidden_dropout: float = 0.0,
-        decoder_dims: Sequence[int] = (1024, 1024, 1024),
-        decoder_dropout: float = 0.0,
         layers_before_pool: Layers_separate_input_t | Layers_t = dc_field(default_factory=lambda: []),
         layers_after_pool: Layers_t = dc_field(default_factory=lambda: []),
-        cond_output_dropout: float = 0.0,
+        condition_embedding_dim: int = 256,
+        cond_output_dropout: float = 0.9,
         condition_encoder_kwargs: dict[str, Any] | None = None,
         pool_sample_covariates: bool = True,
-        vf_act_fn: Callable[[jnp.ndarray], jnp.ndarray] = nn.silu,
         time_freqs: int = 1024,
-        solver_kwargs: dict[str, Any] | None = None,
+        time_encoder_dims: Sequence[int] = (2048, 2048, 2048),
+        time_encoder_dropout: float = 0.0,
+        hidden_dims: Sequence[int] = (2048, 2048, 2048),
+        hidden_dropout: float = 0.0,
+        decoder_dims: Sequence[int] = (4096, 4096, 4096),
+        decoder_dropout: float = 0.0,
+        vf_act_fn: Callable[[jnp.ndarray], jnp.ndarray] = nn.silu,
+        vf_kwargs: dict[str, Any] | None = None,
         flow: dict[Literal["constant_noise", "bridge"], float] | None = None,
         match_fn: Callable[[ArrayLike, ArrayLike], ArrayLike] = match_linear,
-        optimizer: optax.GradientTransformation = optax.adam(1e-4),
+        optimizer: optax.GradientTransformation = optax.MultiSteps(optax.adam(5e-5), 20),
+        solver_kwargs: dict[str, Any] | None = None,
         layer_norm_before_concatenation: bool = False,
         linear_projection_before_concatenation: bool = False,
-        vf_kwargs: dict[str, Any] | None = None,
         seed=0,
     ) -> None:
         """Prepare the model for training.
@@ -280,6 +280,7 @@ class CellFlow:
             - ``'stochastic'``: Learns a Gaussian distribution for representing conditions.
         regularization
             Regularization strength in the latent space:
+
             - For deterministic mode, it is the strength of the L2 regularization.
             - For stochastic mode, it is the strength of the VAE regularization.
         pooling
@@ -298,24 +299,6 @@ class CellFlow:
               ``'attention_token'``.
             - :class:`cellflow.networks.SeedAttentionPooling` if ``'pooling'`` is ``'attention_seed'``.
 
-        condition_embedding_dim
-            Dimensions of the condition embedding, i.e. the last layer of the
-            :class:`cellflow.networks.ConditionEncoder`.
-        condition_encoder_kwargs
-            Keyword arguments for the :class:`cellflow.networks.ConditionEncoder`.
-        time_encoder_dims
-            Dimensions of the layers processing the time embedding in
-            :attr:`cellflow.networks.ConditionalVelocityField.time_encoder`.
-        time_encoder_dropout
-            Dropout rate for the :attr:`cellflow.networks.ConditionalVelocityField.time_encoder`.
-        hidden_dims
-            Dimensions of the layers processing the input to the velocity field
-            via :attr:`cellflow.networks.ConditionalVelocityField.x_encoder`.
-        hidden_dropout
-            Dropout rate for :attr:`cellflow.networks.ConditionalVelocityField.x_encoder`.
-        decoder_dims
-            Dimensions of the output layers in
-            :attr:`cellflow.networks.ConditionalVelocityField.decoder`.
         layers_before_pool
             Layers applied to the condition embeddings before pooling. Can be of type
 
@@ -339,23 +322,44 @@ class CellFlow:
             - Further keys depend on the layer type, either for :class:`cellflow.networks.MLPBlock` or
               for :class:`cellflow.networks.SelfAttentionBlock`.
 
+        condition_embedding_dim
+            Dimensions of the condition embedding, i.e. the last layer of the
+            :class:`cellflow.networks.ConditionEncoder`.
         cond_output_dropout
             Dropout rate for the last layer of the :class:`cellflow.networks.ConditionEncoder`.
         condition_encoder_kwargs
             Keyword arguments for the :class:`cellflow.networks.ConditionEncoder`.
         pool_sample_covariates
             Whether to include sample covariates in the pooling.
-        vf_act_fn
-            Activation function of the :class:`cellflow.networks.ConditionalVelocityField`.
         time_freqs
-            Frequency of the time encoding
+            Frequency of the sinusoidal time encoding
             (:func:`ott.neural.networks.layers.cyclical_time_encoder`).
-        solver_kwargs
-            Keyword arguments for the solver :class:`cellflow.solvers.OTFlowMatching` or
-            :class:`cellflow.solvers.GENOT`.
+        time_encoder_dims
+            Dimensions of the layers processing the time embedding in
+            :attr:`cellflow.networks.ConditionalVelocityField.time_encoder`.
+        time_encoder_dropout
+            Dropout rate for the :attr:`cellflow.networks.ConditionalVelocityField.time_encoder`.
+        hidden_dims
+            Dimensions of the layers processing the input to the velocity field
+            via :attr:`cellflow.networks.ConditionalVelocityField.x_encoder`.
+        hidden_dropout
+            Dropout rate for :attr:`cellflow.networks.ConditionalVelocityField.x_encoder`.
+        decoder_dims
+            Dimensions of the output layers in
+            :attr:`cellflow.networks.ConditionalVelocityField.decoder`.
         decoder_dropout
             Dropout rate for the output layer
             :attr:`cellflow.networks.ConditionalVelocityField.decoder`.
+        vf_act_fn
+            Activation function of the :class:`cellflow.networks.ConditionalVelocityField`.
+        vf_kwargs
+            Additional keyword arguments for the solver-specific vector field.
+            For instance, when ``'solver==genot'``, the following keyword argument can be passed:
+
+                - ``'genot_source_dims'`` of type :class:`tuple` with the dimensions
+                  of the :class:`cellflow.networks.MLPBlock` processing the source cell.
+                - ``'genot_source_dropout'`` of type :class:`float` indicating the dropout rate
+                  for the source cell processing.
         flow
             Flow to use for training. Should be a :class:`dict` of the form
 
@@ -369,21 +373,15 @@ class CellFlow:
             :func:`cellflow.utils.match_linear`.
         optimizer
             Optimizer used for training.
+        solver_kwargs
+            Keyword arguments for the solver :class:`cellflow.solvers.OTFlowMatching` or
+            :class:`cellflow.solvers.GENOT`.
         layer_norm_before_concatenation
             If :obj:`True`, applies layer normalization before concatenating
             the embedded time, embedded data, and condition embeddings.
         linear_projection_before_concatenation
             If :obj:`True`, applies a linear projection before concatenating
-            the embedded time, embedded data.
-        vf_kwargs
-            Additional keyword arguments for the solver-specific vector field.
-            For instance, when ``'solver==genot'``, the following keyword argument can be passed:
-
-                - ``'genot_source_dims'`` of type :class:`tuple` with the dimensions
-                  of the :class:`cellflow.networks.MLPBlock` processing the source cell.
-                - ``'genot_source_dropout'`` of type :class:`float` indicating the dropout rate
-                  for the source cell processing.
-
+            the embedded time, embedded data, and embedded condition.
         seed
             Random seed.
 
