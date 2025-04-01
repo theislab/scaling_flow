@@ -787,9 +787,13 @@ class DataManager:
             cov_name = value if self.is_categorical else primary_cov
             if primary_group in self._covariate_reps:
                 rep_key = self._covariate_reps[primary_group]
-                if cov_name not in rep_dict[rep_key]:
-                    raise ValueError(f"Representation for '{cov_name}' not found in `adata.uns['{rep_key}']`.")
-                prim_arr = jnp.asarray(rep_dict[rep_key][cov_name])
+                try:
+                    prim_arr = rep_dict[rep_key][cov_name]
+                except KeyError as err:
+                    raise ValueError(
+                        f"Representation for '{cov_name}' not found in `adata.uns['{rep_key}']` or `rep_dict`."
+                    ) from err
+                prim_arr = jnp.asarray(prim_arr)
             else:
                 prim_arr = jnp.asarray(
                     self.primary_one_hot_encoder.transform(  # type: ignore[union-attr]

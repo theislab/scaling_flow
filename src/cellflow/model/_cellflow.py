@@ -649,7 +649,8 @@ class CellFlow:
             - an instance of :class:`~cellflow.data.ConditionData`.
 
         rep_dict
-            Dictionary containing the representations of the perturbation covariates.
+            Dictionary containing the representations of the perturbation covariates. Will be considered an
+            empty dictionary if :obj:`None`.
         condition_id_key
             Key defining the name of the condition. Only available
             if ``'covariate_data'`` is a :class:`~pandas.DataFrame`.
