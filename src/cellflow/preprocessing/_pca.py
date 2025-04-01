@@ -26,7 +26,7 @@ def centered_pca(
     n_comps
         Number of principal components to compute.
     layer
-        Layer in :attr:`~anndata.AnnData.layers` to use for PCA.
+        Layer in :attr:`~anndata.AnnData.layers` to use for PCA. If `None`, uses `adata.X`.
     method
         Method to use for PCA. If ``"rapids"``, uses :func:`rapids_singlecell.pp.pca` with GPU acceleration.
         Otherwise, uses :func:`scanpy.pp.pca`.
