@@ -6,3 +6,4 @@ Model
     :toctree: genapi
 
     datasets.ineurons
+    datasets.pbmc_cytokines

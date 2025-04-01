@@ -8,6 +8,7 @@ from cellflow._types import PathLike
 
 __all__ = [
     "ineurons",
+    "pbmc_cytokines",
 ]
 
 
@@ -37,6 +38,39 @@ def ineurons(
     return _load_dataset_from_url(
         path,
         backup_url="https://figshare.com/ndownloader/files/52852961",
+        expected_shape=(54134, 2000),  # TODO: adapt this, and enable check
+        force_download=force_download,
+        **kwargs,
+    )
+
+
+def pbmc_cytokines(
+    path: PathLike = "~/.cache/cellflow/pbmc_parse.h5ad",
+    force_download: bool = False,
+    **kwargs: Any,
+) -> ad.AnnData:
+    """PBMC samples from 12 donors treated with 90 cytokines.
+
+    Processed data from https://www.parsebiosciences.com/datasets/10-million-human-pbmcs-in-a-single-experiment/,
+    subset to 2000 highly varibale genes, containing embeddings for
+    donors and cytokines.
+
+    Parameters
+    ----------
+    path
+        Path where to save the file.
+    force_download
+        Whether to force-download the data.
+    kwargs
+        Keyword arguments for :func:`scanpy.read`.
+
+    Returns
+    -------
+    Annotated data object.
+    """
+    return _load_dataset_from_url(
+        path,
+        backup_url="https://figshare.com/ndownloader/files/53261228",
         expected_shape=(54134, 2000),  # TODO: adapt this, and enable check
         force_download=force_download,
         **kwargs,
