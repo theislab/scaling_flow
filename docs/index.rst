@@ -3,7 +3,7 @@ CellFlow
 =====================
 .. module:: cellflow
 
-:mod:`cellflow` is a framework for modeling perturbation screens with single cell readouts.
+:mod:`cellflow` is a framework for modeling single-cell phenotypic screens. CellFlow is very flexible and enables researchers to systematically explore how cells respond to a wide range of experimental interventions, including drug treatments, genetic modifications, cytokine stimulation, morphogen pathway modulation or even entire organoid protocols.
 
 .. grid:: 3
     :gutter: 1
@@ -18,13 +18,13 @@ CellFlow
         :link: user/index
         :link-type: doc
 
-        Find a detailed documentation of :mod:`cellflow`.
+        The API reference with all the details on how to use :mod:`cellflow` functions.
 
 
     .. grid-item-card:: Manuscript
         :link: https://doi.org/...
         :link-type: url
-        
+
         TODO - link to bioRxiv
 
 .. toctree::
