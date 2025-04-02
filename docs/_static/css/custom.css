@@ -5,9 +5,9 @@ div.cell_output table.dataframe {
 
 /* Adjust the logo to fit within the sidebar */
 .sidebar-logo {
-  max-width: 120%; /* Use percentage to ensure it stays within sidebar */
-  height: auto;
-  margin: 0 auto;
-  display: block;
-  padding: 0px;
+    max-width: 120%; /* Use percentage to ensure it stays within sidebar */
+    height: auto;
+    margin: 0 auto;
+    display: block;
+    padding: 0px;
 }
