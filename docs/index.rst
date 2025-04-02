@@ -3,7 +3,10 @@ CellFlow
 =====================
 .. module:: cellflow
 
-:mod:`cellflow` is a framework for modeling single-cell phenotypic screens. CellFlow is very flexible and enables researchers to systematically explore how cells respond to a wide range of experimental interventions, including drug treatments, genetic modifications, cytokine stimulation, morphogen pathway modulation or even entire organoid protocols.
+:mod:`cellflow` is a framework for modeling single-cell perturbation screens. CellFlow is very flexible and enables researchers to systematically explore how cells respond to a wide range of experimental interventions, including drug treatments, genetic modifications, cytokine stimulation, morphogen pathway modulation or even entire organoid protocols.
+
+:note: This is a work in progress. We are actively working on extending the documentation of :mod:`cellflow` with more tutorials to cover a wide range of use cases. If you have any questions or suggestions, please feel free to reach out to us.
+
 
 .. grid:: 3
     :gutter: 1
