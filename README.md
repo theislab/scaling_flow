@@ -1,3 +1,5 @@
+<img src="docs/_static/images/cellflow_dark.png" width="500" alt="CellFlow">
+
 [![PyPI](https://img.shields.io/pypi/v/cellflow-tools.svg)](https://pypi.org/project/cellflow-tools/)
 [![Downloads](https://static.pepy.tech/badge/cellflow-tools)](https://pepy.tech/project/cellflow-tools)
 [![CI](https://img.shields.io/github/actions/workflow/status/theislab/cellflow/test.yml?branch=main)](https://github.com/theislab/cellflow/actions)
@@ -5,7 +7,7 @@
 [![Codecov](https://codecov.io/gh/theislab/cellflow/branch/master/graph/badge.svg?token=Rgtm5Tsblo)](https://codecov.io/gh/theislab/cellflow)
 [![Docs](https://img.shields.io/readthedocs/cellflow)](https://cellflow.readthedocs.io/en/latest/)
 
-CellFlow - Modeling Complex Perturbations with Flow Matching <img src="docs/_static/images/cellflow_dark.png" width="400" alt="CellFlow" align="right">
+CellFlow - Modeling Complex Perturbations with Flow Matching 
 ============================================================
 
 CellFlow is a framework for predicting phenotypic responses of complex perturbations at the single-cell level. It is quite flexible and enables researchers to systematically explore how cells respond to a wide range of experimental interventions, including drug treatments, genetic modifications, cytokine stimulation, morphogen pathway modulation or even entire organoid protocols.
