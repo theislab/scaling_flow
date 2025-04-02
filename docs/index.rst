@@ -1,10 +1,9 @@
 
-CellFlow perturbation
+CellFlow
 =====================
 .. module:: cellflow
 
-:mod:`cellflow` is a framework for modeling perturbations in single cell genomics.
-
+:mod:`cellflow` is a framework for modeling perturbation screens with single cell readouts.
 
 .. grid:: 3
     :gutter: 1
@@ -23,8 +22,10 @@ CellFlow perturbation
 
 
     .. grid-item-card:: Manuscript
-
-        TODO
+        :link: https://doi.org/...
+        :link-type: url
+        
+        TODO - link to bioRxiv
 
 .. toctree::
     :maxdepth: 3
