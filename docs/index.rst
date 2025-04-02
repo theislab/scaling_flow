@@ -1,9 +1,11 @@
 
-CellFlow perturbation
+CellFlow
 =====================
 .. module:: cellflow
 
-:mod:`cellflow` is a framework for modeling perturbations in single cell genomics.
+:mod:`cellflow` is a framework for modeling single-cell perturbation screens. CellFlow is very flexible and enables researchers to systematically explore how cells respond to a wide range of experimental interventions, including drug treatments, genetic modifications, cytokine stimulation, morphogen pathway modulation or even entire organoid protocols.
+
+:note: This is a work in progress. We are actively working on extending the documentation of :mod:`cellflow` with more tutorials to cover a wide range of use cases. If you have any questions or suggestions, please feel free to reach out to us.
 
 
 .. grid:: 3
@@ -19,12 +21,14 @@ CellFlow perturbation
         :link: user/index
         :link-type: doc
 
-        Find a detailed documentation of :mod:`cellflow`.
+        The API reference with all the details on how to use :mod:`cellflow` functions.
 
 
     .. grid-item-card:: Manuscript
+        :link: https://doi.org/...
+        :link-type: url
 
-        TODO
+        TODO - link to bioRxiv
 
 .. toctree::
     :maxdepth: 3

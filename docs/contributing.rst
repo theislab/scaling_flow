@@ -1,8 +1,6 @@
 Contributing Guide
 ==================
 
-TODO: fix links
-
 `Scanpy <https://scanpy.readthedocs.io>`_ provides extensive developer documentation, most of which applies
 to this project as well. This document will not reproduce the entire
 content from there but aims to summarize the most important information

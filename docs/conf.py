@@ -145,14 +145,15 @@ html_theme = "furo"
 html_static_path = ["_static"]
 html_css_files = [
     "https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.1.1/css/all.min.css",
+    "css/custom.css",
 ]
 
 html_show_sphinx = False
 html_show_sourcelink = False
 html_theme_options = {
     "sidebar_hide_name": True,
-    # "light_logo": "img/light_mode_logo.png",
-    # "dark_logo": "img/dark_mode_logo.png",
+    "light_logo": "images/cellflow_dark.png",
+    "dark_logo": "images/cellflow_dark.png",
     "light_css_variables": {
         "color-brand-primary": "#003262",
         "color-brand-content": "#003262",
