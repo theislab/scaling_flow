@@ -40,4 +40,4 @@ For further instructions how to install jax, please refer to https://github.com/
 
 Citing CellFlow
 ---------------
-TODO
+A preprint is coming very soon, stay tuned!
