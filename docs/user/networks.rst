@@ -6,6 +6,7 @@ Networks
     :toctree: genapi
 
     networks.ConditionalVelocityField
+    networks.GENOTConditionalVelocityField
     networks.ConditionEncoder
     networks.SelfAttention
     networks.SeedAttentionPooling
