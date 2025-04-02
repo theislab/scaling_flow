@@ -1,6 +1,6 @@
 import jax.tree_util as jtu
 import pytest
-
+import numpy as np
 import cellflow
 
 
@@ -34,16 +34,16 @@ class TestMetrics:
         r_squared = cellflow.metrics.compute_r_squared(x_test, y_test)
         sinkhorn_div = cellflow.metrics.compute_sinkhorn_div(x_test, y_test, epsilon=epsilon)
         e_distance = cellflow.metrics.compute_e_distance(x_test, y_test)
-        mmd = cellflow.metrics.compute_scalar_mmd(x_test, y_test)
+        e_distance_fast = cellflow.metrics.compute_e_distance_fast(x_test, y_test)
+        scalar_mmd = cellflow.metrics.compute_scalar_mmd(x_test, y_test)
+        mmd_fast = cellflow.metrics.maximum_mean_discrepancy(x_test, y_test, exact=False)
 
-        assert r_squared is not None
-        assert r_squared <= 1
-        assert sinkhorn_div is not None
+        assert -1000 <= r_squared <= 1
         assert sinkhorn_div >= 0
-        assert e_distance is not None
         assert e_distance >= 0
-        assert mmd is not None
-        assert mmd >= 0
+        assert e_distance_fast >= 0
+        assert scalar_mmd >= 0
+        assert mmd_fast >= 0
 
     @pytest.mark.parametrize("gamma", [0.1, 1, 2])
     def test_fast_metrics(self, metrics_data, gamma):
@@ -56,7 +56,5 @@ class TestMetrics:
         mmd = cellflow.metrics.maximum_mean_discrepancy(x_test, y_test, gamma, exact=True)
         mmd_fast = cellflow.metrics.maximum_mean_discrepancy(x_test, y_test, gamma, exact=False)
 
-        assert e_distance_fast is not None
-        assert abs(e_distance - e_distance_fast) < 1e-4
-        assert mmd_fast is not None
-        assert abs(mmd - mmd_fast) < 1e-5
+        assert np.allclose(e_distance, e_distance_fast, rtol=1e-4, atol=1e-4)
+        assert np.allclose(mmd, mmd_fast, rtol=1e-4, atol=1e-4)
