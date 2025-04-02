@@ -8,11 +8,9 @@
 CellFlow - Modeling Complex Perturbations with Flow Matching
 ============================================================
 
+CellFlow is a framework for predicting phenotypic responses of complex perturbations at the single-cell level.
 
-
-**CellFlow** is a framework for predicting phenotypic responses of complex perturbations at the single-cell level.
-
-![CellFlow](docs/_static/images/cellflow_light.png)
+![CellFlow](docs/_static/images/cellflow_dark.png)
 
 
 ## Example Applications
