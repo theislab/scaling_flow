@@ -58,8 +58,8 @@ intersphinx_mapping = {
     "optax": ("https://optax.readthedocs.io/en/latest/", None),
 }
 master_doc = "index"
-pygments_style = "tango"
-pygments_dark_style = "monokai"
+pygments_style = "autumn"
+pygments_dark_style = "dracula"
 
 nitpicky = True
 nitpick_ignore = [
