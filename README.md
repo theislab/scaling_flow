@@ -10,7 +10,7 @@
 CellFlow - Modeling Complex Perturbations with Flow Matching 
 ============================================================
 
-CellFlow is a framework for predicting phenotypic responses of complex perturbations at the single-cell level. It is quite flexible and enables researchers to systematically explore how cells respond to a wide range of experimental interventions, including drug treatments, genetic modifications, cytokine stimulation, morphogen pathway modulation or even entire organoid protocols.
+CellFlow is a framework for predicting single-cell phenotypes induced by complex perturbations. It is quite flexible and enables researchers to systematically explore how cells respond to a wide range of experimental interventions, including drug treatments, genetic modifications, cytokine stimulation, morphogen pathway modulation or even entire organoid protocols.
 
 
 ## Example Applications
