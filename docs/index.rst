@@ -28,7 +28,7 @@ CellFlow
         :link: https://doi.org/...
         :link-type: url
 
-        TODO - link to bioRxiv
+        bioRxiv preprint coming soon!
 
 .. toctree::
     :maxdepth: 3
