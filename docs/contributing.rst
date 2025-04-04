@@ -18,8 +18,8 @@ install them using pip:
 
 .. code-block:: bash
 
-    cd cellflow
-    pip install -e ".[dev,test,doc]"
+    cd CellFlow
+    pip install -e ".[dev,test]"
 
 Code Style
 ----------
@@ -112,15 +112,15 @@ Once you are done, commit and push your changes and navigate to the
 create a release. For more information, see `managing GitHub releases`. This will
 automatically create a git tag and trigger a GitHub workflow that creates a release on PyPI.
 
-Writing Documentation
-----------------------
+.. Writing Documentation
+.. ----------------------
 
-TODO
+.. TODO
 
-Tutorials with myst-nb and Jupyter Notebooks
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+.. Tutorials with myst-nb and Jupyter Notebooks
+.. ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-TODO
+.. TODO
 
 Hints
 ~~~~~
