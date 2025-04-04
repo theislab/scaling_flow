@@ -8,7 +8,12 @@ import jax.tree_util as jtu
 import numpy as np
 
 from cellflow._types import ArrayLike
-from cellflow.metrics._metrics import compute_r_squared, compute_scalar_mmd, compute_sinkhorn_div, compute_e_distance_fast
+from cellflow.metrics._metrics import (
+    compute_e_distance_fast,
+    compute_r_squared,
+    compute_scalar_mmd,
+    compute_sinkhorn_div,
+)
 
 __all__ = [
     "BaseCallback",
