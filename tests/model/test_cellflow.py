@@ -357,14 +357,22 @@ class TestCellFlow:
         ):
             cf.predict(adata_pred, sample_rep="X", covariate_data=covariate_data, max_steps=3, throw=False)
 
+        with pytest.raises(ValueError, match="covariate_data is empty."):
+            empty_covariate_data = covariate_data.head(0)
+            cf.predict(adata_pred, sample_rep="X", covariate_data=empty_covariate_data, max_steps=3, throw=False)
+
         with pytest.raises(
             ValueError,
             match=r".*No cells found in `adata` for split covariates*",
         ):
-            cov_data_ct_1 = covariate_data[covariate_data["cell_type"] == "cell_line_a"]
+            covariate_data_a = covariate_data.copy()
+            covariate_data_a["cell_type"][0] = "cell_line_a"
+            cov_data_cell_type_1 = covariate_data_a[covariate_data_a["cell_type"] == "cell_line_a"]
             adata_pred_cell_type_2 = adata_pred[adata_pred.obs["cell_type"] == "cell_line_b"]
             adata_pred_cell_type_2.obs["control"] = True
-            cf.predict(adata_pred_cell_type_2, sample_rep="X", covariate_data=cov_data_ct_1, max_steps=3, throw=False)
+            cf.predict(
+                adata_pred_cell_type_2, sample_rep="X", covariate_data=cov_data_cell_type_1, max_steps=3, throw=False
+            )
 
     def test_raise_otfm_vf_kwargs_passed(self, adata_perturbation):
         vf_kwargs = {"genot_source_dims": (32, 32), "genot_source_dropouts": 0.1}
