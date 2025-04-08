@@ -1,7 +1,6 @@
 import anndata as ad
 import numpy as np
 import pytest
-import pubchempy
 
 class TestPreprocessing:
     @pytest.mark.parametrize(
@@ -22,7 +21,7 @@ class TestPreprocessing:
                 query_id_type=compound_key_and_type[1],
                 copy=False,
             )
-        except pubchempy.PubChemHTTPError as e:
+        except Exception as e:
             if 'ServerBusy' in str(e):
                 pytest.skip("Skipped test due to PubChem server being busy.")
             else:
