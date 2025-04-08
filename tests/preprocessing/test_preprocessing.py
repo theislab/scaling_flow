@@ -1,7 +1,7 @@
 import anndata as ad
 import numpy as np
 import pytest
-
+import pubchempy
 
 class TestPreprocessing:
     @pytest.mark.parametrize(
@@ -15,12 +15,18 @@ class TestPreprocessing:
     def test_annotate_compounds(self, adata_with_compounds: ad.AnnData, compound_key_and_type):
         import cellflow
 
-        cellflow.pp.annotate_compounds(
-            adata_with_compounds,
-            compound_keys=compound_key_and_type[0],
-            query_id_type=compound_key_and_type[1],
-            copy=False,
-        )
+        try:
+            cellflow.pp.annotate_compounds(
+                adata_with_compounds,
+                compound_keys=compound_key_and_type[0],
+                query_id_type=compound_key_and_type[1],
+                copy=False,
+            )
+        except pubchempy.PubChemHTTPError as e:
+            if 'ServerBusy' in str(e):
+                pytest.skip("Skipped test due to PubChem server being busy.")
+            else:
+                raise
 
         for compound_key in compound_key_and_type[0]:
             assert f"{compound_key}_pubchem_name" in adata_with_compounds.obs
