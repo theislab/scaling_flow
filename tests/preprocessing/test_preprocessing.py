@@ -1,7 +1,8 @@
 import anndata as ad
 import numpy as np
-import pytest
 import pubchempy
+import pytest
+
 
 class TestPreprocessing:
     @pytest.mark.parametrize(
@@ -23,7 +24,7 @@ class TestPreprocessing:
                 copy=False,
             )
         except pubchempy.PubChemHTTPError as e:
-            if 'ServerBusy' in str(e):
+            if "ServerBusy" in str(e):
                 pytest.skip("Skipped test due to PubChem server being busy.")
             else:
                 raise
