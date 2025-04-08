@@ -81,7 +81,7 @@ optional-dependencies.external = [
   "scvi-tools",
 ]
 optional-dependencies.pp = [
-  "pertpy",
+  "pertpy>=0.6.0",
   "pynndescent",
   "rdkit",
 ]
