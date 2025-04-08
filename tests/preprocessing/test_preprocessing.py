@@ -2,6 +2,7 @@ import anndata as ad
 import numpy as np
 import pytest
 
+
 class TestPreprocessing:
     @pytest.mark.parametrize(
         "compound_key_and_type",
@@ -22,7 +23,7 @@ class TestPreprocessing:
                 copy=False,
             )
         except Exception as e:
-            if 'ServerBusy' in str(e):
+            if "ServerBusy" in str(e):
                 pytest.skip("Skipped test due to PubChem server being busy.")
             else:
                 raise
