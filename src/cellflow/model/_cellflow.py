@@ -591,6 +591,8 @@ class CellFlow:
             sample_rep = self._dm.sample_rep
 
         if adata is not None and covariate_data is not None:
+            if covariate_data.empty:
+                raise ValueError("`covariate_data` is empty.")
             if self._dm.control_key not in adata.obs.columns:
                 raise ValueError(
                     f"If both `adata` and `covariate_data` are given, the control key `{self._dm.control_key}` must be in `adata.obs`."
