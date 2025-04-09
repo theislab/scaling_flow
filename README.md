@@ -4,7 +4,7 @@
 [![Downloads](https://static.pepy.tech/badge/cellflow-tools)](https://pepy.tech/project/cellflow-tools)
 [![CI](https://img.shields.io/github/actions/workflow/status/theislab/cellflow/test.yml?branch=main)](https://github.com/theislab/cellflow/actions)
 [![Pre-commit](https://results.pre-commit.ci/badge/github/theislab/cellflow/main.svg)](https://results.pre-commit.ci/latest/github/theislab/cellflow/main)
-[![Codecov](https://codecov.io/gh/theislab/cellflow/branch/master/graph/badge.svg?token=Rgtm5Tsblo)](https://codecov.io/gh/theislab/cellflow)
+[![Codecov](https://codecov.io/gh/theislab/cellflow/branch/main/graph/badge.svg?token=Rgtm5Tsblo)](https://codecov.io/gh/theislab/cellflow)
 [![Docs](https://img.shields.io/readthedocs/cellflow)](https://cellflow.readthedocs.io/en/latest/)
 
 CellFlow - Modeling Complex Perturbations with Flow Matching 
