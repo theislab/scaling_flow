@@ -357,7 +357,7 @@ class TestCellFlow:
         ):
             cf.predict(adata_pred, sample_rep="X", covariate_data=covariate_data, max_steps=3, throw=False)
 
-        with pytest.raises(ValueError, match="covariate_data is empty."):
+        with pytest.raises(ValueError, match="`covariate_data` is empty."):
             empty_covariate_data = covariate_data.head(0)
             cf.predict(adata_pred, sample_rep="X", covariate_data=empty_covariate_data, max_steps=3, throw=False)
 
