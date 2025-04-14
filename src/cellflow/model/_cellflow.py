@@ -514,15 +514,6 @@ class CellFlow:
                     prophet_config
                 )
 
-                # Debug print to examine structure
-                print("Original param structure:")
-                print(jax.tree_map(lambda x: x.shape if hasattr(x, 'shape') else None,
-                                  vf_state.params['condition_encoder']))
-
-                print("Converted param structure:")
-                print(jax.tree_map(lambda x: x.shape if hasattr(x, 'shape') else None,
-                                  converted_params['condition_encoder']))
-
                 # Create a parameter mask for the optimizer
                 params_dict = unfreeze(vf_state.params)
 
