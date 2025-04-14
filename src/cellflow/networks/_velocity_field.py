@@ -1,6 +1,6 @@
 from collections.abc import Callable, Sequence
 from dataclasses import field as dc_field
-from typing import Any, Literal
+from typing import Any, Literal, Optional
 
 import jax
 import jax.numpy as jnp
@@ -12,6 +12,11 @@ from ott.neural.networks.layers import time_encoder
 from cellflow._logging import logger
 from cellflow._types import Layers_separate_input_t, Layers_t
 from cellflow.networks._set_encoders import ConditionEncoder
+try:
+    from cellflow.networks._prophet_adapter import ProphetEncoder
+    _PROPHET_AVAILABLE = True
+except ImportError:
+    _PROPHET_AVAILABLE = False
 from cellflow.networks._utils import MLPBlock
 
 __all__ = ["ConditionalVelocityField", "GENOTConditionalVelocityField"]
@@ -30,6 +35,7 @@ class ConditionalVelocityField(nn.Module):
             Mode of the encoder, should be one of:
             - ``'deterministic'``: Learns condition encoding point-wise.
             - ``'stochastic'``: Learns a Gaussian distribution for representing conditions.
+            - ``'prophet'``: Uses Prophet's transformer-based encoder architecture.
         regularization
             Regularization strength in the latent space:
             - For deterministic mode, it is the strength of the L2 regularization.
@@ -58,6 +64,8 @@ class ConditionalVelocityField(nn.Module):
             Dropout rate for the last layer of the condition encoder.
         condition_encoder_kwargs
             Keyword arguments for the condition encoder.
+        prophet_config
+            Configuration for Prophet encoder if using condition_mode='prophet'.
         act_fn
             Activation function.
         time_freqs
@@ -88,7 +96,7 @@ class ConditionalVelocityField(nn.Module):
 
     output_dim: int
     max_combination_length: int
-    condition_mode: Literal["deterministic", "stochastic"] = "deterministic"
+    condition_mode: Literal["deterministic", "stochastic", "prophet"] = "deterministic"
     regularization: float = 1.0
     encode_conditions: bool = True
     condition_embedding_dim: int = 32
@@ -100,6 +108,7 @@ class ConditionalVelocityField(nn.Module):
     cond_output_dropout: float = 0.0
     mask_value: float = 0.0
     condition_encoder_kwargs: dict[str, Any] = dc_field(default_factory=lambda: {})
+    prophet_config: Optional[dict[str, Any]] = None
     act_fn: Callable[[jnp.ndarray], jnp.ndarray] = nn.silu
     time_freqs: int = 1024
     time_encoder_dims: Sequence[int] = (1024, 1024, 1024)
@@ -114,18 +123,37 @@ class ConditionalVelocityField(nn.Module):
     def setup(self):
         """Initialize the network."""
         if self.encode_conditions:
-            self.condition_encoder = ConditionEncoder(
-                condition_mode=self.condition_mode,
-                regularization=self.regularization,
-                output_dim=self.condition_embedding_dim,
-                pooling=self.pooling,
-                pooling_kwargs=self.pooling_kwargs,
-                layers_before_pool=self.layers_before_pool,
-                layers_after_pool=self.layers_after_pool,
-                covariates_not_pooled=self.covariates_not_pooled,
-                mask_value=self.mask_value,
-                **self.condition_encoder_kwargs,
-            )
+            if self.condition_mode == "prophet":
+                if not _PROPHET_AVAILABLE:
+                    raise ImportError("Prophet adapter is not available. Please install the prophet_adapter module.")
+                if self.prophet_config is None:
+                    raise ValueError("prophet_config must be provided when condition_mode='prophet'")
+
+                # Initialize Prophet encoder
+                self.condition_encoder = ProphetEncoder(
+                    output_dim=self.condition_embedding_dim,
+                    tokenizer_config=self.prophet_config["tokenizer_config"],
+                    tokenizer_mapping=self.prophet_config["tokenizer_mapping"],
+                    learnable_columns=self.prophet_config["learnable_columns"],
+                    model_dim=self.prophet_config["model_dim"],
+                    num_heads=self.prophet_config["num_heads"],
+                    num_layers=self.prophet_config["num_layers"],
+                    dropout=self.prophet_config.get("dropout", 0.0),
+                )
+            else:
+                # Original CellFlow condition encoder
+                self.condition_encoder = ConditionEncoder(
+                    condition_mode=self.condition_mode,
+                    regularization=self.regularization,
+                    output_dim=self.condition_embedding_dim,
+                    pooling=self.pooling,
+                    pooling_kwargs=self.pooling_kwargs,
+                    layers_before_pool=self.layers_before_pool,
+                    layers_after_pool=self.layers_after_pool,
+                    covariates_not_pooled=self.covariates_not_pooled,
+                    mask_value=self.mask_value,
+                    **self.condition_encoder_kwargs,
+                )
 
         self.layer_cond_output_dropout = nn.Dropout(rate=self.cond_output_dropout)
         self.layer_norm_condition = nn.LayerNorm() if self.layer_norm_before_concatenation else lambda x: x
@@ -166,12 +194,20 @@ class ConditionalVelocityField(nn.Module):
         squeeze = x_t.ndim == 1
         if not self.encode_conditions:
             cond_embedding = jnp.concatenate(list(cond.values()), axis=-1)
+            cond_mean = cond_embedding
+            cond_logvar = jnp.zeros_like(cond_embedding)
         else:
-            cond_mean, cond_logvar = self.condition_encoder(cond, training=train)
-            if self.condition_mode == "deterministic":
-                cond_embedding = cond_mean
+            if self.condition_mode == "prophet":
+                # Prophet encoder expects specific input format
+                cond_mean, cond_logvar = self.condition_encoder(cond, training=train)
+                cond_embedding = cond_mean  # Prophet doesn't use the stochastic approach
             else:
-                cond_embedding = cond_mean + encoder_noise * jnp.exp(cond_logvar / 2.0)
+                # Original CellFlow condition encoder
+                cond_mean, cond_logvar = self.condition_encoder(cond, training=train)
+                if self.condition_mode == "deterministic":
+                    cond_embedding = cond_mean
+                else:
+                    cond_embedding = cond_mean + encoder_noise * jnp.exp(cond_logvar / 2.0)
 
         cond_embedding = self.layer_cond_output_dropout(cond_embedding, deterministic=not train)
 
@@ -188,6 +224,8 @@ class ConditionalVelocityField(nn.Module):
         elif cond_embedding.shape[0] != x_t.shape[0]:  # type: ignore[attr-defined]
             cond_embedding = jnp.tile(cond_embedding, (x_t.shape[0], 1))
 
+        if t_encoded.ndim == 1:
+            t_encoded = jnp.reshape(t_encoded, (-1, t_encoded.shape[0]))
         concatenated = jnp.concatenate((t_encoded, x_encoded, cond_embedding), axis=-1)
         out = self.decoder(concatenated, training=train)
         return self.output_layer(out), cond_mean, cond_logvar
@@ -203,14 +241,23 @@ class ConditionalVelocityField(nn.Module):
         Returns
         -------
             Learnt mean and log-variance of the condition embedding.
-            If :attr:`cellflow.model.CellFlow.condition_mode` is ``'deterministic'``, the log-variance
-            is set to zero.
+            If :attr:`cellflow.model.CellFlow.condition_mode` is ``'deterministic'`` or ``'prophet'``,
+            the log-variance is set to zero.
         """
         if self.encode_conditions:
-            condition_mean, condition_logvar = self.condition_encoder(condition, training=False)
+            if self.condition_mode == "prophet":
+                # Prophet encoder returns mean and a dummy logvar
+                condition_mean, _ = self.condition_encoder(condition, training=False)
+                condition_logvar = jnp.zeros_like(condition_mean)
+            else:
+                # Original CellFlow condition encoder
+                condition_mean, condition_logvar = self.condition_encoder(condition, training=False)
         else:
-            condition = jnp.concatenate(list(condition.values()), axis=-1)
+            condition_concat = jnp.concatenate(list(condition.values()), axis=-1)
             logger.warning("Condition encoder is not defined. Returning concatenated input as the embedding.")
+            condition_mean = condition_concat
+            condition_logvar = jnp.zeros_like(condition_mean)
+
         return condition_mean, condition_logvar
 
     def create_train_state(
@@ -220,38 +267,27 @@ class ConditionalVelocityField(nn.Module):
         input_dim: int,
         conditions: dict[str, jnp.ndarray],
     ) -> train_state.TrainState:
-        """Create the training state.
+        """Create initial training state."""
+        rng_cond, rng_dropout = jax.random.split(rng)
+        # Initialize with a single example
+        t_example = jnp.zeros((1,))
+        x_example = jnp.zeros((1, input_dim))
+        encoder_noise = jnp.zeros((1, self.condition_embedding_dim))
 
-        Parameters
-        ----------
-            rng
-                Random number generator.
-            optimizer
-                Optimizer.
-            input_dim
-                Dimensionality of the velocity field.
-            conditions
-                Conditions describing the perturbation.
+        # Make a single example for each condition
+        example_conditions = {}
+        for k, v in conditions.items():
+            example_conditions[k] = jnp.zeros((1,) + v.shape[1:])
 
-        Returns
-        -------
-            The training state.
-        """
-        t, x_t = jnp.ones((1, 1)), jnp.ones((1, input_dim))
-        encoder_noise = jnp.ones((1, self.condition_embedding_dim))
-        cond = {
-            pert_cov: jnp.ones((1, self.max_combination_length, condition.shape[-1]))
-            for pert_cov, condition in conditions.items()
-        }
-        params_rng, condition_encoder_rng = jax.random.split(rng, 2)
         params = self.init(
-            {"params": params_rng, "condition_encoder": condition_encoder_rng},
-            t=t,
-            x_t=x_t,
-            cond=cond,
-            encoder_noise=encoder_noise,
+            {"params": rng, "dropout": rng_dropout, "condition_encoder": rng_cond},
+            t_example,
+            x_example,
+            example_conditions,
+            encoder_noise,
             train=False,
         )["params"]
+
         return train_state.TrainState.create(apply_fn=self.apply, params=params, tx=optimizer)
 
     @property

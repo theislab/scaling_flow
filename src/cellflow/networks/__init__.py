@@ -10,6 +10,12 @@ from cellflow.networks._utils import (
 )
 from cellflow.networks._velocity_field import ConditionalVelocityField, GENOTConditionalVelocityField
 
+try:
+    from cellflow.networks._prophet_adapter import ProphetEncoder
+    _PROPHET_AVAILABLE = True
+except ImportError:
+    _PROPHET_AVAILABLE = False
+
 __all__ = [
     "ConditionalVelocityField",
     "GENOTConditionalVelocityField",
@@ -20,3 +26,6 @@ __all__ = [
     "TokenAttentionPooling",
     "SelfAttentionBlock",
 ]
+
+if _PROPHET_AVAILABLE:
+    __all__ += ["ProphetEncoder"]

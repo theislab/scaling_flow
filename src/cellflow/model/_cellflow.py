@@ -12,7 +12,12 @@ import jax
 import jax.numpy as jnp
 import optax
 import pandas as pd
+import numpy as np
+import torch
+from flax.training import train_state
 from ott.neural.methods.flows import dynamics
+from flax.core.frozen_dict import FrozenDict, unfreeze
+from optax import multi_transform
 
 from cellflow import _constants
 from cellflow._types import ArrayLike, Layers_separate_input_t, Layers_t
@@ -230,7 +235,7 @@ class CellFlow:
     def prepare_model(
         self,
         encode_conditions: bool = True,
-        condition_mode: Literal["deterministic", "stochastic"] = "deterministic",
+        condition_mode: Literal["deterministic", "stochastic", "prophet"] = "deterministic",
         regularization: float = 0.0,
         pooling: Literal["mean", "attention_token", "attention_seed"] = "attention_token",
         pooling_kwargs: dict[str, Any] = types.MappingProxyType({}),
@@ -239,6 +244,9 @@ class CellFlow:
         condition_embedding_dim: int = 256,
         cond_output_dropout: float = 0.9,
         condition_encoder_kwargs: dict[str, Any] | None = None,
+        prophet_config: dict[str, Any] | None = None,
+        prophet_checkpoint: str | None = None,
+        freeze_prophet_encoder: bool = False,
         pool_sample_covariates: bool = True,
         time_freqs: int = 1024,
         time_encoder_dims: Sequence[int] = (2048, 2048, 2048),
@@ -278,6 +286,7 @@ class CellFlow:
 
             - ``'deterministic'``: Learns condition encoding point-wise.
             - ``'stochastic'``: Learns a Gaussian distribution for representing conditions.
+            - ``'prophet'``: Uses Prophet's transformer-based encoder architecture.
         regularization
             Regularization strength in the latent space:
 
@@ -329,6 +338,20 @@ class CellFlow:
             Dropout rate for the last layer of the :class:`cellflow.networks.ConditionEncoder`.
         condition_encoder_kwargs
             Keyword arguments for the :class:`cellflow.networks.ConditionEncoder`.
+        prophet_config
+            Configuration dictionary for Prophet encoder. Required when condition_mode='prophet'.
+            Should contain:
+            - 'tokenizer_config': Configuration for tokenizer networks
+            - 'tokenizer_mapping': Mapping from input position to tokenizer network
+            - 'learnable_columns': List of column names for learnable embeddings
+            - 'model_dim': Dimension for the transformer model
+            - 'num_heads': Number of attention heads
+            - 'num_layers': Number of transformer layers
+        prophet_checkpoint
+            Path to Prophet checkpoint to load pretrained weights from.
+        freeze_prophet_encoder
+            If True, the Prophet encoder parameters will be frozen during training.
+            Only applicable when condition_mode='prophet' and prophet_checkpoint is provided.
         pool_sample_covariates
             Whether to include sample covariates in the pooling.
         time_freqs
@@ -405,6 +428,21 @@ class CellFlow:
             if regularization == 0.0:
                 raise ValueError("Stochastic condition embeddings require `regularization`>0.")
 
+        if condition_mode == "prophet":
+            if not encode_conditions:
+                raise ValueError("Prophet condition encoding requires encode_conditions=True.")
+            if prophet_config is None:
+                raise ValueError("When condition_mode='prophet', prophet_config must be provided.")
+
+        # JAX problems with frozen dicts
+        # Ensure prophet_config is mutable
+        if isinstance(prophet_config, FrozenDict):
+            prophet_config = {k: v for k, v in prophet_config.items()}  # Convert to mutable dict
+
+        # Ensure tokenizer_config is mutable before initializing ProphetEncoder
+        if 'tokenizer_config' in prophet_config and isinstance(prophet_config['tokenizer_config'], FrozenDict):
+            prophet_config['tokenizer_config'] = {k: v for k, v in prophet_config['tokenizer_config'].items()}
+
         condition_encoder_kwargs = condition_encoder_kwargs or {}
         if self._solver_class == _otfm.OTFlowMatching and vf_kwargs is not None:
             raise ValueError("For `solver='otfm'`, `vf_kwargs` must be `None`.")
@@ -420,6 +458,10 @@ class CellFlow:
         covariates_not_pooled = [] if pool_sample_covariates else self._dm.sample_covariates
         solver_kwargs = solver_kwargs or {}
         flow = flow or {"constant_noise": 0.0}
+
+        # Add prophet_config to vf_kwargs if using prophet mode
+        if condition_mode == "prophet" and prophet_config is not None:
+            vf_kwargs["prophet_config"] = prophet_config
 
         self.vf = self._vf_class(
             output_dim=self._data_dim,
@@ -447,6 +489,108 @@ class CellFlow:
             linear_projection_before_concatenation=linear_projection_before_concatenation,
             **vf_kwargs,
         )
+
+        # Load Prophet weights if provided
+        if condition_mode == "prophet" and prophet_checkpoint is not None:
+            try:
+                from cellflow.utils import convert_prophet_weights_to_flax
+
+                # Initialize the velocity field state to get parameter structure
+                rng = jax.random.PRNGKey(seed)
+                optimizer_instance = optimizer
+
+                # Create initial state to get parameter structure
+                vf_state = self.vf.create_train_state(
+                    rng=rng,
+                    optimizer=optimizer_instance,
+                    input_dim=self._data_dim,
+                    conditions=self.train_data.condition_data,
+                )
+
+                # Convert Prophet weights to JAX/Flax
+                converted_params = convert_prophet_weights_to_flax(
+                    prophet_checkpoint,
+                    vf_state.params,
+                    prophet_config
+                )
+
+                # Debug print to examine structure
+                print("Original param structure:")
+                print(jax.tree_map(lambda x: x.shape if hasattr(x, 'shape') else None,
+                                  vf_state.params['condition_encoder']))
+
+                print("Converted param structure:")
+                print(jax.tree_map(lambda x: x.shape if hasattr(x, 'shape') else None,
+                                  converted_params['condition_encoder']))
+
+                # Create a parameter mask for the optimizer
+                params_dict = unfreeze(vf_state.params)
+
+                # Copy the converted parameters carefully, preserving structure
+                # Create a mutable copy of the params
+                new_condition_encoder = unfreeze(params_dict['condition_encoder'])
+
+                # Copy parameters from converted params carefully
+                for key, value in converted_params['condition_encoder'].items():
+                    if key in new_condition_encoder:
+                        # If the key exists, we need to handle it based on expected structure
+                        if key.startswith('tokenizer_nets_'):
+                            # For tokenizer networks, carefully merge
+                            for layer_key, layer_value in value.items():
+                                if layer_key in new_condition_encoder[key]:
+                                    print(f"Copying layer {layer_key} for {key}")
+                                    new_condition_encoder[key][layer_key] = layer_value
+                                else:
+                                    print(f"Warning: Layer {layer_key} not found in expected structure for {key}")
+                        else:
+                            # For other keys, directly copy
+                            new_condition_encoder[key] = value
+                    else:
+                        # If the key doesn't exist, add it directly
+                        new_condition_encoder[key] = value
+
+                # Update the parameters
+                params_dict['condition_encoder'] = new_condition_encoder
+
+                # Now create a new state with the updated parameters
+                mutable_state = vf_state.replace(params=params_dict)
+
+                # If we want to freeze the Prophet encoder parameters
+                if freeze_prophet_encoder:
+                    # Create a mask based on updated params
+                    param_mask = jax.tree_map(lambda _: True, params_dict)  # Default all trainable
+
+                    # Create a mask for unfrozen parameters (everything except Prophet encoder parts)
+                    for key in param_mask.keys():
+                        # Freeze Prophet encoder-related parameters
+                        if any(prefix in key for prefix in [
+                            'tokenizer_nets_', 'learnable_embeddings_', 'cls_token',
+                            'transformer'
+                        ]):
+                            param_mask[key] = jax.tree_map(lambda _: False, param_mask[key])
+                        else:
+                            # Keep other parameters trainable
+                            param_mask[key] = jax.tree_map(lambda _: True, param_mask[key])
+
+                    # Create a custom optimizer that only updates unfrozen parameters
+                    # For frozen parameters, use a no-op optimizer
+                    custom_optimizer = multi_transform({
+                        True: optimizer,                     # Original optimizer for trainable params
+                        False: optax.set_to_zero()           # No-op optimizer for frozen params
+                    }, param_mask)
+
+                    mutable_state = mutable_state.replace(tx=custom_optimizer)
+
+                    print(f"Freezing Prophet encoder parameters from {prophet_checkpoint}")
+
+                vf_state = mutable_state
+                self._vf_state = vf_state
+
+                print(f"Successfully loaded Prophet weights from {prophet_checkpoint}")
+
+            except Exception as e:
+                print(f"Failed to load Prophet weights: {e}")
+                # Continue with randomly initialized weights
 
         flow, noise = next(iter(flow.items()))
         if flow == "constant_noise":
@@ -830,6 +974,6 @@ class CellFlow:
         self._vf = vf
 
     @property
-    def condition_mode(self) -> Literal["deterministic", "stochastic"]:
+    def condition_mode(self) -> Literal["deterministic", "stochastic", "prophet"]:
         """The mode of the encoder."""
         return self.velocity_field.condition_mode
