@@ -15,6 +15,7 @@ __all__ = ["encode_onehot", "annotate_compounds", "get_molecular_fingerprints"]
 def annotate_compounds(
     adata: ad.AnnData,
     compound_keys: str | Sequence[str],
+    control_category: str = "control",
     query_id_type: Literal["name", "cid"] = "name",
     obs_key_prefixes: str | Sequence[str] | None = None,
     copy: bool = False,
@@ -27,6 +28,8 @@ def annotate_compounds(
         An :class:`~anndata.AnnData` object.
     compound_keys
         Key(s) in :attr:`~anndata.AnnData.obs` containing the compound identifiers.
+    control_category
+        Category to exclude from the annotation.
     query_id_type
         Type of the compound identifiers. Either ``'name'`` or ``'cid'``.
     obs_key_prefixes
@@ -65,6 +68,7 @@ def annotate_compounds(
     not_found = set()
     c_meta = pt.metadata.Compound()
     for query_key, prefix in zip(compound_keys, obs_key_prefixes, strict=False):
+        adata.obs[query_key] = adata.obs[query_key].replace(control_category, np.nan)
         c_meta.annotate_compounds(
             adata,
             query_id=query_key,
@@ -73,21 +77,12 @@ def annotate_compounds(
             copy=False,
         )
 
-        na_values = adata.obs[query_key][adata.obs["smiles"].isna()].astype(str).unique().tolist()
-        not_found.update(na_values)
+        missing = adata.obs.loc[adata.obs["smiles"].isna(), query_key].dropna().unique().tolist()
+        not_found.update(missing)
+
+        adata.obs[[query_key, "pubchem_name"]] = adata.obs[[query_key, "pubchem_name"]].fillna(control_category)
 
         # Drop columns with new annotations
-        adata.obs.drop(
-            columns=[
-                f"{prefix}_pubchem_name",
-                f"{prefix}_pubchem_ID",
-                f"{prefix}_smiles",
-            ],
-            errors="ignore",
-            inplace=True,
-        )
-
-        # Rename with index to not overwrite existing columns
         adata.obs.rename(
             columns={
                 "pubchem_name": f"{prefix}_pubchem_name",
@@ -98,10 +93,9 @@ def annotate_compounds(
         )
 
     if not_found:
-        logger.warning(f"Could not find annotations for the following compounds: {', '.join(not_found)}")
+        logger.warning(f"Could not find annotations for the following compounds: {', '.join(map(str, not_found))}")
 
-    if copy:
-        return adata
+    return adata if copy else None
 
 
 def _get_fingerprint(smiles: str, radius: int = 4, n_bits: int = 1024) -> ArrayLike | None:
@@ -126,8 +120,9 @@ def _get_fingerprint(smiles: str, radius: int = 4, n_bits: int = 1024) -> ArrayL
 
 def get_molecular_fingerprints(
     adata,
-    compound_keys: str,
+    compound_keys: str | list[str],
     smiles_keys: str | None = None,
+    control_value: str = "control",
     uns_key_added: str = "fingerprints",
     radius: int = 4,
     n_bits: int = 1024,
@@ -141,6 +136,8 @@ def get_molecular_fingerprints(
         An :class:`~anndata.AnnData` object.
     compound_keys
         Key(s) in :attr:`~anndata.AnnData.obs` containing the compound identifiers.
+    control_value
+        Skip `control_value` (and :obj:`None` values).
     smiles_keys
         Key(s) in :attr:`~anndata.AnnData.obs` containing the SMILES strings. If :obj:`None`, uses
         ``f"{compound_key}_smiles"``.
@@ -151,7 +148,7 @@ def get_molecular_fingerprints(
     n_bits
         Number of bits in the fingerprint.
     copy
-        Return a copy of ``adata`` instead of updating it in place
+        Return a copy of ``adata`` instead of updating it in place.
 
     Returns
     -------
@@ -178,13 +175,14 @@ def get_molecular_fingerprints(
 
         if smiles_key not in adata.obs:
             raise KeyError(f"Key {smiles_key} not found in `adata.obs`.")
-
         smiles_dict.update(adata.obs.set_index(compound_key)[smiles_key].to_dict())
 
     # Compute fingerprints for each compound
     valid_fingerprints = {}
     not_found = []
     for comp, smiles in smiles_dict.items():
+        if not isinstance(comp, str) or comp == control_value:
+            continue
         comp_fp = _get_fingerprint(smiles, radius=radius, n_bits=n_bits)
         if comp_fp is not None:
             valid_fingerprints[comp] = comp_fp
