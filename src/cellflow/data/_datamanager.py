@@ -348,9 +348,7 @@ class DataManager:
             perturbation_covariates_mask = None
             control_mask = jnp.ones((len(covariate_data),))
 
-        condition_data: dict[str, list[jnp.ndarray]] = (
-            {i: [] for i in self._covar_to_idx.keys()}
-        )
+        condition_data: dict[str, list[jnp.ndarray]] = {i: [] for i in self._covar_to_idx.keys()}
 
         control_to_perturbation: dict[int, ArrayLike] = {}
         split_idx_to_covariates: dict[int, tuple[Any]] = {}

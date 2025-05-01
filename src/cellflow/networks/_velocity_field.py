@@ -10,7 +10,6 @@ from flax import linen as nn
 from flax.training import train_state
 from ott.neural.networks.layers import time_encoder
 
-from cellflow._logging import logger
 from cellflow._types import Layers_separate_input_t, Layers_t
 from cellflow.networks._set_encoders import ConditionEncoder
 from cellflow.networks._utils import FilmBlock, MLPBlock, ResNetBlock
