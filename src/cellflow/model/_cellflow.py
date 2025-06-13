@@ -10,6 +10,7 @@ import cloudpickle
 import flax.linen as nn
 import jax
 import jax.numpy as jnp
+import numpy as np
 import optax
 import pandas as pd
 from ott.neural.methods.flows import dynamics
@@ -625,6 +626,8 @@ class CellFlow:
         batch = pred_loader.sample()
         src = batch["source"]
         condition = batch.get("condition", None)
+        # using jax.tree.map to batch the prediction
+        # because PredictionSampler can return a different number of cells for each condition
         out = jax.tree.map(
             functools.partial(self.solver.predict, rng=rng, **kwargs),
             src,
@@ -637,9 +640,10 @@ class CellFlow:
                 f"When saving predictions to `adata`, all control cells must be from the same control \
                                 population, but found {len(pred_data.control_to_perturbation)} control populations."
             )
+        out_np = {k: np.array(v) for k, v in out.items()}
         _write_predictions(
             adata=adata,
-            predictions=out,
+            predictions=out_np,
             key_added_prefix=key_added_prefix,
         )
 
