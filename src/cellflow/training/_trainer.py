@@ -19,17 +19,12 @@ class CellFlowTrainer:
         dataloader
             Data sampler.
         solver
-    <<<<<<< HEAD
             :class:`~cellflow.solvers._otfm.OTFlowMatching` or
             :class:`~cellflow.solvers._genot.GENOT` solver with a conditional velocity field.
         predict_kwargs
             Keyword arguments for the prediction functions
             :func:`cellflow.solvers._otfm.OTFlowMatching.predict` or
             :func:`cellflow.solvers._genot.GENOT.predict` used during validation.
-    =======
-            :class:`~cellflow.solvers.OTFlowMatching` solver or :class:`~cellflow.solvers.GENOT`
-            solver with a conditional velocity field.
-    >>>>>>> main
         seed
             Random seed for subsampling validation data.
 
