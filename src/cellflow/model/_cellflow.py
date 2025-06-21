@@ -10,6 +10,7 @@ import cloudpickle
 import flax.linen as nn
 import jax
 import jax.numpy as jnp
+import numpy as np
 import optax
 import pandas as pd
 from ott.neural.methods.flows import dynamics
@@ -17,7 +18,7 @@ from ott.neural.methods.flows import dynamics
 from cellflow import _constants
 from cellflow._types import ArrayLike, Layers_separate_input_t, Layers_t
 from cellflow.data._data import ConditionData, TrainingData, ValidationData
-from cellflow.data._dataloader import PredictionSampler, TrainSampler, ValidationSampler
+from cellflow.data._dataloader import OOCTrainSampler, PredictionSampler, TrainSampler, ValidationSampler
 from cellflow.data._datamanager import DataManager
 from cellflow.model._utils import _write_predictions
 from cellflow.networks import _velocity_field
@@ -53,7 +54,7 @@ class CellFlow:
             if solver == "otfm"
             else _velocity_field.GENOTConditionalVelocityField
         )
-        self._dataloader: TrainSampler | None = None
+        self._dataloader: TrainSampler | OOCTrainSampler | None = None
         self._trainer: CellFlowTrainer | None = None
         self._validation_data: dict[str, ValidationData] = {}
         self._solver: _otfm.OTFlowMatching | _genot.GENOT | None = None
@@ -235,7 +236,6 @@ class CellFlow:
 
     def prepare_model(
         self,
-        encode_conditions: bool = True,
         condition_mode: Literal["deterministic", "stochastic"] = "deterministic",
         regularization: float = 0.0,
         pooling: Literal["mean", "attention_token", "attention_seed"] = "attention_token",
@@ -274,13 +274,6 @@ class CellFlow:
 
         Parameters
         ----------
-        encode_conditions
-            Processes the embedding of the perturbation conditions if :obj:`True`. If :obj:`False`,
-            directly inputs the embedding of the perturbation conditions to the generative velocity
-            field. In the latter case, ``'condition_embedding_dim'``,
-            ``'condition_encoder_kwargs'``, ``'pooling'``, ``'pooling_kwargs'``,
-            ``'layers_before_pool'``, ``'layers_after_pool'``, ``'cond_output_dropout'``
-            are ignored.
         condition_mode
             Mode of the encoder, should be one of:
 
@@ -420,8 +413,6 @@ class CellFlow:
             raise ValueError("Dataloader not initialized. Please call `prepare_data` first.")
 
         if condition_mode == "stochastic":
-            if not encode_conditions:
-                raise ValueError("Stochastic condition embeddings require encoding conditions.")
             if regularization == 0.0:
                 raise ValueError("Stochastic condition embeddings require `regularization`>0.")
 
@@ -446,7 +437,6 @@ class CellFlow:
             max_combination_length=self.train_data.max_combination_length,
             condition_mode=condition_mode,
             regularization=regularization,
-            encode_conditions=encode_conditions,
             condition_embedding_dim=condition_embedding_dim,
             covariates_not_pooled=covariates_not_pooled,
             pooling=pooling,
@@ -516,6 +506,7 @@ class CellFlow:
         valid_freq: int = 1000,
         callbacks: Sequence[BaseCallback] = [],
         monitor_metrics: Sequence[str] = [],
+        out_of_core_dataloading: bool = False,
     ) -> None:
         """Train the model.
 
@@ -540,6 +531,9 @@ class CellFlow:
               e.g. :class:`~cellflow.training.WandbLogger`.
         monitor_metrics
             Metrics to monitor.
+        out_of_core_dataloading
+            If :obj:`True`, use out-of-core dataloading. Uses the :class:`cellflow.data._dataloader.OOCTrainSampler`
+            to load data that does not fit into GPU memory.
 
         Returns
         -------
@@ -554,7 +548,10 @@ class CellFlow:
         if self.trainer is None:
             raise ValueError("Model not initialized. Please call `prepare_model` first.")
 
-        self._dataloader = TrainSampler(data=self.train_data, batch_size=batch_size)
+        if out_of_core_dataloading:
+            self._dataloader = OOCTrainSampler(data=self.train_data, batch_size=batch_size)
+        else:
+            self._dataloader = TrainSampler(data=self.train_data, batch_size=batch_size)
         validation_loaders = {k: ValidationSampler(v) for k, v in self.validation_data.items() if k != "predict_kwargs"}
 
         self._solver = self.trainer.train(
@@ -638,8 +635,10 @@ class CellFlow:
         batch = pred_loader.sample()
         src = batch["source"]
         condition = batch.get("condition", None)
+        # using jax.tree.map to batch the prediction
+        # because PredictionSampler can return a different number of cells for each condition
         out = jax.tree.map(
-            functools.partial(self.solver.predict, **kwargs),
+            functools.partial(self.solver.predict, rng=rng, **kwargs),
             src,
             condition,  # type: ignore[attr-defined]
         )
@@ -650,9 +649,10 @@ class CellFlow:
                 f"When saving predictions to `adata`, all control cells must be from the same control \
                                 population, but found {len(pred_data.control_to_perturbation)} control populations."
             )
+        out_np = {k: np.array(v) for k, v in out.items()}
         _write_predictions(
             adata=adata,
-            predictions=out,
+            predictions=out_np,
             key_added_prefix=key_added_prefix,
         )
 
@@ -692,9 +692,6 @@ class CellFlow:
         """
         if self.solver is None or not self.solver.is_trained:
             raise ValueError("Model not trained. Please call `train` first.")
-
-        if not self._dm.is_conditional:
-            raise ValueError("Model is not conditional. Condition embeddings are not available.")
 
         if hasattr(covariate_data, "condition_data"):
             cond_data = covariate_data
@@ -811,7 +808,7 @@ class CellFlow:
         return self._solver
 
     @property
-    def dataloader(self) -> TrainSampler | None:
+    def dataloader(self) -> TrainSampler | OOCTrainSampler | None:
         """The dataloader used for training."""
         return self._dataloader
 
