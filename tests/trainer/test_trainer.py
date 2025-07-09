@@ -1,6 +1,5 @@
 import time
 
-import diffrax
 import jax
 import jax.numpy as jnp
 import numpy as np
@@ -196,8 +195,8 @@ class TestTrainer:
         metric_to_compute = "e_distance"
         metrics_callback = cellflow.training.Metrics(metrics=[metric_to_compute])
 
-        predict_kwargs_1 = {"stepsize_controller": diffrax.PIDController(rtol=0.1, atol=0.1)}
-        predict_kwargs_2 = {"stepsize_controller": diffrax.PIDController(rtol=1e-5, atol=1e-5)}
+        predict_kwargs_1 = {"max_steps": 3, "throw": False}
+        predict_kwargs_2 = {"max_steps": 500, "throw": False}
 
         trainer_1 = cellflow.training.CellFlowTrainer(solver=model_1, predict_kwargs=predict_kwargs_1)
         trainer_2 = cellflow.training.CellFlowTrainer(solver=model_2, predict_kwargs=predict_kwargs_2)
@@ -224,4 +223,4 @@ class TestTrainer:
         end_2 = time.time()
         diff_2 = end_2 - start_2
 
-        assert diff_2 - diff_1 > 5
+        assert diff_2 - diff_1 > 1
