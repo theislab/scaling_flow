@@ -61,7 +61,8 @@ class TestTrainer:
             rng=vf_rng,
         )
 
-        trainer = CellFlowTrainer(solver=model)
+        predict_kwargs = {"max_steps": 3, "throw": False}
+        trainer = CellFlowTrainer(solver=model, predict_kwargs=predict_kwargs)
         trainer.train(
             dataloader=dataloader,
             num_iterations=2,
@@ -99,7 +100,8 @@ class TestTrainer:
         metric_to_compute = "e_distance"
         metrics_callback = Metrics(metrics=[metric_to_compute])
 
-        trainer = CellFlowTrainer(solver=model)
+        predict_kwargs = {"max_steps": 3, "throw": False}
+        trainer = CellFlowTrainer(solver=model, predict_kwargs=predict_kwargs)
         trainer.train(
             dataloader=dataloader,
             valid_loaders=valid_loader if use_validdata else None,
@@ -143,7 +145,8 @@ class TestTrainer:
 
         custom_callback = CustomCallback(rng=callback_rng)
 
-        trainer = CellFlowTrainer(solver=solver)
+        predict_kwargs = {"max_steps": 3, "throw": False}
+        trainer = CellFlowTrainer(solver=solver, predict_kwargs=predict_kwargs)
         trainer.train(
             dataloader=dataloader,
             valid_loaders=valid_loader,

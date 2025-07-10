@@ -59,7 +59,8 @@ class TestSolver:
                 rng=vf_rng,
             )
 
-        trainer = cellflow.training.CellFlowTrainer(solver=solver)
+        predict_kwargs = {"max_steps": 3, "throw": False}
+        trainer = cellflow.training.CellFlowTrainer(solver=solver, predict_kwargs=predict_kwargs)
         trainer.train(
             dataloader=dataloader,
             num_iterations=2,
