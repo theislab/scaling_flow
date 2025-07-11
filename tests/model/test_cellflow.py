@@ -274,6 +274,7 @@ class TestCellFlow:
             name="val",
             n_conditions_on_log_iteration=n_conditions_on_log_iteration,
             n_conditions_on_train_end=n_conditions_on_train_end,
+            predict_kwargs={"max_steps": 3, "throw": False},
         )
         assert isinstance(cf._validation_data, dict)
         assert "val" in cf._validation_data

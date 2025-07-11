@@ -193,6 +193,7 @@ class CellFlow:
         name: str,
         n_conditions_on_log_iteration: int | None = None,
         n_conditions_on_train_end: int | None = None,
+        predict_kwargs: dict[str, Any] | None = None,
     ) -> None:
         """Prepare the validation data.
 
@@ -209,6 +210,10 @@ class CellFlow:
         n_conditions_on_train_end
             Number of conditions to use for computation callbacks at the end of training.
             If :obj:`None`, use all conditions.
+        predict_kwargs
+            Keyword arguments for the prediction function
+            :func:`cellflow.solvers._otfm.OTFlowMatching.predict` or
+            :func:`cellflow.solvers._genot.GENOT.predict` used during validation.
 
         Returns
         -------
@@ -227,6 +232,7 @@ class CellFlow:
             n_conditions_on_train_end=n_conditions_on_train_end,
         )
         self._validation_data[name] = val_data
+        self._validation_data["predict_kwargs"] = predict_kwargs
 
     def prepare_model(
         self,
@@ -488,7 +494,10 @@ class CellFlow:
             )
         else:
             raise NotImplementedError(f"Solver must be an instance of OTFlowMatching or GENOT, got {type(self.solver)}")
-        self._trainer = CellFlowTrainer(solver=self.solver)  # type: ignore[arg-type]
+        if "predict_kwargs" in self.validation_data:
+            self._trainer = CellFlowTrainer(solver=self.solver, predict_kwargs=self.validation_data["predict_kwargs"])  # type: ignore[arg-type]
+        else:
+            self._trainer = CellFlowTrainer(solver=self.solver)  # type: ignore[arg-type]
 
     def train(
         self,
@@ -543,7 +552,7 @@ class CellFlow:
             self._dataloader = OOCTrainSampler(data=self.train_data, batch_size=batch_size)
         else:
             self._dataloader = TrainSampler(data=self.train_data, batch_size=batch_size)
-        validation_loaders = {k: ValidationSampler(v) for k, v in self.validation_data.items()}
+        validation_loaders = {k: ValidationSampler(v) for k, v in self.validation_data.items() if k != "predict_kwargs"}
 
         self._solver = self.trainer.train(
             dataloader=self._dataloader,

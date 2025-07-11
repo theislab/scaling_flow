@@ -1,3 +1,5 @@
+import time
+
 import jax
 import jax.numpy as jnp
 import numpy as np
@@ -59,7 +61,8 @@ class TestTrainer:
             rng=vf_rng,
         )
 
-        trainer = CellFlowTrainer(solver=model)
+        predict_kwargs = {"max_steps": 3, "throw": False}
+        trainer = CellFlowTrainer(solver=model, predict_kwargs=predict_kwargs)
         trainer.train(
             dataloader=dataloader,
             num_iterations=2,
@@ -97,7 +100,8 @@ class TestTrainer:
         metric_to_compute = "e_distance"
         metrics_callback = Metrics(metrics=[metric_to_compute])
 
-        trainer = CellFlowTrainer(solver=model)
+        predict_kwargs = {"max_steps": 3, "throw": False}
+        trainer = CellFlowTrainer(solver=model, predict_kwargs=predict_kwargs)
         trainer.train(
             dataloader=dataloader,
             valid_loaders=valid_loader if use_validdata else None,
@@ -141,7 +145,8 @@ class TestTrainer:
 
         custom_callback = CustomCallback(rng=callback_rng)
 
-        trainer = CellFlowTrainer(solver=solver)
+        predict_kwargs = {"max_steps": 3, "throw": False}
+        trainer = CellFlowTrainer(solver=solver, predict_kwargs=predict_kwargs)
         trainer.train(
             dataloader=dataloader,
             valid_loaders=valid_loader,
@@ -155,3 +160,70 @@ class TestTrainer:
         assert isinstance(logs["diff"][0], np.ndarray)
         assert logs["diff"][0].shape == (5,)
         assert 0 < np.mean(logs["diff"][0]) < 10
+
+    def test_predict_kwargs_iter(self, dataloader, valid_loader):
+        opt_1 = optax.adam(1e-3)
+        opt_2 = optax.adam(1e-3)
+        vf_1 = cellflow.networks.ConditionalVelocityField(
+            output_dim=5,
+            max_combination_length=2,
+            condition_embedding_dim=12,
+            hidden_dims=(32, 32),
+            decoder_dims=(32, 32),
+        )
+        vf_2 = cellflow.networks.ConditionalVelocityField(
+            output_dim=5,
+            max_combination_length=2,
+            condition_embedding_dim=12,
+            hidden_dims=(32, 32),
+            decoder_dims=(32, 32),
+        )
+        model_1 = _otfm.OTFlowMatching(
+            vf=vf_1,
+            match_fn=match_linear,
+            probability_path=dynamics.ConstantNoiseFlow(0.0),
+            optimizer=opt_1,
+            conditions=cond,
+            rng=vf_rng,
+        )
+        model_2 = _otfm.OTFlowMatching(
+            vf=vf_2,
+            match_fn=match_linear,
+            probability_path=dynamics.ConstantNoiseFlow(0.0),
+            optimizer=opt_2,
+            conditions=cond,
+            rng=vf_rng,
+        )
+
+        metric_to_compute = "e_distance"
+        metrics_callback = cellflow.training.Metrics(metrics=[metric_to_compute])
+
+        predict_kwargs_1 = {"max_steps": 3, "throw": False}
+        predict_kwargs_2 = {"max_steps": 500, "throw": False}
+
+        trainer_1 = cellflow.training.CellFlowTrainer(solver=model_1, predict_kwargs=predict_kwargs_1)
+        trainer_2 = cellflow.training.CellFlowTrainer(solver=model_2, predict_kwargs=predict_kwargs_2)
+
+        start_1 = time.time()
+        trainer_1.train(
+            dataloader=dataloader,
+            valid_loaders=valid_loader,
+            num_iterations=2,
+            valid_freq=1,
+            callbacks=[metrics_callback],
+        )
+        end_1 = time.time()
+        diff_1 = end_1 - start_1
+
+        start_2 = time.time()
+        trainer_2.train(
+            dataloader=dataloader,
+            valid_loaders=valid_loader,
+            num_iterations=2,
+            valid_freq=1,
+            callbacks=[metrics_callback],
+        )
+        end_2 = time.time()
+        diff_2 = end_2 - start_2
+
+        assert diff_2 - diff_1 > 1
