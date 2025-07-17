@@ -250,12 +250,18 @@ class DataManager:
             adata=adata, split_cov_combs=split_cov_combs
         )
 
+        control_to_perturbation = self._get_control_to_perturbation(
+            covariate_data=covariate_data,
+            perturbation_idx_to_covariates=cond_data.perturbation_idx_to_covariates,
+            split_cov_combs=split_cov_combs,
+        )
+
         return PredictionData(
             cell_data=cell_data,
             split_covariates_mask=split_covariates_mask,
             split_idx_to_covariates=split_idx_to_covariates,
             condition_data=cond_data.condition_data,
-            control_to_perturbation=cond_data.control_to_perturbation,
+            control_to_perturbation=control_to_perturbation,
             perturbation_idx_to_covariates=cond_data.perturbation_idx_to_covariates,
             perturbation_idx_to_id=cond_data.perturbation_idx_to_id,
             max_combination_length=cond_data.max_combination_length,
@@ -829,6 +835,35 @@ class DataManager:
                 raise ValueError(f"No cells found in `adata` for split covariates {split_combination}.")
             src_counter += 1
         return np.asarray(split_covariates_mask), split_idx_to_covariates
+
+    def _get_control_to_perturbation(
+        self,
+        covariate_data: pd.DataFrame,
+        perturbation_idx_to_covariates: dict[int, tuple[Any]],
+        split_cov_combs: np.ndarray | list[list[Any]],
+    ) -> dict[int, np.ndarray]:
+        control_to_perturbation = {}
+
+        if len(self._split_covariates) == 0:
+            control_to_perturbation[0] = sorted(perturbation_idx_to_covariates.keys())
+        else:
+            for control_idx, split_combination in enumerate(split_cov_combs):
+                filter_dict = dict(zip(self.split_covariates, split_combination, strict=False))
+                split_cov_mask = (covariate_data[list(filter_dict.keys())] == list(filter_dict.values())).all(axis=1)
+                # Get subset of covariate_data that matches this split combination
+                matching_data = covariate_data[split_cov_mask]
+                # Find perturbation indices that correspond to this split combination
+                perturbation_indices = []
+                for pert_idx, pert_covariates in perturbation_idx_to_covariates.items():
+                    for _, row in matching_data.iterrows():
+                        pert_values = tuple(row[self.perturb_covar_keys])
+                        if pert_values == pert_covariates:
+                            perturbation_indices.append(pert_idx)
+                            break
+
+                control_to_perturbation[control_idx] = sorted(perturbation_indices)
+
+        return control_to_perturbation
 
     @staticmethod
     def _verify_perturbation_covariates(data: dict[str, Sequence[str]] | None) -> dict[str, list[str]]:
