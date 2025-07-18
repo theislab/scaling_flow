@@ -1,4 +1,5 @@
 from collections.abc import Callable
+from functools import partial
 from typing import Any
 
 import diffrax
@@ -263,6 +264,12 @@ class OTFlowMatching:
 
             pred_targets = batched_predict(src_inputs, batched_conditions)
             return {k: pred_targets[i] for i, k in enumerate(keys)}
+        elif isinstance(x, dict):
+            return jax.tree.map(
+                partial(self._predict_jit, rng=rng, **kwargs),
+                x,
+                condition,  # type: ignore[attr-defined]
+            )
         else:
             x_pred = self._predict_jit(x, condition, rng, **kwargs)
             return np.array(x_pred)
