@@ -68,7 +68,7 @@ class CellFlowTrainer:
             true_tgt = batch["target"]
             valid_source_data[val_key] = src
             valid_pred_data[val_key] = self.solver.predict(
-                src, condition=condition, batched=True, **self.predict_kwargs
+                src, condition=condition, **self.predict_kwargs
             )
             valid_true_data[val_key] = true_tgt
 
