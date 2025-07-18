@@ -232,6 +232,16 @@ class CellFlow:
             n_conditions_on_train_end=n_conditions_on_train_end,
         )
         self._validation_data[name] = val_data
+        # Batched prediction is not compatible with split covariates
+        # as all conditions need to be the same size
+        split_val = len(val_data.control_to_perturbation) > 1
+        predict_kwargs = predict_kwargs or {}
+        # Check if predict_kwargs is alreday provided from an earlier call
+        if "predict_kwargs" in self._validation_data:
+            predict_kwargs = self._validation_data["predict_kwargs"].update(predict_kwargs)
+        # Set batched prediction to False if split_val is True
+        if split_val:
+            predict_kwargs["batched"] = False
         self._validation_data["predict_kwargs"] = predict_kwargs
 
     def prepare_model(
@@ -494,10 +504,8 @@ class CellFlow:
             )
         else:
             raise NotImplementedError(f"Solver must be an instance of OTFlowMatching or GENOT, got {type(self.solver)}")
-        if "predict_kwargs" in self.validation_data:
-            self._trainer = CellFlowTrainer(solver=self.solver, predict_kwargs=self.validation_data["predict_kwargs"])  # type: ignore[arg-type]
-        else:
-            self._trainer = CellFlowTrainer(solver=self.solver)  # type: ignore[arg-type]
+
+        self._trainer = CellFlowTrainer(solver=self.solver, predict_kwargs=self.validation_data["predict_kwargs"])  # type: ignore[arg-type]
 
     def train(
         self,
