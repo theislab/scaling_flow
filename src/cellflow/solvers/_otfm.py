@@ -60,6 +60,7 @@ class OTFlowMatching:
         self.ema = kwargs.pop("ema", 1.0)
 
         self.vf_state = self.vf.create_train_state(input_dim=self.vf.output_dims[-1], **kwargs)
+        self.vf_state_inference = self.vf_state.copy()
         self.vf_step_fn = self._get_vf_step_fn()
 
     def _get_vf_step_fn(self) -> Callable:  # type: ignore[type-arg]
@@ -142,7 +143,7 @@ class OTFlowMatching:
             src_ixs, tgt_ixs = solver_utils.sample_joint(rng_resample, tmat)
             src, tgt = src[src_ixs], tgt[tgt_ixs]
 
-        vf_state, loss = self.vf_step_fn(
+        self.vf_state, loss = self.vf_step_fn(
             rng_step_fn,
             self.vf_state,
             time,
@@ -153,10 +154,10 @@ class OTFlowMatching:
         )
 
         if self.ema == 1.0:
-            self.vf_state = vf_state
-        if self.ema < 1.0:
-            self.vf_state = self.vf_state.replace(
-                params=solver_utils.ema_update(self.vf_state.params, vf_state.params, self.ema)
+            self.vf_state_inference = self.vf_state
+        else:
+            self.vf_state_inference = self.vf_state.replace(
+                params=solver_utils.ema_update(self.vf_state.params, self.vf_state_inference.params, self.ema)
             )
         return loss
 
@@ -175,7 +176,7 @@ class OTFlowMatching:
         Mean and log-variance of encoded conditions.
         """
         cond_mean, cond_logvar = self.vf.apply(
-            {"params": self.vf_state.params},
+            {"params": self.vf_state_inference.params},
             condition,
             method="get_condition_embedding",
         )
@@ -197,9 +198,9 @@ class OTFlowMatching:
         encoder_noise = jnp.zeros(noise_dim) if use_mean else jax.random.normal(rng, noise_dim)
 
         def vf(t: jnp.ndarray, x: jnp.ndarray, args: tuple[dict[str, jnp.ndarray], jnp.ndarray]) -> jnp.ndarray:
-            params = self.vf_state.params
+            params = self.vf_state_inference.params
             condition, encoder_noise = args
-            return self.vf_state.apply_fn({"params": params}, t, x, condition, encoder_noise, train=False)[0]
+            return self.vf_state_inference.apply_fn({"params": params}, t, x, condition, encoder_noise, train=False)[0]
 
         def solve_ode(x: jnp.ndarray, condition: dict[str, jnp.ndarray], encoder_noise: jnp.ndarray) -> jnp.ndarray:
             ode_term = diffrax.ODETerm(vf)

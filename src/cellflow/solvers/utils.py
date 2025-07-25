@@ -1,15 +1,15 @@
 import jax
 
 
-def ema_update(current_model, new_model, ema):
+def ema_update(current_model_params: dict, new_model_params: dict, ema: float) -> dict:
     """
     Update parameters using exponential moving average.
 
     Parameters
     ----------
-        current_model
+        current_model_parames
             Current parameters.
-        new_model
+        new_model_params
             New parameters to be averaged.
         ema
             Exponential moving average factor
@@ -19,5 +19,7 @@ def ema_update(current_model, new_model, ema):
     -------
         Updated parameters after applying EMA.
     """
-    new_target_params = jax.tree_map(lambda p, tp: p * (1 - ema) + tp * ema, current_model.params, new_model.params)
-    return new_model.replace(params=new_target_params)
+    new_target_params = jax.tree_map(
+        lambda p, tp: p * (1 - ema) + tp * ema, current_model_params.params, new_model_params.params
+    )
+    return new_model_params.replace(params=new_target_params)
