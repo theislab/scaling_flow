@@ -257,6 +257,7 @@ class CellFlow:
         condition_encoder_kwargs: dict[str, Any] | None = None,
         pool_sample_covariates: bool = True,
         time_freqs: int = 1024,
+        max_period: int | None = 10000,
         time_encoder_dims: Sequence[int] = (2048, 2048, 2048),
         time_encoder_dropout: float = 0.0,
         hidden_dims: Sequence[int] = (2048, 2048, 2048),
@@ -347,6 +348,9 @@ class CellFlow:
         time_freqs
             Frequency of the sinusoidal time encoding
             (:func:`ott.neural.networks.layers.cyclical_time_encoder`).
+        max_period
+            Controls the frequency of the time embeddings, see
+            :func:`cellflow.networks.utils.cyclical_time_encoder`.
         time_encoder_dims
             Dimensions of the layers processing the time embedding in
             :attr:`cellflow.networks.ConditionalVelocityField.time_encoder`.
@@ -457,6 +461,7 @@ class CellFlow:
             condition_encoder_kwargs=condition_encoder_kwargs,
             act_fn=vf_act_fn,
             time_freqs=time_freqs,
+            max_period=max_period,
             time_encoder_dims=time_encoder_dims,
             time_encoder_dropout=time_encoder_dropout,
             hidden_dims=hidden_dims,

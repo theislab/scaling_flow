@@ -59,6 +59,8 @@ class ConditionalVelocityField(nn.Module):
             Activation function.
         time_freqs
             Frequency of the cyclical time encoding.
+        max_period
+            Controls the minimum frequency of the time embeddings.
         time_encoder_dims
             Dimensions of the time embedding.
         time_encoder_dropout
@@ -108,6 +110,7 @@ class ConditionalVelocityField(nn.Module):
     condition_encoder_kwargs: dict[str, Any] = dc_field(default_factory=lambda: {})
     act_fn: Callable[[jnp.ndarray], jnp.ndarray] = nn.silu
     time_freqs: int = 1024
+    max_period: int = 10000
     time_encoder_dims: Sequence[int] = (1024, 1024, 1024)
     time_encoder_dropout: float = 0.0
     hidden_dims: Sequence[int] = (1024, 1024, 1024)
@@ -200,7 +203,7 @@ class ConditionalVelocityField(nn.Module):
 
         cond_embedding = self.layer_cond_output_dropout(cond_embedding, deterministic=not train)
 
-        t_encoded = time_encoder.cyclical_time_encoder(t, n_freqs=self.time_freqs)
+        t_encoded = time_encoder.cyclical_time_encoder(t, n_freqs=self.time_freqs, max_period=self.max_period)
         t_encoded = self.time_encoder(t_encoded, training=train)
         x_encoded = self.x_encoder(x_t, training=train)
 
@@ -361,6 +364,8 @@ class GENOTConditionalVelocityField(ConditionalVelocityField):
             Activation function.
         time_freqs
             Frequency of the cyclical time encoding.
+        max_period
+            Controls the minimum frequency of the time embeddings.
         time_encoder_dims
             Dimensions of the time embedding.
         time_encoder_dropout
@@ -414,6 +419,7 @@ class GENOTConditionalVelocityField(ConditionalVelocityField):
     condition_encoder_kwargs: dict[str, Any] = dc_field(default_factory=lambda: {})
     act_fn: Callable[[jnp.ndarray], jnp.ndarray] = nn.silu
     time_freqs: int = 1024
+    max_period: int = 10000
     time_encoder_dims: Sequence[int] = (1024, 1024, 1024)
     time_encoder_dropout: float = 0.0
     hidden_dims: Sequence[int] = (1024, 1024, 1024)
@@ -514,7 +520,7 @@ class GENOTConditionalVelocityField(ConditionalVelocityField):
         else:
             cond_embedding = cond_mean + encoder_noise * jnp.exp(cond_logvar / 2.0)
         cond_embedding = self.layer_cond_output_dropout(cond_embedding, deterministic=not train)
-        t_encoded = time_encoder.cyclical_time_encoder(t, n_freqs=self.time_freqs)
+        t_encoded = time_encoder.cyclical_time_encoder(t, n_freqs=self.time_freqs, max_period=self.max_period)
         t_encoded = self.time_encoder(t_encoded, training=train)
         x_encoded = self.x_encoder(x_t, training=train)
         x_0_encoded = self.x_0_encoder(x_0, training=train)
