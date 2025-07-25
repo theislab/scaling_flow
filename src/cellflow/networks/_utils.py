@@ -21,7 +21,7 @@ __all__ = [
 ]
 
 
-def sinusoidal_time_encoder(t: jnp.ndarray, n_freqs: int = 1024, max_period: int | None = 10000) -> jnp.ndarray:
+def sinusoidal_time_encoder(t: jnp.ndarray, time_freqs: int = 1024, time_max_period: int | None = 10000) -> jnp.ndarray:
     """
     Create sinusoidal timestep embeddings.
 
@@ -42,14 +42,14 @@ def sinusoidal_time_encoder(t: jnp.ndarray, n_freqs: int = 1024, max_period: int
     jnp.ndarray
         Sinusoidal embedding.
     """
-    if max_period is None:
-        freq = 2 * jnp.arange(n_freqs) * jnp.pi
+    if time_max_period is None:
+        freq = 2 * jnp.arange(time_freqs) * jnp.pi
         t = freq * t
         return jnp.concatenate([jnp.cos(t), jnp.sin(t)], axis=-1)
 
-    t = t * max_period
-    half = n_freqs // 2
-    freqs = jnp.exp(-math.log(max_period) * jnp.arange(start=0, stop=half, dtype=jnp.float32) / half)
+    t = t * time_max_period
+    half = time_freqs // 2
+    freqs = jnp.exp(-math.log(time_max_period) * jnp.arange(start=0, stop=half, dtype=jnp.float32) / half)
     args = t * freqs
     embedding = jnp.concatenate([jnp.cos(args), jnp.sin(args)], axis=-1)
     return embedding
