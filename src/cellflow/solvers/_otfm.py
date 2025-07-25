@@ -13,6 +13,7 @@ from ott.solvers import utils as solver_utils
 from cellflow import utils
 from cellflow._types import ArrayLike
 from cellflow.networks._velocity_field import ConditionalVelocityField
+from cellflow.solvers.utils import ema_update
 
 __all__ = ["OTFlowMatching"]
 
@@ -60,7 +61,7 @@ class OTFlowMatching:
         self.ema = kwargs.pop("ema", 1.0)
 
         self.vf_state = self.vf.create_train_state(input_dim=self.vf.output_dims[-1], **kwargs)
-        self.vf_state_inference = self.vf_state.copy()
+        self.vf_state_inference = self.vf.create_train_state(input_dim=self.vf.output_dims[-1], **kwargs)
         self.vf_step_fn = self._get_vf_step_fn()
 
     def _get_vf_step_fn(self) -> Callable:  # type: ignore[type-arg]
@@ -156,8 +157,8 @@ class OTFlowMatching:
         if self.ema == 1.0:
             self.vf_state_inference = self.vf_state
         else:
-            self.vf_state_inference = self.vf_state.replace(
-                params=solver_utils.ema_update(self.vf_state.params, self.vf_state_inference.params, self.ema)
+            self.vf_state_inference = self.vf_state_inference.replace(
+                params=ema_update(self.vf_state_inference.params, self.vf_state.params, self.ema)
             )
         return loss
 

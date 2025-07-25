@@ -19,7 +19,7 @@ def ema_update(current_model_params: dict, new_model_params: dict, ema: float) -
     -------
         Updated parameters after applying EMA.
     """
-    new_target_params = jax.tree_map(
-        lambda p, tp: p * (1 - ema) + tp * ema, current_model_params.params, new_model_params.params
+    new_inference_model_params = jax.tree_map(
+        lambda p, tp: p * (1 - ema) + tp * ema, current_model_params, new_model_params
     )
-    return new_model_params.replace(params=new_target_params)
+    return new_inference_model_params
