@@ -57,6 +57,7 @@ class OTFlowMatching:
         self.probability_path = probability_path
         self.time_sampler = time_sampler
         self.match_fn = jax.jit(match_fn)
+        self.ema = kwargs.pop("ema", 1.0)
 
         self.vf_state = self.vf.create_train_state(input_dim=self.vf.output_dims[-1], **kwargs)
         self.vf_step_fn = self._get_vf_step_fn()
@@ -141,7 +142,7 @@ class OTFlowMatching:
             src_ixs, tgt_ixs = solver_utils.sample_joint(rng_resample, tmat)
             src, tgt = src[src_ixs], tgt[tgt_ixs]
 
-        self.vf_state, loss = self.vf_step_fn(
+        vf_state, loss = self.vf_step_fn(
             rng_step_fn,
             self.vf_state,
             time,
@@ -150,6 +151,13 @@ class OTFlowMatching:
             condition,
             encoder_noise,
         )
+
+        if self.ema == 1.0:
+            self.vf_state = vf_state
+        if self.ema < 1.0:
+            self.vf_state = self.vf_state.replace(
+                params=solver_utils.ema_update(self.vf_state.params, vf_state.params, self.ema)
+            )
         return loss
 
     def get_condition_embedding(self, condition: dict[str, ArrayLike], return_as_numpy=True) -> ArrayLike:
