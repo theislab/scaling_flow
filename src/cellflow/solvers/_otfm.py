@@ -7,6 +7,7 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 from flax.training import train_state
+from flax.core import frozen_dict
 from ott.neural.methods.flows import dynamics
 from ott.solvers import utils as solver_utils
 
@@ -192,6 +193,7 @@ class OTFlowMatching:
         kwargs.setdefault("dt0", None)
         kwargs.setdefault("solver", diffrax.Tsit5())
         kwargs.setdefault("stepsize_controller", diffrax.PIDController(rtol=1e-5, atol=1e-5))
+        kwargs = frozen_dict.freeze(kwargs)
 
         noise_dim = (1, self.vf.condition_embedding_dim)
         use_mean = rng is None or self.condition_encoder_mode == "deterministic"
