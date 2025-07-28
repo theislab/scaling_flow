@@ -6,8 +6,8 @@ import diffrax
 import jax
 import jax.numpy as jnp
 import numpy as np
-from flax.training import train_state
 from flax.core import frozen_dict
+from flax.training import train_state
 from ott.neural.methods.flows import dynamics
 from ott.solvers import utils as solver_utils
 
