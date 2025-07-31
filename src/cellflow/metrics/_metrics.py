@@ -136,7 +136,7 @@ def compute_metrics(x: ArrayLike, y: ArrayLike) -> dict[str, float]:
     metrics["sinkhorn_div_1"] = compute_sinkhorn_div(x, y, epsilon=1.0)
     metrics["sinkhorn_div_10"] = compute_sinkhorn_div(x, y, epsilon=10.0)
     metrics["sinkhorn_div_100"] = compute_sinkhorn_div(x, y, epsilon=100.0)
-    metrics["e_distance"] = compute_e_distance(x, y)
+    metrics["e_distance"] = compute_e_distance_fast(x, y)
     metrics["mmd"] = compute_scalar_mmd(x, y)
     return metrics
 
@@ -243,6 +243,6 @@ def compute_metrics_fast(x: ArrayLike, y: ArrayLike) -> dict[str, float]:
     """
     metrics = {}
     metrics["r_squared"] = compute_r_squared(x, y)
-    metrics["e_distance"] = compute_e_distance(x, y)
+    metrics["e_distance"] = compute_e_distance_fast(x, y)
     metrics["mmd"] = compute_scalar_mmd(x, y)
     return metrics
