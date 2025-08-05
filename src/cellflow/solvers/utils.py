@@ -1,6 +1,7 @@
 import jax
 
 
+@jax.jit
 def ema_update(current_model_params: dict, new_model_params: dict, ema: float) -> dict:
     """
     Update parameters using exponential moving average.
