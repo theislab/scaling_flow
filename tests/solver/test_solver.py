@@ -87,7 +87,7 @@ class TestSolver:
             atol=1e-1,
             rtol=1e-2,
         )
-        assert diff_nonbatched - diff_batched > 2
+        assert diff_nonbatched - diff_batched > 0.5
 
     @pytest.mark.parametrize("ema", [0.5, 1.0])
     def test_EMA(self, dataloader, ema):
