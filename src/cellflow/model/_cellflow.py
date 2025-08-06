@@ -237,7 +237,7 @@ class CellFlow:
         split_val = len(val_data.control_to_perturbation) > 1
         predict_kwargs = predict_kwargs or {}
         # Check if predict_kwargs is alreday provided from an earlier call
-        if "predict_kwargs" in self._validation_data:
+        if "predict_kwargs" in self._validation_data and len(predict_kwargs):
             predict_kwargs = self._validation_data["predict_kwargs"].update(predict_kwargs)
         # Set batched prediction to False if split_val is True
         if split_val:
