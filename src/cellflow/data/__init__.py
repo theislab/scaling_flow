@@ -11,9 +11,9 @@ from cellflow.data._dataloader import (
     TrainSampler,
     ValidationSampler,
 )
+from cellflow.data._datamanager import DataManager
 from cellflow.data._jax_dataloader import JaxOutOfCoreTrainSampler
 from cellflow.data._torch_dataloader import TorchCombinedTrainSampler
-from cellflow.data._datamanager import DataManager
 
 __all__ = [
     "DataManager",

@@ -11,5 +11,3 @@ def test_optional_dependency_exception_message():
     msg = str(excinfo.value)
     assert "Optional dependency 'torch' is required" in msg
     assert "pip install torch" in msg
-
-

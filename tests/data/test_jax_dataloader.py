@@ -1,10 +1,8 @@
 import sys
-import threading
 
 import numpy as np
 import pytest
 
-from cellflow.data._dataloader import TrainSampler
 from cellflow.data._jax_dataloader import JaxOutOfCoreTrainSampler
 
 
@@ -39,5 +37,3 @@ def test_jax_out_of_core_sampler_with_jax(monkeypatch):
     assert set(b1.keys()) == {"src_cell_data", "tgt_cell_data"}
     assert b1["src_cell_data"].shape[0] == 2
     assert b2["src_cell_data"].shape[0] == 2
-
-

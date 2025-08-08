@@ -8,7 +8,7 @@ import pytest
 # under test imports torch at module import time.
 pytest.importorskip("torch")
 
-from cellflow.data._torch_dataloader import (  # noqa: E402
+from cellflow.data._torch_dataloader import (
     TorchCombinedTrainSampler,
     _worker_init_fn_helper,
 )
@@ -18,7 +18,7 @@ from cellflow.data._torch_dataloader import (  # noqa: E402
 class DummySampler:
     label: str
 
-    def sample(self, rng: np.random.Generator):  # noqa: D401
+    def sample(self, rng: np.random.Generator):
         return {"label": self.label, "rand": rng.random()}
 
 
@@ -63,8 +63,10 @@ def test_worker_init_fn_helper_sets_rng(monkeypatch):
                 pass
 
     worker_info = _FakeWorkerInfo()
+
     def _get_worker_info():
         return worker_info
+
     _FakeTorch.utils.data.get_worker_info = staticmethod(_get_worker_info)  # type: ignore[attr-defined]
 
     monkeypatch.setitem(sys.modules, "torch", _FakeTorch())
@@ -74,5 +76,3 @@ def test_worker_init_fn_helper_sets_rng(monkeypatch):
     # Verify returned rng is the same and dataset received it
     assert out is rngs[0]
     assert worker_info.dataset._rng is rngs[0]
-
-

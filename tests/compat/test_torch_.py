@@ -1,5 +1,4 @@
 import importlib
-import types
 
 import pytest
 
@@ -14,10 +13,8 @@ class ImportBlocker:
     def __init__(self, blocked_prefix: str):
         self.blocked_prefix = blocked_prefix
 
-    def find_spec(self, fullname, path, target=None):  # noqa: D401
-        if fullname == self.blocked_prefix or fullname.startswith(
-            f"{self.blocked_prefix}."
-        ):
+    def find_spec(self, fullname, path, target=None):
+        if fullname == self.blocked_prefix or fullname.startswith(f"{self.blocked_prefix}."):
             raise ImportError(f"blocked import: {fullname}")
         return None
 
@@ -57,5 +54,3 @@ def test_torch_iterabledataset_when_torch_available(monkeypatch):
     from torch.utils.data import IterableDataset as TorchIterableDatasetReal
 
     assert compat_torch.TorchIterableDataset is TorchIterableDatasetReal
-
-
