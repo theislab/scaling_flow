@@ -9,7 +9,7 @@ import pytest
 pytest.importorskip("torch")
 
 from cellflow.data._torch_dataloader import (  # noqa: E402
-    CombinedTrainingSampler,
+    TorchCombinedTrainSampler,
     _worker_init_fn_helper,
 )
 
@@ -23,20 +23,20 @@ class DummySampler:
 
 
 def test_combined_sampler_requires_rng():
-    s = CombinedTrainingSampler([DummySampler("a"), DummySampler("b")])
+    s = TorchCombinedTrainSampler([DummySampler("a"), DummySampler("b")])
     with pytest.raises(ValueError):
         next(iter(s))
 
 
 def test_combined_sampler_respects_weights_choice_first():
-    s = CombinedTrainingSampler([DummySampler("a"), DummySampler("b")], weights=np.array([1.0, 0.0]))
+    s = TorchCombinedTrainSampler([DummySampler("a"), DummySampler("b")], weights=np.array([1.0, 0.0]))
     s.set_rng(np.random.default_rng(123))
     batch = next(iter(s))
     assert batch["label"] == "a"
 
 
 def test_combined_sampler_respects_weights_choice_second():
-    s = CombinedTrainingSampler([DummySampler("a"), DummySampler("b")], weights=np.array([0.0, 1.0]))
+    s = TorchCombinedTrainSampler([DummySampler("a"), DummySampler("b")], weights=np.array([0.0, 1.0]))
     s.set_rng(np.random.default_rng(123))
     batch = next(iter(s))
     assert batch["label"] == "b"
