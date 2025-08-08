@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-from cellflow.data._dataloader import OOCTrainSampler, PredictionSampler, TrainSampler
+from cellflow.data import JaxOutOfCoreTrainSampler, PredictionSampler, TrainSampler
 from cellflow.data._datamanager import DataManager
 
 
@@ -45,7 +45,7 @@ class TestTrainSampler:
         assert sample_2["condition"]["dosage"].shape[0] == 1
 
 
-class TestOOCTrainSampler:
+class TestJaxOutOfCoreTrainSampler:
     @pytest.mark.parametrize("batch_size", [1, 31])
     def test_sampling_no_combinations(self, adata_perturbation, batch_size: int):
         sample_rep = "X"
@@ -67,7 +67,7 @@ class TestOOCTrainSampler:
         )
 
         train_data = dm.get_train_data(adata_perturbation)
-        sampler = OOCTrainSampler(data=train_data, batch_size=batch_size, seed=0)
+        sampler = JaxOutOfCoreTrainSampler(data=train_data, batch_size=batch_size, seed=0)
         sampler.set_sampler(num_iterations=2)
         sample_1 = sampler.sample()
         sample_2 = sampler.sample()

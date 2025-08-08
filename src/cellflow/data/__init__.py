@@ -10,8 +10,9 @@ from cellflow.data._dataloader import (
     PredictionSampler,
     TrainSampler,
     ValidationSampler,
-    CombinedTrainSampler,
 )
+from cellflow.data._jax_dataloader import JaxOutOfCoreTrainSampler
+from cellflow.data._torch_dataloader import TorchCombinedTrainSampler
 from cellflow.data._datamanager import DataManager
 
 __all__ = [
@@ -25,5 +26,6 @@ __all__ = [
     "TrainSampler",
     "ValidationSampler",
     "PredictionSampler",
-    "CombinedTrainSampler",
+    "TorchCombinedTrainSampler",
+    "JaxOutOfCoreTrainSampler",
 ]

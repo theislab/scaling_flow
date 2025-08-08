@@ -4,13 +4,15 @@ from cellflow._optional import OptionalDependencyNotAvailable, torch_required_ms
 
 try:
     from torch.utils.data import IterableDataset as TorchIterableDataset  # type: ignore
+
     TORCH_AVAILABLE = True
 except ImportError as _:
     TORCH_AVAILABLE = False
 
-    class TorchIterableDataset:  # type: ignore
+    class TorchIterableDataset:  # noqa: D101
         def __init__(self, *args, **kwargs):
             raise OptionalDependencyNotAvailable(torch_required_msg())
+
 
 if TYPE_CHECKING:
     # keeps type checkers aligned with the real type

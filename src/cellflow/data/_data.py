@@ -155,24 +155,13 @@ class TrainingData(BaseDataMixin):
         cell_data = np.asarray(self.cell_data)
         split_covariates_mask = np.asarray(self.split_covariates_mask)
         perturbation_covariates_mask = np.asarray(self.perturbation_covariates_mask)
-        condition_data = {
-            str(k): np.asarray(v) for k, v in (self.condition_data or {}).items()
-        }
-        control_to_perturbation = {
-            str(k): np.asarray(v)
-            for k, v in (self.control_to_perturbation or {}).items()
-        }
-        split_idx_to_covariates = {
-            str(k): np.asarray(v)
-            for k, v in (self.split_idx_to_covariates or {}).items()
-        }
+        condition_data = {str(k): np.asarray(v) for k, v in (self.condition_data or {}).items()}
+        control_to_perturbation = {str(k): np.asarray(v) for k, v in (self.control_to_perturbation or {}).items()}
+        split_idx_to_covariates = {str(k): np.asarray(v) for k, v in (self.split_idx_to_covariates or {}).items()}
         perturbation_idx_to_covariates = {
-            str(k): np.asarray(v)
-            for k, v in (self.perturbation_idx_to_covariates or {}).items()
+            str(k): np.asarray(v) for k, v in (self.perturbation_idx_to_covariates or {}).items()
         }
-        perturbation_idx_to_id = {
-            str(k): v for k, v in (self.perturbation_idx_to_id or {}).items()
-        }
+        perturbation_idx_to_id = {str(k): v for k, v in (self.perturbation_idx_to_id or {}).items()}
 
         train_data_dict: dict[str, Any] = {
             "cell_data": cell_data,
@@ -216,9 +205,7 @@ class TrainingData(BaseDataMixin):
             func(group, key, element, dataset_kwargs=dataset_kwargs)
 
         zgroup = zarr.open_group(path, mode="a")
-        ad.experimental.write_dispatched(
-            zgroup, "/", train_data_dict, callback=_write_sharded_callback
-        )
+        ad.experimental.write_dispatched(zgroup, "/", train_data_dict, callback=_write_sharded_callback)
         zarr.consolidate_metadata(zgroup.store)
 
 
@@ -330,7 +317,7 @@ class ZarrTrainingData(BaseDataMixin):
     max_combination_length: int
 
     @classmethod
-    def read_zarr(cls, path: str) -> "ZarrTrainingData":
+    def read_zarr(cls, path: str) -> ZarrTrainingData:
         group = zarr.open_group(path, mode="r")
         max_len_node = group.get("max_combination_length")
         if max_len_node is None:
@@ -338,25 +325,17 @@ class ZarrTrainingData(BaseDataMixin):
         else:
             try:
                 max_combination_length = int(max_len_node[()])
-            except Exception:
+            except Exception:  # noqa: BLE001
                 max_combination_length = int(max_len_node)
 
         return cls(
             cell_data=group["cell_data"],
             split_covariates_mask=group["split_covariates_mask"],
             perturbation_covariates_mask=group["perturbation_covariates_mask"],
-            split_idx_to_covariates=ad.io.read_elem(
-                group["split_idx_to_covariates"]
-            ),
-            perturbation_idx_to_covariates=ad.io.read_elem(
-                group["perturbation_idx_to_covariates"]
-            ),
-            perturbation_idx_to_id=ad.io.read_elem(
-                group["perturbation_idx_to_id"]
-            ),
+            split_idx_to_covariates=ad.io.read_elem(group["split_idx_to_covariates"]),
+            perturbation_idx_to_covariates=ad.io.read_elem(group["perturbation_idx_to_covariates"]),
+            perturbation_idx_to_id=ad.io.read_elem(group["perturbation_idx_to_id"]),
             condition_data=ad.io.read_elem(group["condition_data"]),
-            control_to_perturbation=ad.io.read_elem(
-                group["control_to_perturbation"]
-            ),
+            control_to_perturbation=ad.io.read_elem(group["control_to_perturbation"]),
             max_combination_length=max_combination_length,
         )

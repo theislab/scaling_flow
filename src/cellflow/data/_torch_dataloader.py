@@ -1,10 +1,11 @@
-import numpy as np
 from dataclasses import dataclass
 from functools import partial
+
 import numpy as np
 import torch
-from cellflow.data._data import ZarrTrainingData
+
 from cellflow.compat import TorchIterableDataset
+from cellflow.data._data import ZarrTrainingData
 from cellflow.data._dataloader import TrainSampler
 
 
@@ -20,7 +21,7 @@ def _worker_init_fn_helper(worker_id, random_generators):
 
 
 @dataclass
-class CombinedTrainingSampler(TorchIterableDataset):
+class TorchCombinedTrainSampler(TorchIterableDataset):
     """
     Combined training sampler that iterates over multiple samplers.
 

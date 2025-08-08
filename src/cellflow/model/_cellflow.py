@@ -18,7 +18,7 @@ from ott.neural.methods.flows import dynamics
 from cellflow import _constants
 from cellflow._types import ArrayLike, Layers_separate_input_t, Layers_t
 from cellflow.data._data import ConditionData, TrainingData, ValidationData
-from cellflow.data._dataloader import OOCTrainSampler, PredictionSampler, TrainSampler, ValidationSampler
+from cellflow.data import JaxOutOfCoreTrainSampler, PredictionSampler, TrainSampler, ValidationSampler
 from cellflow.data._datamanager import DataManager
 from cellflow.model._utils import _write_predictions
 from cellflow.networks import _velocity_field
@@ -54,7 +54,7 @@ class CellFlow:
             if solver == "otfm"
             else _velocity_field.GENOTConditionalVelocityField
         )
-        self._dataloader: TrainSampler | OOCTrainSampler | None = None
+        self._dataloader: TrainSampler | JaxOutOfCoreTrainSampler | None = None
         self._trainer: CellFlowTrainer | None = None
         self._validation_data: dict[str, ValidationData] = {}
         self._solver: _otfm.OTFlowMatching | _genot.GENOT | None = None
@@ -532,7 +532,7 @@ class CellFlow:
         monitor_metrics
             Metrics to monitor.
         out_of_core_dataloading
-            If :obj:`True`, use out-of-core dataloading. Uses the :class:`cellflow.data._dataloader.OOCTrainSampler`
+            If :obj:`True`, use out-of-core dataloading. Uses the :class:`cellflow.data.JaxOutOfCoreTrainSampler`
             to load data that does not fit into GPU memory.
 
         Returns
@@ -549,7 +549,7 @@ class CellFlow:
             raise ValueError("Model not initialized. Please call `prepare_model` first.")
 
         if out_of_core_dataloading:
-            self._dataloader = OOCTrainSampler(data=self.train_data, batch_size=batch_size)
+            self._dataloader = JaxOutOfCoreTrainSampler(data=self.train_data, batch_size=batch_size)
         else:
             self._dataloader = TrainSampler(data=self.train_data, batch_size=batch_size)
         validation_loaders = {k: ValidationSampler(v) for k, v in self.validation_data.items() if k != "predict_kwargs"}
@@ -808,7 +808,7 @@ class CellFlow:
         return self._solver
 
     @property
-    def dataloader(self) -> TrainSampler | OOCTrainSampler | None:
+    def dataloader(self) -> TrainSampler | JaxOutOfCoreTrainSampler | None:
         """The dataloader used for training."""
         return self._dataloader
 
