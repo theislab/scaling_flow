@@ -1,10 +1,6 @@
 import abc
-import queue
-import threading
-from collections.abc import Generator
 from typing import Any, Literal
 
-import jax
 import numpy as np
 
 from cellflow.data._data import (
@@ -18,8 +14,6 @@ __all__ = [
     "TrainSampler",
     "ValidationSampler",
     "PredictionSampler",
-    "OOCTrainSampler",
-    "CombinedTrainSampler",
 ]
 
 
@@ -243,116 +237,3 @@ class PredictionSampler(BaseValidSampler):
     def data(self) -> PredictionData:
         """The training data."""
         return self._data
-
-
-def prefetch_to_device(sampler: TrainSampler, seed: int, num_iterations: int, prefetch_factor: int = 2, num_workers: int = 4) -> Generator[dict[str, Any], None, None]:
-    seq = np.random.SeedSequence(seed)
-    random_generators = [np.random.default_rng(s) for s in seq.spawn(num_workers)]
-
-    q: queue.Queue[dict[str, Any]] = queue.Queue(maxsize=prefetch_factor * num_workers)
-    sem = threading.Semaphore(num_iterations)
-    stop_event = threading.Event()
-
-    def worker(rng: np.random.Generator):
-        while not stop_event.is_set() and sem.acquire(blocking=False):
-            batch = sampler.sample(rng)
-            batch = jax.device_put(batch, jax.devices()[0], donate=True)
-            jax.block_until_ready(batch)
-            while not stop_event.is_set():
-                try:
-                    q.put(batch, timeout=1.0)
-                    break  # Batch successfully put into the queue; break out of retry loop
-                except queue.Full:
-                    continue
-
-        return
-
-    # Start multiple worker threads
-    ts = []
-    for i in range(num_workers):
-        t = threading.Thread(target=worker, daemon=True, name=f"worker-{i}", args=(random_generators[i],))
-        t.start()
-        ts.append(t)
-
-    try:
-        for _ in range(num_iterations):
-            # Yield batches from the queue; blocks waiting for available batch
-            yield q.get()
-    finally:
-        # When the generator is closed or garbage collected, clean up the worker threads
-        stop_event.set()  # Signal all workers to exit
-        for t in ts:
-            t.join()  # Wait for all worker threads to finish
-
-
-class OOCTrainSampler:
-    def __init__(
-        self,
-        data: TrainingData | ZarrTrainingData,
-        seed: int,
-        batch_size: int = 1024,
-        num_workers: int = 4,
-        prefetch_factor: int = 2,
-    ):
-        self.inner = TrainSampler(data=data, batch_size=batch_size)
-        self.num_workers = num_workers
-        self.prefetch_factor = prefetch_factor
-        self.seed = seed
-        self._iterator = None
-
-    def set_sampler(self, num_iterations: int) -> None:
-        self._iterator = prefetch_to_device(sampler=self.inner, seed=self.seed, num_iterations=num_iterations, prefetch_factor=self.prefetch_factor)
-
-    def sample(self, rng=None) -> dict[str, Any]:
-        if self._iterator is None:
-            raise ValueError(
-                "Sampler not set. Use `set_sampler` to set the sampler with"
-                "the number of iterations. Without the number of iterations,"
-                " the sampler will not be able to sample the data."
-            )
-        if rng is not None:
-            del rng
-        return next(self._iterator)
-
-
-class CombinedTrainSampler:
-    """Sample batches from multiple datasets with optional sampling weights.
-
-    Returns batches from the chosen dataset and includes the chosen
-    ``dataset_index`` in the returned dict.
-
-    Parameters
-    ----------
-    datasets
-        List of training datasets (in-memory or Zarr-backed).
-    weights
-        Sampling weights for each dataset. If ``None``, use uniform weights.
-    batch_size
-        Batch size for each inner sampler.
-    """
-
-    def __init__(
-        self,
-        datasets: list[TrainingData | ZarrTrainingData],
-        *,
-        weights: np.ndarray | list[float] | None = None,
-        batch_size: int = 1024,
-    ) -> None:
-        if len(datasets) == 0:
-            raise ValueError("'datasets' must be a non-empty list.")
-        self.samplers: list[TrainSampler] = [TrainSampler(d, batch_size=batch_size) for d in datasets]
-        if weights is None:
-            self.weights = np.full(len(datasets), 1.0 / len(datasets), dtype=float)
-        else:
-            w = np.asarray(weights, dtype=float)
-            if w.shape[0] != len(datasets):
-                raise ValueError("'weights' length must match number of datasets.")
-            total = float(w.sum())
-            if total <= 0:
-                raise ValueError("'weights' must sum to a positive value.")
-            self.weights = w / total
-
-    def sample(self, rng: np.random.Generator) -> dict[str, Any]:
-        dataset_index = int(rng.choice(len(self.samplers), p=self.weights))
-        batch = self.samplers[dataset_index].sample(rng)
-        return {**batch, "dataset_index": dataset_index}

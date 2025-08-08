@@ -4,8 +4,10 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
 
-import jax
+import anndata as ad
 import numpy as np
+import zarr
+from zarr.codecs import BloscCodec
 
 from cellflow._types import ArrayLike
 
@@ -146,18 +148,8 @@ class TrainingData(BaseDataMixin):
         compressors
             Optional list/tuple of Zarr codecs. If ``None``, a sensible default is used.
         """
-        try:
-            import anndata as ad  # lazy import
-            import importlib
-            zarr = importlib.import_module("zarr")
-            zarr_codecs = importlib.import_module("zarr.codecs")
-        except Exception as exc:  # pragma: no cover
-            raise ImportError(
-                "Writing to Zarr requires 'anndata>=0.10' and 'zarr>=3'."
-            ) from exc
-
         if compressors is None:
-            compressors = (zarr_codecs.BloscCodec(cname="lz4", clevel=3),)
+            compressors = (BloscCodec(cname="lz4", clevel=3),)
 
         # Convert to numpy-backed containers for serialization
         cell_data = np.asarray(self.cell_data)
@@ -197,7 +189,6 @@ class TrainingData(BaseDataMixin):
         # Ensure Zarr v3 write format for sharding
         ad.settings.zarr_write_format = 3
 
-       
         def _write_sharded_callback(
             func: Any,
             group: Any,
@@ -300,8 +291,8 @@ class PredictionData(BaseDataMixin):
         Token to use for masking ``null_value``.
     """
 
-    cell_data: jax.Array  # (n_cells, n_features)
-    split_covariates_mask: jax.Array  # (n_cells,), which cell assigned to which source distribution
+    cell_data: ArrayLike  # (n_cells, n_features)
+    split_covariates_mask: ArrayLike  # (n_cells,), which cell assigned to which source distribution
     split_idx_to_covariates: dict[int, tuple[Any, ...]]  # (n_sources,) dictionary explaining split_covariates_mask
     perturbation_idx_to_covariates: dict[
         int, tuple[str, ...]
@@ -340,15 +331,6 @@ class ZarrTrainingData(BaseDataMixin):
 
     @classmethod
     def read_zarr(cls, path: str) -> "ZarrTrainingData":
-        try:
-            import anndata as ad  # lazy import
-            import importlib
-            zarr = importlib.import_module("zarr")
-        except Exception as exc:  # pragma: no cover
-            raise ImportError(
-                "Reading from Zarr requires 'anndata>=0.10' and 'zarr>=3'."
-            ) from exc
-
         group = zarr.open_group(path, mode="r")
         max_len_node = group.get("max_combination_length")
         if max_len_node is None:
