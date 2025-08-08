@@ -60,9 +60,12 @@ def test_worker_init_fn_helper_sets_rng(monkeypatch):
     class _FakeTorch:
         class utils:
             class data:
-                @staticmethod
-                def get_worker_info():
-                    return _FakeWorkerInfo()
+                pass
+
+    worker_info = _FakeWorkerInfo()
+    def _get_worker_info():
+        return worker_info
+    _FakeTorch.utils.data.get_worker_info = staticmethod(_get_worker_info)  # type: ignore[attr-defined]
 
     monkeypatch.setitem(sys.modules, "torch", _FakeTorch())
 
@@ -70,6 +73,6 @@ def test_worker_init_fn_helper_sets_rng(monkeypatch):
     out = _worker_init_fn_helper(0, rngs)
     # Verify returned rng is the same and dataset received it
     assert out is rngs[0]
-    assert _FakeTorch.utils.data.get_worker_info().dataset._rng is rngs[0]
+    assert worker_info.dataset._rng is rngs[0]
 
 
