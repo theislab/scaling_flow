@@ -7,9 +7,20 @@ from typing import Any, Literal
 import jax
 import numpy as np
 
-from cellflow.data._data import PredictionData, TrainingData, ValidationData
+from cellflow.data._data import (
+    PredictionData,
+    TrainingData,
+    ValidationData,
+    ZarrTrainingData,
+)
 
-__all__ = ["TrainSampler", "ValidationSampler", "PredictionSampler", "OOCTrainSampler"]
+__all__ = [
+    "TrainSampler",
+    "ValidationSampler",
+    "PredictionSampler",
+    "OOCTrainSampler",
+    "CombinedTrainSampler",
+]
 
 
 class TrainSampler:
@@ -24,7 +35,7 @@ class TrainSampler:
 
     """
 
-    def __init__(self, data: TrainingData, batch_size: int = 1024):
+    def __init__(self, data: TrainingData | ZarrTrainingData, batch_size: int = 1024):
         self._data = data
         self._data_idcs = np.arange(data.cell_data.shape[0])
         self.batch_size = batch_size
@@ -94,7 +105,7 @@ class TrainSampler:
             }
 
     @property
-    def data(self):
+    def data(self) -> TrainingData | ZarrTrainingData:
         """The training data."""
         return self._data
 
@@ -234,9 +245,7 @@ class PredictionSampler(BaseValidSampler):
         return self._data
 
 
-def prefetch_to_device(
-    sampler: TrainSampler, seed: int, num_iterations: int, prefetch_factor: int = 2, num_workers: int = 4
-) -> Generator[dict[str, Any], None, None]:
+def prefetch_to_device(sampler: TrainSampler, seed: int, num_iterations: int, prefetch_factor: int = 2, num_workers: int = 4) -> Generator[dict[str, Any], None, None]:
     seq = np.random.SeedSequence(seed)
     random_generators = [np.random.default_rng(s) for s in seq.spawn(num_workers)]
 
@@ -267,7 +276,7 @@ def prefetch_to_device(
 
     try:
         for _ in range(num_iterations):
-            # Yield batches from the queue; will block waiting for available batch
+            # Yield batches from the queue; blocks waiting for available batch
             yield q.get()
     finally:
         # When the generator is closed or garbage collected, clean up the worker threads
@@ -278,7 +287,12 @@ def prefetch_to_device(
 
 class OOCTrainSampler:
     def __init__(
-        self, data: TrainingData, seed: int, batch_size: int = 1024, num_workers: int = 4, prefetch_factor: int = 2
+        self,
+        data: TrainingData | ZarrTrainingData,
+        seed: int,
+        batch_size: int = 1024,
+        num_workers: int = 4,
+        prefetch_factor: int = 2,
     ):
         self.inner = TrainSampler(data=data, batch_size=batch_size)
         self.num_workers = num_workers
@@ -287,9 +301,7 @@ class OOCTrainSampler:
         self._iterator = None
 
     def set_sampler(self, num_iterations: int) -> None:
-        self._iterator = prefetch_to_device(
-            sampler=self.inner, seed=self.seed, num_iterations=num_iterations, prefetch_factor=self.prefetch_factor
-        )
+        self._iterator = prefetch_to_device(sampler=self.inner, seed=self.seed, num_iterations=num_iterations, prefetch_factor=self.prefetch_factor)
 
     def sample(self, rng=None) -> dict[str, Any]:
         if self._iterator is None:
@@ -301,3 +313,46 @@ class OOCTrainSampler:
         if rng is not None:
             del rng
         return next(self._iterator)
+
+
+class CombinedTrainSampler:
+    """Sample batches from multiple datasets with optional sampling weights.
+
+    Returns batches from the chosen dataset and includes the chosen
+    ``dataset_index`` in the returned dict.
+
+    Parameters
+    ----------
+    datasets
+        List of training datasets (in-memory or Zarr-backed).
+    weights
+        Sampling weights for each dataset. If ``None``, use uniform weights.
+    batch_size
+        Batch size for each inner sampler.
+    """
+
+    def __init__(
+        self,
+        datasets: list[TrainingData | ZarrTrainingData],
+        *,
+        weights: np.ndarray | list[float] | None = None,
+        batch_size: int = 1024,
+    ) -> None:
+        if len(datasets) == 0:
+            raise ValueError("'datasets' must be a non-empty list.")
+        self.samplers: list[TrainSampler] = [TrainSampler(d, batch_size=batch_size) for d in datasets]
+        if weights is None:
+            self.weights = np.full(len(datasets), 1.0 / len(datasets), dtype=float)
+        else:
+            w = np.asarray(weights, dtype=float)
+            if w.shape[0] != len(datasets):
+                raise ValueError("'weights' length must match number of datasets.")
+            total = float(w.sum())
+            if total <= 0:
+                raise ValueError("'weights' must sum to a positive value.")
+            self.weights = w / total
+
+    def sample(self, rng: np.random.Generator) -> dict[str, Any]:
+        dataset_index = int(rng.choice(len(self.samplers), p=self.weights))
+        batch = self.samplers[dataset_index].sample(rng)
+        return {**batch, "dataset_index": dataset_index}

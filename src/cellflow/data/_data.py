@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
@@ -13,6 +15,7 @@ __all__ = [
     "PredictionData",
     "TrainingData",
     "ValidationData",
+    "ZarrTrainingData",
 ]
 
 
@@ -121,6 +124,112 @@ class TrainingData(BaseDataMixin):
     null_value: Any
     data_manager: Any
 
+    # --- Zarr export helpers -------------------------------------------------
+    def to_zarr(
+        self,
+        path: str,
+        *,
+        chunk_size: int = 4096,
+        shard_size: int = 65536,
+        compressors: Any | None = None,
+    ) -> None:
+        """Write this training data to Zarr v3 with sharded, compressed arrays.
+
+        Parameters
+        ----------
+        path
+            Path to a Zarr group to create or open for writing.
+        chunk_size
+            Chunk size along the first axis.
+        shard_size
+            Shard size along the first axis.
+        compressors
+            Optional list/tuple of Zarr codecs. If ``None``, a sensible default is used.
+        """
+        try:
+            import anndata as ad  # lazy import
+            import importlib
+            zarr = importlib.import_module("zarr")
+            zarr_codecs = importlib.import_module("zarr.codecs")
+        except Exception as exc:  # pragma: no cover
+            raise ImportError(
+                "Writing to Zarr requires 'anndata>=0.10' and 'zarr>=3'."
+            ) from exc
+
+        if compressors is None:
+            compressors = (zarr_codecs.BloscCodec(cname="lz4", clevel=3),)
+
+        # Convert to numpy-backed containers for serialization
+        cell_data = np.asarray(self.cell_data)
+        split_covariates_mask = np.asarray(self.split_covariates_mask)
+        perturbation_covariates_mask = np.asarray(self.perturbation_covariates_mask)
+        condition_data = {
+            str(k): np.asarray(v) for k, v in (self.condition_data or {}).items()
+        }
+        control_to_perturbation = {
+            str(k): np.asarray(v)
+            for k, v in (self.control_to_perturbation or {}).items()
+        }
+        split_idx_to_covariates = {
+            str(k): np.asarray(v)
+            for k, v in (self.split_idx_to_covariates or {}).items()
+        }
+        perturbation_idx_to_covariates = {
+            str(k): np.asarray(v)
+            for k, v in (self.perturbation_idx_to_covariates or {}).items()
+        }
+        perturbation_idx_to_id = {
+            str(k): v for k, v in (self.perturbation_idx_to_id or {}).items()
+        }
+
+        train_data_dict: dict[str, Any] = {
+            "cell_data": cell_data,
+            "split_covariates_mask": split_covariates_mask,
+            "perturbation_covariates_mask": perturbation_covariates_mask,
+            "split_idx_to_covariates": split_idx_to_covariates,
+            "perturbation_idx_to_covariates": perturbation_idx_to_covariates,
+            "perturbation_idx_to_id": perturbation_idx_to_id,
+            "condition_data": condition_data,
+            "control_to_perturbation": control_to_perturbation,
+            "max_combination_length": int(self.max_combination_length),
+        }
+
+        # Ensure Zarr v3 write format for sharding
+        ad.settings.zarr_write_format = 3
+
+       
+        def _write_sharded_callback(
+            func: Any,
+            group: Any,
+            key: str,
+            element: Any,
+            dataset_kwargs: dict[str, Any],
+            iospec: Any,
+        ) -> None:
+            # Only shard/chunk along the first dimension
+            if getattr(iospec, "encoding_type", None) in {"array"}:
+                dataset_kwargs = {
+                    "shards": (shard_size,) + tuple(element.shape[1:]),
+                    "chunks": (chunk_size,) + tuple(element.shape[1:]),
+                    "compressors": compressors,
+                    **dataset_kwargs,
+                }
+            elif getattr(iospec, "encoding_type", None) in {"csr_matrix", "csc_matrix"}:
+                dataset_kwargs = {
+                    "shards": (shard_size,),
+                    "chunks": (chunk_size,),
+                    "compressors": compressors,
+                    **dataset_kwargs,
+                }
+
+            func(group, key, element, dataset_kwargs=dataset_kwargs)
+
+        zgroup = zarr.open_group(path, mode="a")
+        ad.experimental.write_dispatched(
+            zgroup, "/", train_data_dict, callback=_write_sharded_callback
+        )
+        zarr.consolidate_metadata(zgroup.store)
+
 
 @dataclass
 class ValidationData(BaseDataMixin):
@@ -203,3 +312,69 @@ class PredictionData(BaseDataMixin):
     max_combination_length: int
     null_value: Any
     data_manager: Any
+
+
+@dataclass
+class ZarrTrainingData(BaseDataMixin):
+    """Lazy, Zarr-backed variant of :class:`TrainingData`.
+
+    Fields mirror those in :class:`TrainingData`, but array-like members are
+    Zarr arrays or Zarr-backed mappings. This enables out-of-core training and
+    composition without loading everything into memory.
+
+    Use :meth:`read_zarr` to construct from a Zarr v3 group written via
+    :meth:`TrainingData.to_zarr`.
+    """
+
+    # Note: annotations use Any to allow zarr.Array and zarr groups without
+    # importing zarr at module import time.
+    cell_data: Any
+    split_covariates_mask: Any
+    perturbation_covariates_mask: Any
+    split_idx_to_covariates: dict[int, tuple[Any, ...]]
+    perturbation_idx_to_covariates: dict[int, tuple[str, ...]]
+    perturbation_idx_to_id: dict[int, Any]
+    condition_data: dict[str, Any]
+    control_to_perturbation: dict[int, Any]
+    max_combination_length: int
+
+    @classmethod
+    def read_zarr(cls, path: str) -> "ZarrTrainingData":
+        try:
+            import anndata as ad  # lazy import
+            import importlib
+            zarr = importlib.import_module("zarr")
+        except Exception as exc:  # pragma: no cover
+            raise ImportError(
+                "Reading from Zarr requires 'anndata>=0.10' and 'zarr>=3'."
+            ) from exc
+
+        group = zarr.open_group(path, mode="r")
+        max_len_node = group.get("max_combination_length")
+        if max_len_node is None:
+            max_combination_length = 0
+        else:
+            try:
+                max_combination_length = int(max_len_node[()])
+            except Exception:
+                max_combination_length = int(max_len_node)
+
+        return cls(
+            cell_data=group["cell_data"],
+            split_covariates_mask=group["split_covariates_mask"],
+            perturbation_covariates_mask=group["perturbation_covariates_mask"],
+            split_idx_to_covariates=ad.io.read_elem(
+                group["split_idx_to_covariates"]
+            ),
+            perturbation_idx_to_covariates=ad.io.read_elem(
+                group["perturbation_idx_to_covariates"]
+            ),
+            perturbation_idx_to_id=ad.io.read_elem(
+                group["perturbation_idx_to_id"]
+            ),
+            condition_data=ad.io.read_elem(group["condition_data"]),
+            control_to_perturbation=ad.io.read_elem(
+                group["control_to_perturbation"]
+            ),
+            max_combination_length=max_combination_length,
+        )

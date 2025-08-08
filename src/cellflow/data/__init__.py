@@ -1,5 +1,17 @@
-from cellflow.data._data import BaseDataMixin, ConditionData, PredictionData, TrainingData, ValidationData
-from cellflow.data._dataloader import PredictionSampler, TrainSampler, ValidationSampler
+from cellflow.data._data import (
+    BaseDataMixin,
+    ConditionData,
+    PredictionData,
+    TrainingData,
+    ValidationData,
+    ZarrTrainingData,
+)
+from cellflow.data._dataloader import (
+    PredictionSampler,
+    TrainSampler,
+    ValidationSampler,
+    CombinedTrainSampler,
+)
 from cellflow.data._datamanager import DataManager
 
 __all__ = [
@@ -9,7 +21,9 @@ __all__ = [
     "PredictionData",
     "TrainingData",
     "ValidationData",
+    "ZarrTrainingData",
     "TrainSampler",
     "ValidationSampler",
     "PredictionSampler",
+    "CombinedTrainSampler",
 ]
