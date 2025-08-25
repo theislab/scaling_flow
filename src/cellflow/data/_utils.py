@@ -3,7 +3,8 @@ from typing import Any
 
 import anndata as ad
 import zarr
-from zarr.codecs import BloscCodec, BytesBytesCodec
+from zarr.abc.codec import BytesBytesCodec
+from zarr.codecs import BloscCodec
 
 
 def write_sharded(

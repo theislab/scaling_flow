@@ -7,7 +7,6 @@ from typing import Any
 import anndata as ad
 import numpy as np
 import zarr
-from zarr.codecs import BloscCodec
 
 from cellflow._types import ArrayLike
 from cellflow.data._utils import write_sharded
@@ -128,7 +127,7 @@ class TrainingData(BaseDataMixin):
     data_manager: Any
 
     # --- Zarr export helpers -------------------------------------------------
-    def to_zarr(
+    def write_zarr(
         self,
         path: str,
         *,
@@ -149,9 +148,6 @@ class TrainingData(BaseDataMixin):
         compressors
             Optional list/tuple of Zarr codecs. If ``None``, a sensible default is used.
         """
-        if compressors is None:
-            compressors = (BloscCodec(cname="lz4", clevel=3),)
-
         # Convert to numpy-backed containers for serialization
         cell_data = np.asarray(self.cell_data)
         split_covariates_mask = np.asarray(self.split_covariates_mask)
@@ -176,13 +172,17 @@ class TrainingData(BaseDataMixin):
             "max_combination_length": int(self.max_combination_length),
         }
 
-        zgroup = zarr.open_group(path, mode="a")
+        additional_kwargs = {}
+        if compressors is not None:
+            additional_kwargs["compressors"] = compressors
+
+        zgroup = zarr.open_group(path, mode="w")
         write_sharded(
             zgroup,
             train_data_dict,
             chunk_size=chunk_size,
             shard_size=shard_size,
-            compressors=compressors,
+            **additional_kwargs,
         )
 
 
@@ -292,6 +292,12 @@ class ZarrTrainingData(BaseDataMixin):
     condition_data: dict[str, Any]
     control_to_perturbation: dict[int, Any]
     max_combination_length: int
+
+    def __post_init__(self):
+        self.control_to_perturbation = {int(k): v for k, v in self.control_to_perturbation.items()}
+        self.perturbation_idx_to_id = {int(k): v for k, v in self.perturbation_idx_to_id.items()}
+        self.perturbation_idx_to_covariates = {int(k): v for k, v in self.perturbation_idx_to_covariates.items()}
+        self.split_idx_to_covariates = {int(k): v for k, v in self.split_idx_to_covariates.items()}
 
     @classmethod
     def read_zarr(cls, path: str) -> ZarrTrainingData:
