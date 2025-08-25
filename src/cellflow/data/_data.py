@@ -8,9 +8,9 @@ import anndata as ad
 import numpy as np
 import zarr
 from zarr.codecs import BloscCodec
-from cellflow.data._utils import write_sharded
 
 from cellflow._types import ArrayLike
+from cellflow.data._utils import write_sharded
 
 __all__ = [
     "BaseDataMixin",

@@ -1,4 +1,5 @@
-from typing import Any, Mapping, Iterable
+from collections.abc import Iterable, Mapping
+from typing import Any
 
 import anndata as ad
 import zarr
