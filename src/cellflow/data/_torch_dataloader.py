@@ -2,7 +2,6 @@ from dataclasses import dataclass
 from functools import partial
 
 import numpy as np
-import torch
 
 from cellflow.compat import TorchIterableDataset
 from cellflow.data._data import ZarrTrainingData
@@ -63,6 +62,8 @@ class TorchCombinedTrainSampler(TorchIterableDataset):
         prefetch_factor: int = 2,
         weights: np.ndarray | None = None,
     ):
+        import torch
+
         seq = np.random.SeedSequence(seed)
         random_generators = [np.random.default_rng(s) for s in seq.spawn(len(data_paths))]
         worker_init_fn = partial(_worker_init_fn_helper, random_generators=random_generators)
