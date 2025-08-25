@@ -32,7 +32,9 @@ class TestTrainSampler:
         train_data = dm.get_train_data(adata_perturbation)
         train_data.write_zarr(Path(tmp_path) / "test_train_data.zarr")
         sampler = TrainSampler(data=train_data, batch_size=batch_size)
-        zarr_sampler = TrainSampler(ZarrTrainingData.read_zarr(Path(tmp_path) / "test_train_data.zarr"), batch_size=batch_size)
+        zarr_sampler = TrainSampler(
+            ZarrTrainingData.read_zarr(Path(tmp_path) / "test_train_data.zarr"), batch_size=batch_size
+        )
         rng_1 = np.random.default_rng(0)
         rng_2 = np.random.default_rng(1)
         rng_3 = np.random.default_rng(2)
