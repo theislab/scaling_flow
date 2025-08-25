@@ -8,6 +8,7 @@ import anndata as ad
 import numpy as np
 import zarr
 from zarr.codecs import BloscCodec
+from cellflow.data._utils import write_sharded
 
 from cellflow._types import ArrayLike
 
@@ -175,38 +176,14 @@ class TrainingData(BaseDataMixin):
             "max_combination_length": int(self.max_combination_length),
         }
 
-        # Ensure Zarr v3 write format for sharding
-        ad.settings.zarr_write_format = 3
-
-        def _write_sharded_callback(
-            func: Any,
-            group: Any,
-            key: str,
-            element: Any,
-            dataset_kwargs: dict[str, Any],
-            iospec: Any,
-        ) -> None:
-            # Only shard/chunk along the first dimension
-            if getattr(iospec, "encoding_type", None) in {"array"}:
-                dataset_kwargs = {
-                    "shards": (shard_size,) + tuple(element.shape[1:]),
-                    "chunks": (chunk_size,) + tuple(element.shape[1:]),
-                    "compressors": compressors,
-                    **dataset_kwargs,
-                }
-            elif getattr(iospec, "encoding_type", None) in {"csr_matrix", "csc_matrix"}:
-                dataset_kwargs = {
-                    "shards": (shard_size,),
-                    "chunks": (chunk_size,),
-                    "compressors": compressors,
-                    **dataset_kwargs,
-                }
-
-            func(group, key, element, dataset_kwargs=dataset_kwargs)
-
         zgroup = zarr.open_group(path, mode="a")
-        ad.experimental.write_dispatched(zgroup, "/", train_data_dict, callback=_write_sharded_callback)
-        zarr.consolidate_metadata(zgroup.store)
+        write_sharded(
+            zgroup,
+            train_data_dict,
+            chunk_size=chunk_size,
+            shard_size=shard_size,
+            compressors=compressors,
+        )
 
 
 @dataclass
