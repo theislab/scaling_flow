@@ -1,7 +1,6 @@
 import numpy as np
 import pandas as pd
 import pytest
-from pathlib import Path
 
 import cellflow
 from cellflow.networks import _velocity_field
@@ -528,4 +527,3 @@ class TestCellFlow:
             time_freqs=time_freqs,
             time_max_period=time_max_period,
         )
-
