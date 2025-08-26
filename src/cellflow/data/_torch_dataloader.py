@@ -35,6 +35,7 @@ class TorchCombinedTrainSampler(TorchIterableDataset):
     weights: np.ndarray | None = None
     rng: np.random.Generator | None = None
     dataset_names: list[str] | None = None
+
     def __post_init__(self):
         if self.weights is None:
             self.weights = np.ones(len(self.samplers))

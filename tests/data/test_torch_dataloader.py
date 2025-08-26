@@ -1,8 +1,6 @@
-import pytest
-
 import cellflow
 from cellflow.data import TorchCombinedTrainSampler
-import torch
+
 
 class TestTorchDataloader:
     def test_torch_dataloader_shapes(
