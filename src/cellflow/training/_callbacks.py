@@ -460,6 +460,7 @@ class WandbLogger(LoggingCallback):
             config=self.omegaconf.OmegaConf.to_container(config, resolve=True),
             dir=self.out_dir,
             settings=self.wandb.Settings(start_method=self.kwargs.pop("start_method", "thread")),
+            **self.kwargs,
         )
 
     def on_log_iteration(
@@ -473,7 +474,6 @@ class WandbLogger(LoggingCallback):
     def on_train_end(self, dict_to_log: dict[str, float]) -> Any:
         """Called at the end of training to log data to WandB"""
         self.wandb.log(dict_to_log)
-        self.wandb.finish()
 
 
 class CallbackRunner:

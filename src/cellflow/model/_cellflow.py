@@ -56,7 +56,7 @@ class CellFlow:
         )
         self._dataloader: TrainSampler | JaxOutOfCoreTrainSampler | None = None
         self._trainer: CellFlowTrainer | None = None
-        self._validation_data: dict[str, ValidationData] = {}
+        self._validation_data: dict[str, ValidationData] = {"predict_kwargs": {}}
         self._solver: _otfm.OTFlowMatching | _genot.GENOT | None = None
         self._condition_dim: int | None = None
         self._vf: _velocity_field.ConditionalVelocityField | _velocity_field.GENOTConditionalVelocityField | None = None
@@ -232,6 +232,16 @@ class CellFlow:
             n_conditions_on_train_end=n_conditions_on_train_end,
         )
         self._validation_data[name] = val_data
+        # Batched prediction is not compatible with split covariates
+        # as all conditions need to be the same size
+        split_val = len(val_data.control_to_perturbation) > 1
+        predict_kwargs = predict_kwargs or {}
+        # Check if predict_kwargs is alreday provided from an earlier call
+        if "predict_kwargs" in self._validation_data and len(predict_kwargs):
+            predict_kwargs = self._validation_data["predict_kwargs"].update(predict_kwargs)
+        # Set batched prediction to False if split_val is True
+        if split_val:
+            predict_kwargs["batched"] = False
         self._validation_data["predict_kwargs"] = predict_kwargs
 
     def prepare_model(
@@ -247,6 +257,7 @@ class CellFlow:
         condition_encoder_kwargs: dict[str, Any] | None = None,
         pool_sample_covariates: bool = True,
         time_freqs: int = 1024,
+        time_max_period: int | None = 10000,
         time_encoder_dims: Sequence[int] = (2048, 2048, 2048),
         time_encoder_dropout: float = 0.0,
         hidden_dims: Sequence[int] = (2048, 2048, 2048),
@@ -336,7 +347,10 @@ class CellFlow:
             Whether to include sample covariates in the pooling.
         time_freqs
             Frequency of the sinusoidal time encoding
-            (:func:`ott.neural.networks.layers.cyclical_time_encoder`).
+            (:func:`ott.neural.networks.layers.sinusoidal_time_encoder`).
+        time_max_period
+            Controls the frequency of the time embeddings, see
+            :func:`cellflow.networks.utils.sinusoidal_time_encoder`.
         time_encoder_dims
             Dimensions of the layers processing the time embedding in
             :attr:`cellflow.networks.ConditionalVelocityField.time_encoder`.
@@ -447,6 +461,7 @@ class CellFlow:
             condition_encoder_kwargs=condition_encoder_kwargs,
             act_fn=vf_act_fn,
             time_freqs=time_freqs,
+            time_max_period=time_max_period,
             time_encoder_dims=time_encoder_dims,
             time_encoder_dropout=time_encoder_dropout,
             hidden_dims=hidden_dims,
@@ -494,10 +509,8 @@ class CellFlow:
             )
         else:
             raise NotImplementedError(f"Solver must be an instance of OTFlowMatching or GENOT, got {type(self.solver)}")
-        if "predict_kwargs" in self.validation_data:
-            self._trainer = CellFlowTrainer(solver=self.solver, predict_kwargs=self.validation_data["predict_kwargs"])  # type: ignore[arg-type]
-        else:
-            self._trainer = CellFlowTrainer(solver=self.solver)  # type: ignore[arg-type]
+
+        self._trainer = CellFlowTrainer(solver=self.solver, predict_kwargs=self.validation_data["predict_kwargs"])  # type: ignore[arg-type]
 
     def train(
         self,
