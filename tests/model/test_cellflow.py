@@ -491,6 +491,7 @@ class TestCellFlow:
         assert out[1].shape[0] == out[1].shape[0]
         assert out[1].index.name == condition_id_key
         cond_id_vals = conds[condition_id_key].values
+        assert out[1].index.isin(cond_id_vals).all()
 
     @pytest.mark.parametrize("time_max_period", [None, 10000, -3])
     def test_time_embedding(
