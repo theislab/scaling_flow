@@ -72,7 +72,7 @@ class TorchCombinedTrainSampler(TorchIterableDataset):
         import torch
 
         seq = np.random.SeedSequence(seed)
-        random_generators = [np.random.default_rng(s) for s in seq.spawn(len(data_paths))]
+        random_generators = [np.random.default_rng(s) for s in seq.spawn(num_workers)]
         worker_init_fn = partial(_worker_init_fn_helper, random_generators=random_generators)
         data = [ZarrTrainingData.read_zarr(path) for path in data_paths]
         samplers = [TrainSampler(data[i], batch_size) for i in range(len(data))]
