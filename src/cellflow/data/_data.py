@@ -7,9 +7,9 @@ from typing import Any
 import anndata as ad
 import numpy as np
 import zarr
-
 from cellflow._types import ArrayLike
 from cellflow.data._utils import write_sharded
+from zarr.storage import LocalStore
 
 __all__ = [
     "BaseDataMixin",
@@ -235,6 +235,10 @@ class ValidationData(BaseDataMixin):
     n_conditions_on_train_end: int | None = None
 
 
+def _read_dict(zgroup: zarr.Group, key: str) -> dict[int, Any]:
+    keys = zgroup[key].keys()
+    return {k: zgroup[key][k] for k in keys}
+
 @dataclass
 class PredictionData(BaseDataMixin):
     """Data container to perform prediction.
@@ -294,13 +298,21 @@ class ZarrTrainingData(BaseDataMixin):
     max_combination_length: int
 
     def __post_init__(self):
-        self.control_to_perturbation = {int(k): v for k, v in self.control_to_perturbation.items()}
-        self.perturbation_idx_to_id = {int(k): v for k, v in self.perturbation_idx_to_id.items()}
-        self.perturbation_idx_to_covariates = {int(k): v for k, v in self.perturbation_idx_to_covariates.items()}
-        self.split_idx_to_covariates = {int(k): v for k, v in self.split_idx_to_covariates.items()}
+        # load everything except cell_data to memory
 
+        # load masks as numpy arrays
+        self.split_covariates_mask = self.split_covariates_mask[...]
+        self.perturbation_covariates_mask = self.perturbation_covariates_mask[...]
+
+        self.condition_data = {k: np.asarray(v) for k, v in self.condition_data.items()}
+        self.control_to_perturbation = {int(k): np.asarray(v) for k, v in self.control_to_perturbation.items()}
+        self.perturbation_idx_to_id = {int(k): np.asarray(v) for k, v in self.perturbation_idx_to_id.items()}
+        self.perturbation_idx_to_covariates = {int(k): np.asarray(v) for k, v in self.perturbation_idx_to_covariates.items()}
+        self.split_idx_to_covariates = {int(k): np.asarray(v) for k, v in self.split_idx_to_covariates.items()}
     @classmethod
     def read_zarr(cls, path: str) -> ZarrTrainingData:
+        if isinstance(path, str):
+            path = LocalStore(path)
         group = zarr.open_group(path, mode="r")
         max_len_node = group.get("max_combination_length")
         if max_len_node is None:
@@ -315,10 +327,10 @@ class ZarrTrainingData(BaseDataMixin):
             cell_data=group["cell_data"],
             split_covariates_mask=group["split_covariates_mask"],
             perturbation_covariates_mask=group["perturbation_covariates_mask"],
-            split_idx_to_covariates=ad.io.read_elem(group["split_idx_to_covariates"]),
-            perturbation_idx_to_covariates=ad.io.read_elem(group["perturbation_idx_to_covariates"]),
-            perturbation_idx_to_id=ad.io.read_elem(group["perturbation_idx_to_id"]),
-            condition_data=ad.io.read_elem(group["condition_data"]),
-            control_to_perturbation=ad.io.read_elem(group["control_to_perturbation"]),
+            split_idx_to_covariates=_read_dict(group, "split_idx_to_covariates"),
+            perturbation_idx_to_covariates=_read_dict(group, "perturbation_idx_to_covariates"),
+            perturbation_idx_to_id=_read_dict(group, "perturbation_idx_to_id"),
+            condition_data=_read_dict(group, "condition_data"),
+            control_to_perturbation=_read_dict(group, "control_to_perturbation"),
             max_combination_length=max_combination_length,
         )

@@ -43,6 +43,10 @@ class TrainSampler:
         """Sample a target distribution index given the source distribution index."""
         return rng.choice(self._data.control_to_perturbation[source_dist_idx])
 
+    def _sample_source_dist_idx(self, rng) -> int:
+        """Sample a source distribution index."""
+        return rng.choice(self.n_source_dists)
+
     def _get_embeddings(self, idx, condition_data) -> dict[str, np.ndarray]:
         """Get embeddings for a given index."""
         result = {}
@@ -54,7 +58,6 @@ class TrainSampler:
         """Sample indices according to a mask."""
         # Convert mask to probability distribution
         valid_indices = np.where(mask)[0]
-
         # Handle case with no valid indices (should not happen in practice)
         if len(valid_indices) == 0:
             raise ValueError("No valid indices found in the mask")
@@ -62,6 +65,7 @@ class TrainSampler:
         # Sample from valid indices with equal probability
         batch_idcs = rng.choice(valid_indices, self.batch_size, replace=True)
         return batch_idcs
+
 
     def sample(self, rng) -> dict[str, Any]:
         """Sample a batch of data.
@@ -76,16 +80,16 @@ class TrainSampler:
         Dictionary with source and target data
         """
         # Sample source distribution index
-        source_dist_idx = rng.integers(0, self.n_source_dists)
+        source_dist_idx = self._sample_source_dist_idx(rng)
 
         # Get source cells
         source_cells_mask = self._data.split_covariates_mask == source_dist_idx
         source_batch_idcs = self._sample_from_mask(rng, source_cells_mask)
-        source_batch = self._data.cell_data[source_batch_idcs]
-
         target_dist_idx = self._sample_target_dist_idx(source_dist_idx, rng)
         target_cells_mask = self._data.perturbation_covariates_mask == target_dist_idx
         target_batch_idcs = self._sample_from_mask(rng, target_cells_mask)
+        
+        source_batch = self._data.cell_data[source_batch_idcs]
         target_batch = self._data.cell_data[target_batch_idcs]
 
         if not self._has_condition_data:
@@ -102,6 +106,91 @@ class TrainSampler:
     def data(self) -> TrainingData | ZarrTrainingData:
         """The training data."""
         return self._data
+
+
+class TrainSamplerWithPool(TrainSampler):
+    """Data sampler with gradual pool replacement using reservoir sampling.
+
+    This approach replaces pool elements one by one rather than refreshing
+    the entire pool, providing better cache locality while maintaining
+    reasonable randomness.
+
+    Parameters
+    ----------
+    data
+        The training data.
+    batch_size
+        The batch size.
+    pool_size
+        The size of the pool of source distribution indices.
+    replacement_prob
+        Probability of replacing a pool element after each sample.
+        Lower values = longer cache retention, less randomness.
+        Higher values = faster cache turnover, more randomness.
+    replace_in_pool
+        Whether to allow replacement when sampling from the pool.
+    """
+
+    def __init__(
+        self,
+        data: TrainingData | ZarrTrainingData,
+        batch_size: int = 1024,
+        pool_size: int = 100,
+        replacement_prob: float = 0.01,
+    ):
+        super().__init__(data, batch_size)
+        self._pool_size = pool_size
+        self._replacement_prob = replacement_prob
+        self._src_idx_pool = np.empty(self._pool_size, dtype=int)
+        self._pool_usage_count = np.zeros(self._pool_size, dtype=int)
+        self._all_src_idx_pool = set(range(self.n_source_dists))
+        self._initialized = False
+
+    def _init_pool(self, rng):
+        """Initialize the pool with random source distribution indices."""
+        self._src_idx_pool = rng.choice(self.n_source_dists, size=self._pool_size, replace=False)
+        self._initialized = True
+
+    def _sample_source_dist_idx(self, rng) -> int:
+        """Sample a source distribution index with gradual pool replacement."""
+        if not self._initialized:
+            self._init_pool(rng)
+
+        # Sample from current pool
+        pool_idx = rng.choice(self._pool_size)
+        source_idx = self._src_idx_pool[pool_idx]
+
+        # Increment usage count for monitoring
+        self._pool_usage_count[pool_idx] += 1
+
+        # Gradually replace elements based on replacement probability
+        if rng.random() < self._replacement_prob:
+            self._replace_pool_element(rng, pool_idx)
+
+        return source_idx
+
+    def _replace_pool_element(self, rng, pool_idx):
+        """Replace a single pool element with a new one."""
+        # Get all indices not currently in the pool
+        available_indices = list(self._all_src_idx_pool - set(self._src_idx_pool))
+
+        if available_indices:
+            # Choose new element (could be weighted by usage count)
+            new_idx = rng.choice(available_indices)
+            self._src_idx_pool[pool_idx] = new_idx
+            self._pool_usage_count[pool_idx] = 0
+
+    def get_pool_stats(self) -> dict:
+        """Get statistics about the current pool state."""
+        if self._src_idx_pool is None:
+            return {"pool_size": 0, "avg_usage": 0, "unique_sources": 0}
+        return {
+            "pool_size": self._pool_size,
+            "avg_usage": float(np.mean(self._pool_usage_count)),
+            "unique_sources": len(set(self._src_idx_pool)),
+            "pool_elements": self._src_idx_pool.copy(),
+            "usage_counts": self._pool_usage_count.copy(),
+        }
 
 
 class BaseValidSampler(abc.ABC):
