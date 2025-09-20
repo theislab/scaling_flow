@@ -4,13 +4,12 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
 
-import anndata as ad
 import numpy as np
 import zarr
-from cellflow._types import ArrayLike
-from cellflow.data._utils import write_sharded
 from zarr.storage import LocalStore
 
+from cellflow._types import ArrayLike
+from cellflow.data._utils import write_sharded
 
 __all__ = [
     "BaseDataMixin",
@@ -240,6 +239,7 @@ def _read_dict(zgroup: zarr.Group, key: str) -> dict[int, Any]:
     keys = zgroup[key].keys()
     return {k: zgroup[key][k] for k in keys}
 
+
 @dataclass
 class PredictionData(BaseDataMixin):
     """Data container to perform prediction.
@@ -308,9 +308,11 @@ class ZarrTrainingData(BaseDataMixin):
         self.condition_data = {k: np.asarray(v) for k, v in self.condition_data.items()}
         self.control_to_perturbation = {int(k): np.asarray(v) for k, v in self.control_to_perturbation.items()}
         self.perturbation_idx_to_id = {int(k): np.asarray(v) for k, v in self.perturbation_idx_to_id.items()}
-        self.perturbation_idx_to_covariates = {int(k): np.asarray(v) for k, v in self.perturbation_idx_to_covariates.items()}
+        self.perturbation_idx_to_covariates = {
+            int(k): np.asarray(v) for k, v in self.perturbation_idx_to_covariates.items()
+        }
         self.split_idx_to_covariates = {int(k): np.asarray(v) for k, v in self.split_idx_to_covariates.items()}
-    
+
     @classmethod
     def read_zarr(cls, path: str) -> ZarrTrainingData:
         if isinstance(path, str):
