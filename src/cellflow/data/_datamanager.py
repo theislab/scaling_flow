@@ -759,15 +759,15 @@ class DataManager:
         if sample_rep == "X":
             sample_rep = adata.X
             if isinstance(sample_rep, sp.csr_matrix):
-                return np.asarray(sample_rep.toarray())
+                return sample_rep.toarray()
             else:
-                return np.asarray(sample_rep)
+                return sample_rep
         if isinstance(self._sample_rep, str):
             if self._sample_rep not in adata.obsm:
                 raise KeyError(f"Sample representation '{self._sample_rep}' not found in `adata.obsm`.")
-            return np.asarray(adata.obsm[self._sample_rep])
+            return adata.obsm[self._sample_rep]
         attr, key = next(iter(sample_rep.items()))  # type: ignore[union-attr]
-        return np.asarray(getattr(adata, attr)[key])
+        return getattr(adata, attr)[key]
 
     def _verify_control_data(self, adata: anndata.AnnData | None) -> None:
         if adata is None:
