@@ -1,11 +1,15 @@
+from __future__ import annotations
+
 from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
 
-import jax
 import numpy as np
+import zarr
+from zarr.storage import LocalStore
 
 from cellflow._types import ArrayLike
+from cellflow.data._utils import write_sharded
 
 __all__ = [
     "BaseDataMixin",
@@ -13,6 +17,7 @@ __all__ = [
     "PredictionData",
     "TrainingData",
     "ValidationData",
+    "ZarrTrainingData",
 ]
 
 
@@ -121,6 +126,65 @@ class TrainingData(BaseDataMixin):
     null_value: Any
     data_manager: Any
 
+    # --- Zarr export helpers -------------------------------------------------
+    def write_zarr(
+        self,
+        path: str,
+        *,
+        chunk_size: int = 4096,
+        shard_size: int = 65536,
+        compressors: Any | None = None,
+    ) -> None:
+        """Write this training data to Zarr v3 with sharded, compressed arrays.
+
+        Parameters
+        ----------
+        path
+            Path to a Zarr group to create or open for writing.
+        chunk_size
+            Chunk size along the first axis.
+        shard_size
+            Shard size along the first axis.
+        compressors
+            Optional list/tuple of Zarr codecs. If ``None``, a sensible default is used.
+        """
+        # Convert to numpy-backed containers for serialization
+        cell_data = np.asarray(self.cell_data)
+        split_covariates_mask = np.asarray(self.split_covariates_mask)
+        perturbation_covariates_mask = np.asarray(self.perturbation_covariates_mask)
+        condition_data = {str(k): np.asarray(v) for k, v in (self.condition_data or {}).items()}
+        control_to_perturbation = {str(k): np.asarray(v) for k, v in (self.control_to_perturbation or {}).items()}
+        split_idx_to_covariates = {str(k): np.asarray(v) for k, v in (self.split_idx_to_covariates or {}).items()}
+        perturbation_idx_to_covariates = {
+            str(k): np.asarray(v) for k, v in (self.perturbation_idx_to_covariates or {}).items()
+        }
+        perturbation_idx_to_id = {str(k): v for k, v in (self.perturbation_idx_to_id or {}).items()}
+
+        train_data_dict: dict[str, Any] = {
+            "cell_data": cell_data,
+            "split_covariates_mask": split_covariates_mask,
+            "perturbation_covariates_mask": perturbation_covariates_mask,
+            "split_idx_to_covariates": split_idx_to_covariates,
+            "perturbation_idx_to_covariates": perturbation_idx_to_covariates,
+            "perturbation_idx_to_id": perturbation_idx_to_id,
+            "condition_data": condition_data,
+            "control_to_perturbation": control_to_perturbation,
+            "max_combination_length": int(self.max_combination_length),
+        }
+
+        additional_kwargs = {}
+        if compressors is not None:
+            additional_kwargs["compressors"] = compressors
+
+        zgroup = zarr.open_group(path, mode="w")
+        write_sharded(
+            zgroup,
+            train_data_dict,
+            chunk_size=chunk_size,
+            shard_size=shard_size,
+            **additional_kwargs,
+        )
+
 
 @dataclass
 class ValidationData(BaseDataMixin):
@@ -171,6 +235,11 @@ class ValidationData(BaseDataMixin):
     n_conditions_on_train_end: int | None = None
 
 
+def _read_dict(zgroup: zarr.Group, key: str) -> dict[int, Any]:
+    keys = zgroup[key].keys()
+    return {k: zgroup[key][k] for k in keys}
+
+
 @dataclass
 class PredictionData(BaseDataMixin):
     """Data container to perform prediction.
@@ -191,8 +260,8 @@ class PredictionData(BaseDataMixin):
         Token to use for masking ``null_value``.
     """
 
-    cell_data: jax.Array  # (n_cells, n_features)
-    split_covariates_mask: jax.Array  # (n_cells,), which cell assigned to which source distribution
+    cell_data: ArrayLike  # (n_cells, n_features)
+    split_covariates_mask: ArrayLike  # (n_cells,), which cell assigned to which source distribution
     split_idx_to_covariates: dict[int, tuple[Any, ...]]  # (n_sources,) dictionary explaining split_covariates_mask
     perturbation_idx_to_covariates: dict[
         int, tuple[str, ...]
@@ -203,3 +272,69 @@ class PredictionData(BaseDataMixin):
     max_combination_length: int
     null_value: Any
     data_manager: Any
+
+
+@dataclass
+class ZarrTrainingData(BaseDataMixin):
+    """Lazy, Zarr-backed variant of :class:`TrainingData`.
+
+    Fields mirror those in :class:`TrainingData`, but array-like members are
+    Zarr arrays or Zarr-backed mappings. This enables out-of-core training and
+    composition without loading everything into memory.
+
+    Use :meth:`read_zarr` to construct from a Zarr v3 group written via
+    :meth:`TrainingData.to_zarr`.
+    """
+
+    # Note: annotations use Any to allow zarr.Array and zarr groups without
+    # importing zarr at module import time.
+    cell_data: Any
+    split_covariates_mask: Any
+    perturbation_covariates_mask: Any
+    split_idx_to_covariates: dict[int, tuple[Any, ...]]
+    perturbation_idx_to_covariates: dict[int, tuple[str, ...]]
+    perturbation_idx_to_id: dict[int, Any]
+    condition_data: dict[str, Any]
+    control_to_perturbation: dict[int, Any]
+    max_combination_length: int
+
+    def __post_init__(self):
+        # load everything except cell_data to memory
+
+        # load masks as numpy arrays
+        self.split_covariates_mask = self.split_covariates_mask[...]
+        self.perturbation_covariates_mask = self.perturbation_covariates_mask[...]
+
+        self.condition_data = {k: np.asarray(v) for k, v in self.condition_data.items()}
+        self.control_to_perturbation = {int(k): np.asarray(v) for k, v in self.control_to_perturbation.items()}
+        self.perturbation_idx_to_id = {int(k): np.asarray(v) for k, v in self.perturbation_idx_to_id.items()}
+        self.perturbation_idx_to_covariates = {
+            int(k): np.asarray(v) for k, v in self.perturbation_idx_to_covariates.items()
+        }
+        self.split_idx_to_covariates = {int(k): np.asarray(v) for k, v in self.split_idx_to_covariates.items()}
+
+    @classmethod
+    def read_zarr(cls, path: str) -> ZarrTrainingData:
+        if isinstance(path, str):
+            path = LocalStore(path, read_only=True)
+        group = zarr.open_group(path, mode="r")
+        max_len_node = group.get("max_combination_length")
+        if max_len_node is None:
+            max_combination_length = 0
+        else:
+            try:
+                max_combination_length = int(max_len_node[()])
+            except Exception:  # noqa: BLE001
+                max_combination_length = int(max_len_node)
+
+        return cls(
+            cell_data=group["cell_data"],
+            split_covariates_mask=group["split_covariates_mask"],
+            perturbation_covariates_mask=group["perturbation_covariates_mask"],
+            split_idx_to_covariates=_read_dict(group, "split_idx_to_covariates"),
+            perturbation_idx_to_covariates=_read_dict(group, "perturbation_idx_to_covariates"),
+            perturbation_idx_to_id=_read_dict(group, "perturbation_idx_to_id"),
+            condition_data=_read_dict(group, "condition_data"),
+            control_to_perturbation=_read_dict(group, "control_to_perturbation"),
+            max_combination_length=max_combination_length,
+        )

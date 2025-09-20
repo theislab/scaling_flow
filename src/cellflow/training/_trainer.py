@@ -6,7 +6,7 @@ import numpy as np
 from numpy.typing import ArrayLike
 from tqdm import tqdm
 
-from cellflow.data._dataloader import OOCTrainSampler, TrainSampler, ValidationSampler
+from cellflow.data import JaxOutOfCoreTrainSampler, TrainSampler, ValidationSampler
 from cellflow.solvers import _genot, _otfm
 from cellflow.training._callbacks import BaseCallback, CallbackRunner
 
@@ -81,7 +81,7 @@ class CellFlowTrainer:
 
     def train(
         self,
-        dataloader: TrainSampler | OOCTrainSampler,
+        dataloader: TrainSampler | JaxOutOfCoreTrainSampler,
         num_iterations: int,
         valid_freq: int,
         valid_loaders: dict[str, ValidationSampler] | None = None,
@@ -122,7 +122,7 @@ class CellFlowTrainer:
 
         pbar = tqdm(range(num_iterations))
         sampler = dataloader
-        if isinstance(dataloader, OOCTrainSampler):
+        if isinstance(dataloader, JaxOutOfCoreTrainSampler):
             dataloader.set_sampler(num_iterations=num_iterations)
         for it in pbar:
             rng_jax, rng_step_fn = jax.random.split(rng_jax, 2)
