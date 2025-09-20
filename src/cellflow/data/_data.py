@@ -11,6 +11,7 @@ from cellflow._types import ArrayLike
 from cellflow.data._utils import write_sharded
 from zarr.storage import LocalStore
 
+
 __all__ = [
     "BaseDataMixin",
     "ConditionData",
@@ -309,10 +310,11 @@ class ZarrTrainingData(BaseDataMixin):
         self.perturbation_idx_to_id = {int(k): np.asarray(v) for k, v in self.perturbation_idx_to_id.items()}
         self.perturbation_idx_to_covariates = {int(k): np.asarray(v) for k, v in self.perturbation_idx_to_covariates.items()}
         self.split_idx_to_covariates = {int(k): np.asarray(v) for k, v in self.split_idx_to_covariates.items()}
+    
     @classmethod
     def read_zarr(cls, path: str) -> ZarrTrainingData:
         if isinstance(path, str):
-            path = LocalStore(path)
+            path = LocalStore(path, read_only=True)
         group = zarr.open_group(path, mode="r")
         max_len_node = group.get("max_combination_length")
         if max_len_node is None:

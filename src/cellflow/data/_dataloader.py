@@ -1,7 +1,9 @@
 import abc
 from typing import Any, Literal
 
+import tqdm
 import numpy as np
+import dask.array as da
 
 from cellflow.data._data import (
     PredictionData,
@@ -39,7 +41,7 @@ class TrainSampler:
         self._control_to_perturbation_keys = sorted(data.control_to_perturbation.keys())
         self._has_condition_data = data.condition_data is not None
 
-    def _sample_target_dist_idx(self, source_dist_idx, rng):
+    def _sample_target_dist_idx(self, rng, source_dist_idx: int) -> int:
         """Sample a target distribution index given the source distribution index."""
         return rng.choice(self._data.control_to_perturbation[source_dist_idx])
 
@@ -67,6 +69,32 @@ class TrainSampler:
         return batch_idcs
 
 
+    def _get_source_cells_mask(self, source_dist_idx: int) -> np.ndarray:
+        return self._data.split_covariates_mask == source_dist_idx
+    
+    def _get_target_cells_mask(self, source_dist_idx: int, target_dist_idx: int) -> np.ndarray:
+        return self._data.perturbation_covariates_mask == target_dist_idx
+
+    def _sample_source_batch_idcs(self, rng, source_dist_idx: int) -> dict[str, Any]:
+        source_cells_mask = self._get_source_cells_mask(source_dist_idx)
+        source_batch_idcs = self._sample_from_mask(rng, source_cells_mask)
+        return source_batch_idcs
+
+    def _sample_target_batch_idcs(self, rng, source_dist_idx: int, target_dist_idx: int) -> dict[str, Any]:
+        target_cells_mask = self._get_target_cells_mask(source_dist_idx, target_dist_idx)
+        target_batch_idcs = self._sample_from_mask(rng, target_cells_mask)
+        return target_batch_idcs
+
+    def _sample_source_cells(self, rng, source_dist_idx: int) -> np.ndarray:
+        source_cells_mask = self._get_source_cells_mask(source_dist_idx)
+        source_batch_idcs = self._sample_from_mask(rng, source_cells_mask)
+        return self._data.cell_data[source_batch_idcs]
+    
+    def _sample_target_cells(self, rng, source_dist_idx: int, target_dist_idx: int) -> np.ndarray:
+        target_cells_mask = self._get_target_cells_mask(source_dist_idx, target_dist_idx)
+        target_batch_idcs = self._sample_from_mask(rng, target_cells_mask)
+        return self._data.cell_data[target_batch_idcs]
+
     def sample(self, rng) -> dict[str, Any]:
         """Sample a batch of data.
 
@@ -79,29 +107,19 @@ class TrainSampler:
         -------
         Dictionary with source and target data
         """
-        # Sample source distribution index
+        # Sample source and target
         source_dist_idx = self._sample_source_dist_idx(rng)
+        target_dist_idx = self._sample_target_dist_idx(rng, source_dist_idx)
 
-        # Get source cells
-        source_cells_mask = self._data.split_covariates_mask == source_dist_idx
-        source_batch_idcs = self._sample_from_mask(rng, source_cells_mask)
-        target_dist_idx = self._sample_target_dist_idx(source_dist_idx, rng)
-        target_cells_mask = self._data.perturbation_covariates_mask == target_dist_idx
-        target_batch_idcs = self._sample_from_mask(rng, target_cells_mask)
-        
-        source_batch = self._data.cell_data[source_batch_idcs]
-        target_batch = self._data.cell_data[target_batch_idcs]
+        # Sample source and target cells
+        source_batch = self._sample_source_cells(rng, source_dist_idx)
+        target_batch = self._sample_target_cells(rng, source_dist_idx, target_dist_idx)
 
-        if not self._has_condition_data:
-            return {"src_cell_data": source_batch, "tgt_cell_data": target_batch}
-        else:
+        res = {"src_cell_data": source_batch, "tgt_cell_data": target_batch}
+        if self._has_condition_data:
             condition_batch = self._get_embeddings(target_dist_idx, self._data.condition_data)
-            return {
-                "src_cell_data": source_batch,
-                "tgt_cell_data": target_batch,
-                "condition": condition_batch,
-            }
-
+            res["condition"] = condition_batch
+        return res
     @property
     def data(self) -> TrainingData | ZarrTrainingData:
         """The training data."""
@@ -142,9 +160,79 @@ class TrainSamplerWithPool(TrainSampler):
         self._pool_size = pool_size
         self._replacement_prob = replacement_prob
         self._src_idx_pool = np.empty(self._pool_size, dtype=int)
-        self._pool_usage_count = np.zeros(self._pool_size, dtype=int)
-        self._all_src_idx_pool = set(range(self.n_source_dists))
+        self._pool_usage_count = np.zeros(self.n_source_dists, dtype=int)
         self._initialized = False
+
+
+    def _compute_idx_mappings(self):
+        import cupy as cp
+        self._tgt_to_cell_data_idcs = [None] * self.n_target_dists
+        gpu_per_cov_mask = cp.asarray(self._data.perturbation_covariates_mask)
+        gpu_spl_cov_mask = cp.asarray(self._data.split_covariates_mask)
+        
+        for tgt_idx in tqdm.tqdm(range(self.n_target_dists), desc="Computing target to cell data idcs"):
+            mask = gpu_per_cov_mask == tgt_idx
+            self._tgt_to_cell_data_idcs[tgt_idx] = cp.where(mask)[0].get()
+        self._src_to_cell_data_idcs = [None] * self.n_source_dists
+        for src_idx in tqdm.tqdm(range(self.n_source_dists), desc="Computing source to cell data idcs"):
+            mask = (gpu_spl_cov_mask == src_idx)
+            self._src_to_cell_data_idcs[src_idx] = cp.where(mask)[0].get()
+
+
+    def init_pool_n_cache(self, rng):
+        self._compute_idx_mappings()
+        self._init_pool(rng)
+        self._init_cache_pool_elements()
+
+    @staticmethod
+    def _get_target_idx_pool(src_idx_pool: np.ndarray, control_to_perturbation: dict[int, np.ndarray]) -> set[int]:
+        tgt_idx_pool = set()
+        for src_idx in src_idx_pool:
+            tgt_idx_pool.update(control_to_perturbation[src_idx].tolist())
+        return tgt_idx_pool
+        
+    def _init_cache_pool_elements(self):
+        if not self._initialized:
+            raise ValueError("Pool not initialized. Call init_pool_n_cache(rng) first.")
+
+        # Build concatenated row indices and slice maps for sources
+        src_concat = []
+        src_slices: dict[int, slice] = {}
+        offset = 0
+        for src_idx in self._src_idx_pool:
+            idcs = self._src_to_cell_data_idcs[src_idx]
+            n = len(idcs)
+            src_slices[src_idx] = slice(offset, offset + n)
+            src_concat.append(idcs)
+            offset += n
+        src_concat = np.concatenate(src_concat) if len(src_concat) else np.empty((0,), dtype=int)
+
+        # Build concatenated row indices and slice maps for targets
+        tgt_pool = TrainSamplerWithPool._get_target_idx_pool(
+            self._src_idx_pool, self._data.control_to_perturbation
+        )
+        tgt_concat = []
+        tgt_slices: dict[int, slice] = {}
+        offset = 0
+        for tgt_idx in tqdm.tqdm(sorted(tgt_pool), desc="Caching target cells"):
+            idcs = self._tgt_to_cell_data_idcs[tgt_idx]
+            n = len(idcs)
+            tgt_slices[tgt_idx] = slice(offset, offset + n)
+            tgt_concat.append(idcs)
+            offset += n
+        tgt_concat = np.concatenate(tgt_concat) if len(tgt_concat) else np.empty((0,), dtype=int)
+
+        # Single orthogonal-index reads (fast path)
+        self._src_block = self._data.cell_data.oindex[src_concat, :] if src_concat.size else np.empty((0, self._data.cell_data.shape[1]), dtype=self._data.cell_data.dtype)
+        self._tgt_block = self._data.cell_data.oindex[tgt_concat, :] if tgt_concat.size else np.empty((0, self._data.cell_data.shape[1]), dtype=self._data.cell_data.dtype)
+
+        # Views into the blocks (no extra copies)
+        self._cached_srcs = {src_idx: self._src_block[sli] for src_idx, sli in src_slices.items()}
+        tgt_views = {tgt_idx: self._tgt_block[sli] for tgt_idx, sli in tgt_slices.items()}
+        self._cached_tgts = {src_idx: {tgt_idx: tgt_views[tgt_idx] for tgt_idx in self._data.control_to_perturbation[src_idx] if tgt_idx in tgt_views}
+                             for src_idx in self._src_idx_pool}
+        self._initialized = True
+
 
     def _init_pool(self, rng):
         """Initialize the pool with random source distribution indices."""
@@ -161,24 +249,33 @@ class TrainSamplerWithPool(TrainSampler):
         source_idx = self._src_idx_pool[pool_idx]
 
         # Increment usage count for monitoring
-        self._pool_usage_count[pool_idx] += 1
+        self._pool_usage_count[source_idx] += 1
 
         # Gradually replace elements based on replacement probability
         if rng.random() < self._replacement_prob:
-            self._replace_pool_element(rng, pool_idx)
+            self._replace_pool_element(rng)
 
         return source_idx
 
-    def _replace_pool_element(self, rng, pool_idx):
+    def _replace_pool_element(self, rng):
         """Replace a single pool element with a new one."""
-        # Get all indices not currently in the pool
-        available_indices = list(self._all_src_idx_pool - set(self._src_idx_pool))
 
-        if available_indices:
-            # Choose new element (could be weighted by usage count)
-            new_idx = rng.choice(available_indices)
-            self._src_idx_pool[pool_idx] = new_idx
-            self._pool_usage_count[pool_idx] = 0
+        # instead sample weighted by usage count
+        # let's only consider the pool_usage_count.min() for least used
+        # and the pool_usage_count.max() for most used
+        most_used_weight = (self._pool_usage_count == self._pool_usage_count.max()).astype(float)
+        most_used_weight /= most_used_weight.sum()
+
+        # weight by most used
+        replaced_pool_idx = rng.choice(self.n_source_dists, p=most_used_weight)
+        if replaced_pool_idx in set(self._src_idx_pool):
+            in_pool_idx = np.where(self._src_idx_pool == replaced_pool_idx)[0][0]
+            least_used_weight = (self._pool_usage_count == self._pool_usage_count.min()).astype(float)
+            least_used_weight /= least_used_weight.sum()
+            new_pool_idx = rng.choice(self.n_source_dists, p=least_used_weight)
+            self._src_idx_pool[in_pool_idx] = new_pool_idx
+            print(f"replaced {replaced_pool_idx} with {new_pool_idx}")
+        
 
     def get_pool_stats(self) -> dict:
         """Get statistics about the current pool state."""
@@ -192,6 +289,11 @@ class TrainSamplerWithPool(TrainSampler):
             "usage_counts": self._pool_usage_count.copy(),
         }
 
+    def _sample_source_cells(self, rng, source_dist_idx: int) -> np.ndarray:
+        return rng.choice(self._cached_srcs[source_dist_idx], size=self.batch_size, replace=True)
+    
+    def _sample_target_cells(self, rng, source_dist_idx: int, target_dist_idx: int) -> np.ndarray:
+        return rng.choice(self._cached_tgts[source_dist_idx][target_dist_idx], size=self.batch_size, replace=True)
 
 class BaseValidSampler(abc.ABC):
     @abc.abstractmethod
