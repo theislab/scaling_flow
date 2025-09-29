@@ -8,13 +8,14 @@ from cellflow.data._data import (
     PredictionData,
     TrainingData,
     ValidationData,
-    ZarrTrainingData,
+    MappedCellData,
 )
 
 __all__ = [
     "TrainSampler",
     "ValidationSampler",
     "PredictionSampler",
+    "ReservoirSampler",
 ]
 
 
@@ -30,7 +31,7 @@ class TrainSampler:
 
     """
 
-    def __init__(self, data: TrainingData | ZarrTrainingData, batch_size: int = 1024):
+    def __init__(self, data: TrainingData, batch_size: int = 1024):
         self._data = data
         self._data_idcs = np.arange(data.cell_data.shape[0])
         self.batch_size = batch_size
@@ -120,12 +121,12 @@ class TrainSampler:
         return res
 
     @property
-    def data(self) -> TrainingData | ZarrTrainingData:
+    def data(self) -> TrainingData:
         """The training data."""
         return self._data
 
 
-class TrainSamplerWithPool(TrainSampler):
+class ReservoirSampler(TrainSampler):
     """Data sampler with gradual pool replacement using reservoir sampling.
 
     This approach replaces pool elements one by one rather than refreshing
@@ -150,35 +151,24 @@ class TrainSamplerWithPool(TrainSampler):
 
     def __init__(
         self,
-        data: TrainingData | ZarrTrainingData,
+        data: MappedCellData,
         batch_size: int = 1024,
         pool_size: int = 100,
         replacement_prob: float = 0.01,
     ):
-        super().__init__(data, batch_size)
+        self.batch_size = batch_size
+        self.n_source_dists = data.n_controls
+        self.n_target_dists = data.n_perturbations
+        self._data = data
+
+        self._control_to_perturbation_keys = sorted(data.control_to_perturbation.keys())
+        self._has_condition_data = data.condition_data is not None
         self._pool_size = pool_size
         self._replacement_prob = replacement_prob
-        self._src_idx_pool = np.empty(self._pool_size, dtype=int)
         self._pool_usage_count = np.zeros(self.n_source_dists, dtype=int)
         self._initialized = False
 
-    def _compute_idx_mappings(self):
-        import cupy as cp
-
-        self._tgt_to_cell_data_idcs = [None] * self.n_target_dists
-        gpu_per_cov_mask = cp.asarray(self._data.perturbation_covariates_mask)
-        gpu_spl_cov_mask = cp.asarray(self._data.split_covariates_mask)
-
-        for tgt_idx in tqdm.tqdm(range(self.n_target_dists), desc="Computing target to cell data idcs"):
-            mask = gpu_per_cov_mask == tgt_idx
-            self._tgt_to_cell_data_idcs[tgt_idx] = cp.where(mask)[0].get()
-        self._src_to_cell_data_idcs = [None] * self.n_source_dists
-        for src_idx in tqdm.tqdm(range(self.n_source_dists), desc="Computing source to cell data idcs"):
-            mask = gpu_spl_cov_mask == src_idx
-            self._src_to_cell_data_idcs[src_idx] = cp.where(mask)[0].get()
-
-    def init_pool_n_cache(self, rng):
-        self._compute_idx_mappings()
+    def init_pool(self, rng):
         self._init_pool(rng)
         self._init_cache_pool_elements()
 
@@ -191,57 +181,9 @@ class TrainSamplerWithPool(TrainSampler):
 
     def _init_cache_pool_elements(self):
         if not self._initialized:
-            raise ValueError("Pool not initialized. Call init_pool_n_cache(rng) first.")
-
-        # Build concatenated row indices and slice maps for sources
-        src_concat = []
-        src_slices: dict[int, slice] = {}
-        offset = 0
-        for src_idx in self._src_idx_pool:
-            idcs = self._src_to_cell_data_idcs[src_idx]
-            n = len(idcs)
-            src_slices[src_idx] = slice(offset, offset + n)
-            src_concat.append(idcs)
-            offset += n
-        src_concat = np.concatenate(src_concat) if len(src_concat) else np.empty((0,), dtype=int)
-
-        # Build concatenated row indices and slice maps for targets
-        tgt_pool = TrainSamplerWithPool._get_target_idx_pool(self._src_idx_pool, self._data.control_to_perturbation)
-        tgt_concat = []
-        tgt_slices: dict[int, slice] = {}
-        offset = 0
-        for tgt_idx in tqdm.tqdm(sorted(tgt_pool), desc="Caching target cells"):
-            idcs = self._tgt_to_cell_data_idcs[tgt_idx]
-            n = len(idcs)
-            tgt_slices[tgt_idx] = slice(offset, offset + n)
-            tgt_concat.append(idcs)
-            offset += n
-        tgt_concat = np.concatenate(tgt_concat) if len(tgt_concat) else np.empty((0,), dtype=int)
-
-        # Single orthogonal-index reads (fast path)
-        self._src_block = (
-            self._data.cell_data.oindex[src_concat, :]
-            if src_concat.size
-            else np.empty((0, self._data.cell_data.shape[1]), dtype=self._data.cell_data.dtype)
-        )
-        self._tgt_block = (
-            self._data.cell_data.oindex[tgt_concat, :]
-            if tgt_concat.size
-            else np.empty((0, self._data.cell_data.shape[1]), dtype=self._data.cell_data.dtype)
-        )
-
-        # Views into the blocks (no extra copies)
-        self._cached_srcs = {src_idx: self._src_block[sli] for src_idx, sli in src_slices.items()}
-        tgt_views = {tgt_idx: self._tgt_block[sli] for tgt_idx, sli in tgt_slices.items()}
-        self._cached_tgts = {
-            src_idx: {
-                tgt_idx: tgt_views[tgt_idx]
-                for tgt_idx in self._data.control_to_perturbation[src_idx]
-                if tgt_idx in tgt_views
-            }
-            for src_idx in self._src_idx_pool
-        }
-        self._initialized = True
+            raise ValueError("Pool not initialized. Call init_pool(rng) first.")
+        self._cached_srcs = {i: np.asarray(self._data.src_cell_data[i]) for i in self._src_idx_pool}
+        self._cached_tgts = {j: np.asarray(self._data.tgt_cell_data[j]) for i in self._src_idx_pool for j in self._data.control_to_perturbation[i]}
 
     def _init_pool(self, rng):
         """Initialize the pool with random source distribution indices."""
@@ -251,11 +193,9 @@ class TrainSamplerWithPool(TrainSampler):
     def _sample_source_dist_idx(self, rng) -> int:
         """Sample a source distribution index with gradual pool replacement."""
         if not self._initialized:
-            self._init_pool(rng)
-
+            raise ValueError("Pool not initialized. Call init_pool(rng) first.")
         # Sample from current pool
-        pool_idx = rng.choice(self._pool_size)
-        source_idx = self._src_idx_pool[pool_idx]
+        source_idx = rng.choice(sorted(self._cached_srcs.keys()))
 
         # Increment usage count for monitoring
         self._pool_usage_count[source_idx] += 1
@@ -282,7 +222,20 @@ class TrainSamplerWithPool(TrainSampler):
             least_used_weight /= least_used_weight.sum()
             new_pool_idx = rng.choice(self.n_source_dists, p=least_used_weight)
             self._src_idx_pool[in_pool_idx] = new_pool_idx
+            self._update_cache(replaced_pool_idx, new_pool_idx)
             print(f"replaced {replaced_pool_idx} with {new_pool_idx}")
+
+    def _update_cache(self, replaced_pool_idx: int, new_pool_idx: int):
+        print(f"updating cache for {replaced_pool_idx} and {new_pool_idx}")
+        del self._cached_srcs[replaced_pool_idx]
+        for k in self._data.control_to_perturbation[replaced_pool_idx]:
+            del self._cached_tgts[k]
+        self._cached_srcs[new_pool_idx] = np.asarray(self._data.src_cell_data[new_pool_idx])
+        for k in self._data.control_to_perturbation[new_pool_idx]:
+            self._cached_tgts[k] = np.asarray(self._data.tgt_cell_data[k])
+        print(f"updated cache for {replaced_pool_idx} and {new_pool_idx}")
+
+
 
     def get_pool_stats(self) -> dict:
         """Get statistics about the current pool state."""
@@ -300,7 +253,7 @@ class TrainSamplerWithPool(TrainSampler):
         return rng.choice(self._cached_srcs[source_dist_idx], size=self.batch_size, replace=True)
 
     def _sample_target_cells(self, rng, source_dist_idx: int, target_dist_idx: int) -> np.ndarray:
-        return rng.choice(self._cached_tgts[source_dist_idx][target_dist_idx], size=self.batch_size, replace=True)
+        return rng.choice(self._cached_tgts[target_dist_idx], size=self.batch_size, replace=True)
 
 
 class BaseValidSampler(abc.ABC):
