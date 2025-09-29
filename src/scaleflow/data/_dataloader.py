@@ -3,6 +3,7 @@ from typing import Any, Literal
 
 import numpy as np
 import tqdm
+import os
 import threading
 from concurrent.futures import ThreadPoolExecutor, Future
 
@@ -191,11 +192,19 @@ class ReservoirSampler(TrainSampler):
             raise ValueError("Pool not initialized. Call init_pool(rng) first.")
         with self._lock:
             self._cached_srcs = {i: self._data.src_cell_data[i][...] for i in self._src_idx_pool}
-            self._cached_tgts = {
-                j: self._data.tgt_cell_data[j][...]
-                for i in self._src_idx_pool
-                for j in self._data.control_to_perturbation[i]
-            }
+            tgt_indices = sorted(
+                {int(j) for i in self._src_idx_pool for j in self._data.control_to_perturbation[i]}
+            )
+
+        def _load_tgt(j: int):
+            return j, self._data.tgt_cell_data[j][...]
+
+        max_workers = min(32, (os.cpu_count() or 4))
+        with ThreadPoolExecutor(max_workers=max_workers) as ex:
+            results = list(ex.map(_load_tgt, tgt_indices))
+
+        with self._lock:
+            self._cached_tgts = {j: arr for j, arr in results}
 
     def _init_pool(self, rng):
         """Initialize the pool with random source distribution indices."""
