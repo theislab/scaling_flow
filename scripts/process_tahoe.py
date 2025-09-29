@@ -7,9 +7,9 @@
 import anndata as ad
 import h5py
 import zarr
-from cellflow.data._utils import write_sharded
+from scaleflow.data._utils import write_sharded
 from anndata.experimental import read_lazy
-from cellflow.data import DataManager
+from scaleflow.data import DataManager
 import cupy as cp
 import tqdm
 import dask

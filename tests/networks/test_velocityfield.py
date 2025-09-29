@@ -4,7 +4,7 @@ import optax
 import pytest
 from flax.linen import activation
 
-from cellflow.networks import _velocity_field
+from scaleflow.networks import _velocity_field
 
 x_test = jnp.ones((10, 5)) * 10
 t_test = jnp.ones((10, 1))

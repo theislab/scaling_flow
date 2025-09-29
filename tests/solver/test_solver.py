@@ -7,9 +7,9 @@ import optax
 import pytest
 from ott.neural.methods.flows import dynamics
 
-import cellflow
-from cellflow.solvers import _genot, _otfm
-from cellflow.utils import match_linear
+import scaleflow
+from scaleflow.solvers import _genot, _otfm
+from scaleflow.utils import match_linear
 
 src = {
     ("drug_1",): np.random.rand(10, 5),
@@ -26,9 +26,9 @@ class TestSolver:
     @pytest.mark.parametrize("solver_class", ["otfm", "genot"])
     def test_predict_batch(self, dataloader, solver_class):
         if solver_class == "otfm":
-            vf_class = cellflow.networks.ConditionalVelocityField
+            vf_class = scaleflow.networks.ConditionalVelocityField
         else:
-            vf_class = cellflow.networks.GENOTConditionalVelocityField
+            vf_class = scaleflow.networks.GENOTConditionalVelocityField
 
         opt = optax.adam(1e-3)
         vf = vf_class(
@@ -60,7 +60,7 @@ class TestSolver:
             )
 
         predict_kwargs = {"max_steps": 3, "throw": False}
-        trainer = cellflow.training.CellFlowTrainer(solver=solver, predict_kwargs=predict_kwargs)
+        trainer = scaleflow.training.CellFlowTrainer(solver=solver, predict_kwargs=predict_kwargs)
         trainer.train(
             dataloader=dataloader,
             num_iterations=2,
@@ -91,7 +91,7 @@ class TestSolver:
 
     @pytest.mark.parametrize("ema", [0.5, 1.0])
     def test_EMA(self, dataloader, ema):
-        vf_class = cellflow.networks.ConditionalVelocityField
+        vf_class = scaleflow.networks.ConditionalVelocityField
         drug = np.random.rand(2, 1, 3)
         opt = optax.adam(1e-3)
         vf1 = vf_class(
@@ -111,7 +111,7 @@ class TestSolver:
             rng=vf_rng,
             ema=ema,
         )
-        trainer1 = cellflow.training.CellFlowTrainer(solver=solver1)
+        trainer1 = scaleflow.training.CellFlowTrainer(solver=solver1)
         trainer1.train(
             dataloader=dataloader,
             num_iterations=5,
