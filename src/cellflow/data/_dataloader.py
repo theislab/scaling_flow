@@ -3,6 +3,8 @@ from typing import Any, Literal
 
 import numpy as np
 import tqdm
+import threading
+from concurrent.futures import ThreadPoolExecutor, Future
 
 from cellflow.data._data import (
     PredictionData,
@@ -125,7 +127,6 @@ class TrainSampler:
         """The training data."""
         return self._data
 
-
 class ReservoirSampler(TrainSampler):
     """Data sampler with gradual pool replacement using reservoir sampling.
 
@@ -168,6 +169,12 @@ class ReservoirSampler(TrainSampler):
         self._pool_usage_count = np.zeros(self.n_source_dists, dtype=int)
         self._initialized = False
 
+        # Concurrency primitives
+        self._lock = threading.RLock()
+        self._executor = ThreadPoolExecutor(max_workers=2)
+        # Map pool position -> {"old": int, "new": int, "future": Future}
+        self._pending_replacements: dict[int, dict[str, Any]] = {}
+
     def init_pool(self, rng):
         self._init_pool(rng)
         self._init_cache_pool_elements()
@@ -182,8 +189,13 @@ class ReservoirSampler(TrainSampler):
     def _init_cache_pool_elements(self):
         if not self._initialized:
             raise ValueError("Pool not initialized. Call init_pool(rng) first.")
-        self._cached_srcs = {i: np.asarray(self._data.src_cell_data[i]) for i in self._src_idx_pool}
-        self._cached_tgts = {j: np.asarray(self._data.tgt_cell_data[j]) for i in self._src_idx_pool for j in self._data.control_to_perturbation[i]}
+        with self._lock:
+            self._cached_srcs = {i: self._data.src_cell_data[i][...] for i in self._src_idx_pool}
+            self._cached_tgts = {
+                j: self._data.tgt_cell_data[j][...]
+                for i in self._src_idx_pool
+                for j in self._data.control_to_perturbation[i]
+            }
 
     def _init_pool(self, rng):
         """Initialize the pool with random source distribution indices."""
@@ -194,48 +206,102 @@ class ReservoirSampler(TrainSampler):
         """Sample a source distribution index with gradual pool replacement."""
         if not self._initialized:
             raise ValueError("Pool not initialized. Call init_pool(rng) first.")
+
+        # Opportunistically apply any ready replacements (non-blocking)
+        self._apply_ready_replacements()
+
         # Sample from current pool
-        source_idx = rng.choice(sorted(self._cached_srcs.keys()))
+        with self._lock:
+            source_idx = rng.choice(sorted(self._cached_srcs.keys()))
 
         # Increment usage count for monitoring
         self._pool_usage_count[source_idx] += 1
 
-        # Gradually replace elements based on replacement probability
+        # Gradually replace elements based on replacement probability (schedule only)
         if rng.random() < self._replacement_prob:
-            self._replace_pool_element(rng)
+            self._schedule_replacement(rng)
 
         return source_idx
 
-    def _replace_pool_element(self, rng):
-        """Replace a single pool element with a new one."""
-        # instead sample weighted by usage count
-        # let's only consider the pool_usage_count.min() for least used
-        # and the pool_usage_count.max() for most used
+    def _schedule_replacement(self, rng):
+        """Schedule a single pool element replacement without blocking."""
+        # weights same as previous logic
         most_used_weight = (self._pool_usage_count == self._pool_usage_count.max()).astype(float)
+        if most_used_weight.sum() == 0:
+            return
         most_used_weight /= most_used_weight.sum()
-
-        # weight by most used
         replaced_pool_idx = rng.choice(self.n_source_dists, p=most_used_weight)
-        if replaced_pool_idx in set(self._src_idx_pool):
-            in_pool_idx = np.where(self._src_idx_pool == replaced_pool_idx)[0][0]
+
+        with self._lock:
+            pool_set = set(self._src_idx_pool.tolist())
+            if replaced_pool_idx not in pool_set:
+                return
+            in_pool_idx = int(np.where(self._src_idx_pool == replaced_pool_idx)[0][0])
+
+            # If there's already a pending replacement for this pool slot, skip
+            if in_pool_idx in self._pending_replacements:
+                return
+
             least_used_weight = (self._pool_usage_count == self._pool_usage_count.min()).astype(float)
+            if least_used_weight.sum() == 0:
+                return
             least_used_weight /= least_used_weight.sum()
-            new_pool_idx = rng.choice(self.n_source_dists, p=least_used_weight)
-            self._src_idx_pool[in_pool_idx] = new_pool_idx
-            self._update_cache(replaced_pool_idx, new_pool_idx)
-            print(f"replaced {replaced_pool_idx} with {new_pool_idx}")
+            new_pool_idx = int(rng.choice(self.n_source_dists, p=least_used_weight))
 
-    def _update_cache(self, replaced_pool_idx: int, new_pool_idx: int):
-        print(f"updating cache for {replaced_pool_idx} and {new_pool_idx}")
-        del self._cached_srcs[replaced_pool_idx]
-        for k in self._data.control_to_perturbation[replaced_pool_idx]:
-            del self._cached_tgts[k]
-        self._cached_srcs[new_pool_idx] = np.asarray(self._data.src_cell_data[new_pool_idx])
-        for k in self._data.control_to_perturbation[new_pool_idx]:
-            self._cached_tgts[k] = np.asarray(self._data.tgt_cell_data[k])
-        print(f"updated cache for {replaced_pool_idx} and {new_pool_idx}")
+            # Kick off background load for new indices
+            fut: Future = self._executor.submit(self._load_new_cache, new_pool_idx)
+            self._pending_replacements[in_pool_idx] = {
+                "old": replaced_pool_idx,
+                "new": new_pool_idx,
+                "future": fut,
+            }
+            print(f"scheduled replacement of {replaced_pool_idx} with {new_pool_idx} (slot {in_pool_idx})")
 
+    def _apply_ready_replacements(self):
+        """Apply any finished background loads; non-blocking."""
+        to_apply: list[int] = []
+        with self._lock:
+            for slot, info in self._pending_replacements.items():
+                fut: Future = info["future"]
+                if fut.done() and not fut.cancelled():
+                    to_apply.append(slot)
 
+        for slot in to_apply:
+            with self._lock:
+                info = self._pending_replacements.pop(slot, None)
+                if info is None:
+                    continue
+                old_idx = int(info["old"])
+                new_idx = int(info["new"])
+                fut: Future = info["future"]
+                try:
+                    prepared = fut.result(timeout=0)  # already done
+                except Exception as e:
+                    print(f"background load failed for {new_idx}: {e}")
+                    continue
+
+                # Swap pool index
+                self._src_idx_pool[slot] = new_idx
+
+                # Add new entries first
+                self._cached_srcs[new_idx] = prepared["src"]
+                for k, arr in prepared["tgts"].items():
+                    self._cached_tgts[k] = arr
+
+                # Remove old entries
+                if old_idx in self._cached_srcs:
+                    del self._cached_srcs[old_idx]
+                for k in self._data.control_to_perturbation[old_idx]:
+                    if k in self._cached_tgts:
+                        del self._cached_tgts[k]
+
+                print(f"applied replacement: {old_idx} -> {new_idx} (slot {slot})")
+
+    def _load_new_cache(self, src_idx: int) -> dict[str, Any]:
+        """Load new src and corresponding tgt arrays in the background."""
+        src_arr = self._data.src_cell_data[src_idx][...]
+        tgt_dict = {k: self._data.tgt_cell_data[k][...] for k in self._data.control_to_perturbation[src_idx]}
+        return {"src": src_arr, "tgts": tgt_dict}
 
     def get_pool_stats(self) -> dict:
         """Get statistics about the current pool state."""
@@ -250,10 +316,14 @@ class ReservoirSampler(TrainSampler):
         }
 
     def _sample_source_cells(self, rng, source_dist_idx: int) -> np.ndarray:
-        return rng.choice(self._cached_srcs[source_dist_idx], size=self.batch_size, replace=True)
+        with self._lock:
+            arr = self._cached_srcs[source_dist_idx]
+        return rng.choice(arr, size=self.batch_size, replace=True)
 
     def _sample_target_cells(self, rng, source_dist_idx: int, target_dist_idx: int) -> np.ndarray:
-        return rng.choice(self._cached_tgts[target_dist_idx], size=self.batch_size, replace=True)
+        with self._lock:
+            arr = self._cached_tgts[target_dist_idx]
+        return rng.choice(arr, size=self.batch_size, replace=True)
 
 
 class BaseValidSampler(abc.ABC):
