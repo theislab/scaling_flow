@@ -23,7 +23,7 @@ from scaleflow.data._datamanager import DataManager
 from scaleflow.model._utils import _write_predictions
 from scaleflow.networks import _velocity_field
 from scaleflow.plotting import _utils
-from scaleflow.solvers import _genot, _otfm
+from scaleflow.solvers import _genot, _otfm, _eqm
 from scaleflow.training._callbacks import BaseCallback
 from scaleflow.training._trainer import CellFlowTrainer
 from scaleflow.utils import match_linear
@@ -43,23 +43,28 @@ class CellFlow:
         adata
             An :class:`~anndata.AnnData` object to extract the training data from.
         solver
-            Solver to use for training. Either ``'otfm'`` or ``'genot'``.
+            Solver to use for training. Either ``'otfm'``, ``'genot'`` or ``'eqm'``.
     """
 
-    def __init__(self, adata: ad.AnnData, solver: Literal["otfm", "genot"] = "otfm"):
+    def __init__(self, adata: ad.AnnData, solver: Literal["otfm", "genot", "eqm"] = "otfm"):
         self._adata = adata
-        self._solver_class = _otfm.OTFlowMatching if solver == "otfm" else _genot.GENOT
-        self._vf_class = (
-            _velocity_field.ConditionalVelocityField
-            if solver == "otfm"
-            else _velocity_field.GENOTConditionalVelocityField
-        )
+        if solver == "otfm":
+            self._solver_class = _otfm.OTFlowMatching
+            self._vf_class = _velocity_field.ConditionalVelocityField
+        elif solver == "genot":
+            self._solver_class = _genot.GENOT
+            self._vf_class = _velocity_field.GENOTConditionalVelocityField
+        elif solver == "eqm":
+            self._solver_class = _eqm.EquilibriumMatching
+            self._vf_class = _velocity_field.EquilibriumVelocityField
+        else:
+            raise ValueError(f"Unknown solver: {solver}. Must be 'otfm', 'genot', or 'eqm'.")
         self._dataloader: TrainSampler | JaxOutOfCoreTrainSampler | None = None
         self._trainer: CellFlowTrainer | None = None
         self._validation_data: dict[str, ValidationData] = {"predict_kwargs": {}}
-        self._solver: _otfm.OTFlowMatching | _genot.GENOT | None = None
+        self._solver: _otfm.OTFlowMatching | _genot.GENOT | _eqm.EquilibriumMatching | None = None
         self._condition_dim: int | None = None
-        self._vf: _velocity_field.ConditionalVelocityField | _velocity_field.GENOTConditionalVelocityField | None = None
+        self._vf: _velocity_field.ConditionalVelocityField | _velocity_field.GENOTConditionalVelocityField | _velocity_field.EquilibriumVelocityField | None = None
 
     def prepare_data(
         self,
@@ -431,8 +436,8 @@ class CellFlow:
                 raise ValueError("Stochastic condition embeddings require `regularization`>0.")
 
         condition_encoder_kwargs = condition_encoder_kwargs or {}
-        if self._solver_class == _otfm.OTFlowMatching and vf_kwargs is not None:
-            raise ValueError("For `solver='otfm'`, `vf_kwargs` must be `None`.")
+        if (self._solver_class == _otfm.OTFlowMatching or self._solver_class == _eqm.EquilibriumMatching) and vf_kwargs is not None:
+            raise ValueError("For `solver='otfm'` or `solver='eqm'`, `vf_kwargs` must be `None`.")
         if self._solver_class == _genot.GENOT:
             if vf_kwargs is None:
                 vf_kwargs = {"genot_source_dims": [1024, 1024, 1024], "genot_source_dropout": 0.0}
@@ -446,34 +451,59 @@ class CellFlow:
         solver_kwargs = solver_kwargs or {}
         probability_path = probability_path or {"constant_noise": 0.0}
 
-        self.vf = self._vf_class(
-            output_dim=self._data_dim,
-            max_combination_length=self.train_data.max_combination_length,
-            condition_mode=condition_mode,
-            regularization=regularization,
-            condition_embedding_dim=condition_embedding_dim,
-            covariates_not_pooled=covariates_not_pooled,
-            pooling=pooling,
-            pooling_kwargs=pooling_kwargs,
-            layers_before_pool=layers_before_pool,
-            layers_after_pool=layers_after_pool,
-            cond_output_dropout=cond_output_dropout,
-            condition_encoder_kwargs=condition_encoder_kwargs,
-            act_fn=vf_act_fn,
-            time_freqs=time_freqs,
-            time_max_period=time_max_period,
-            time_encoder_dims=time_encoder_dims,
-            time_encoder_dropout=time_encoder_dropout,
-            hidden_dims=hidden_dims,
-            hidden_dropout=hidden_dropout,
-            conditioning=conditioning,
-            conditioning_kwargs=conditioning_kwargs,
-            decoder_dims=decoder_dims,
-            decoder_dropout=decoder_dropout,
-            layer_norm_before_concatenation=layer_norm_before_concatenation,
-            linear_projection_before_concatenation=linear_projection_before_concatenation,
-            **vf_kwargs,
-        )
+        if self._solver_class == _eqm.EquilibriumMatching:
+            self.vf = self._vf_class(
+                output_dim=self._data_dim,
+                max_combination_length=self.train_data.max_combination_length,
+                condition_mode=condition_mode,
+                regularization=regularization,
+                condition_embedding_dim=condition_embedding_dim,
+                covariates_not_pooled=covariates_not_pooled,
+                pooling=pooling,
+                pooling_kwargs=pooling_kwargs,
+                layers_before_pool=layers_before_pool,
+                layers_after_pool=layers_after_pool,
+                cond_output_dropout=cond_output_dropout,
+                condition_encoder_kwargs=condition_encoder_kwargs,
+                act_fn=vf_act_fn,
+                hidden_dims=hidden_dims,
+                hidden_dropout=hidden_dropout,
+                conditioning=conditioning,
+                conditioning_kwargs=conditioning_kwargs,
+                decoder_dims=decoder_dims,
+                decoder_dropout=decoder_dropout,
+                layer_norm_before_concatenation=layer_norm_before_concatenation,
+                linear_projection_before_concatenation=linear_projection_before_concatenation,
+            )
+        else:
+            self.vf = self._vf_class(
+                output_dim=self._data_dim,
+                max_combination_length=self.train_data.max_combination_length,
+                condition_mode=condition_mode,
+                regularization=regularization,
+                condition_embedding_dim=condition_embedding_dim,
+                covariates_not_pooled=covariates_not_pooled,
+                pooling=pooling,
+                pooling_kwargs=pooling_kwargs,
+                layers_before_pool=layers_before_pool,
+                layers_after_pool=layers_after_pool,
+                cond_output_dropout=cond_output_dropout,
+                condition_encoder_kwargs=condition_encoder_kwargs,
+                act_fn=vf_act_fn,
+                time_freqs=time_freqs,
+                time_max_period=time_max_period,
+                time_encoder_dims=time_encoder_dims,
+                time_encoder_dropout=time_encoder_dropout,
+                hidden_dims=hidden_dims,
+                hidden_dropout=hidden_dropout,
+                conditioning=conditioning,
+                conditioning_kwargs=conditioning_kwargs,
+                decoder_dims=decoder_dims,
+                decoder_dropout=decoder_dropout,
+                layer_norm_before_concatenation=layer_norm_before_concatenation,
+                linear_projection_before_concatenation=linear_projection_before_concatenation,
+                **vf_kwargs,
+            )
 
         probability_path, noise = next(iter(probability_path.items()))
         if probability_path == "constant_noise":
@@ -495,6 +525,16 @@ class CellFlow:
                 rng=jax.random.PRNGKey(seed),
                 **solver_kwargs,
             )
+        elif self._solver_class == _eqm.EquilibriumMatching:
+            # EqM doesn't use probability_path, only match_fn
+            self._solver = self._solver_class(
+                vf=self.vf,
+                match_fn=match_fn,
+                optimizer=optimizer,
+                conditions=self.train_data.condition_data,
+                rng=jax.random.PRNGKey(seed),
+                **solver_kwargs,
+            )
         elif self._solver_class == _genot.GENOT:
             self._solver = self._solver_class(
                 vf=self.vf,
@@ -508,7 +548,7 @@ class CellFlow:
                 **solver_kwargs,
             )
         else:
-            raise NotImplementedError(f"Solver must be an instance of OTFlowMatching or GENOT, got {type(self.solver)}")
+            raise NotImplementedError(f"Solver must be an instance of OTFlowMatching, EquilibriumMatching, or GENOT, got {type(self.solver)}")
 
         self._trainer = CellFlowTrainer(solver=self.solver, predict_kwargs=self.validation_data["predict_kwargs"])  # type: ignore[arg-type]
 
@@ -816,7 +856,7 @@ class CellFlow:
         return self._adata
 
     @property
-    def solver(self) -> _otfm.OTFlowMatching | _genot.GENOT | None:
+    def solver(self) -> _otfm.OTFlowMatching | _genot.GENOT | _eqm.EquilibriumMatching | None:
         """The solver."""
         return self._solver
 
@@ -843,7 +883,7 @@ class CellFlow:
     @property
     def velocity_field(
         self,
-    ) -> _velocity_field.ConditionalVelocityField | _velocity_field.GENOTConditionalVelocityField | None:
+    ) -> _velocity_field.ConditionalVelocityField | _velocity_field.GENOTConditionalVelocityField | _velocity_field.EquilibriumVelocityField | None:
         """The conditional velocity field."""
         return self._vf
 
