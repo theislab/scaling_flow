@@ -88,7 +88,7 @@ class EquilibriumMatching:
                 rng_encoder, rng_dropout = jax.random.split(rng, 2)
 
                 # Interpolate between source (noise) and target (data)
-                gamma_expanded = gamma[:, None]
+                gamma_expanded = gamma[:, jnp.newaxis]
                 x_gamma = gamma_expanded * target + (1.0 - gamma_expanded) * source
 
                 # Predict gradient field (no time input)
@@ -101,7 +101,7 @@ class EquilibriumMatching:
                 )
 
                 # Target gradient: (source - target) * c(gamma)
-                c_gamma = self.c_fn(gamma)[:, None]
+                c_gamma = self.c_fn(gamma)[:, jnp.newaxis]
                 target_gradient = (source - target) * c_gamma
 
                 # EqM loss
@@ -149,7 +149,7 @@ class EquilibriumMatching:
         condition = batch.get("condition")
         rng_resample, rng_gamma, rng_step_fn, rng_encoder_noise = jax.random.split(rng, 4)
         n = src.shape[0]
-        gamma = self.gamma_sampler(rng_gamma, n)
+        gamma = self.gamma_sampler(rng_gamma, n).squeeze()
         encoder_noise = jax.random.normal(rng_encoder_noise, (n, self.vf.condition_embedding_dim))
 
         if self.match_fn is not None:

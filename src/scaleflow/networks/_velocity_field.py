@@ -495,7 +495,7 @@ class GENOTConditionalVelocityField(ConditionalVelocityField):
         elif self.conditioning == "resnet":
             self.resnet_block = ResNetBlock(
                 input_dim=self.hidden_dims[-1],
-                **self.conditioning_kwargs,
+                **conditioning_kwargs,
             )
         elif self.conditioning == "concatenation":
             if len(conditioning_kwargs) > 0:

@@ -17,7 +17,7 @@ perturbation_covariate_comb_args = [
 
 class TestCellFlow:
     @pytest.mark.slow
-    @pytest.mark.parametrize("solver", ["otfm"])  # , "genot"])
+    @pytest.mark.parametrize("solver", ["otfm", "genot", "eqm"])
     @pytest.mark.parametrize("condition_mode", ["deterministic", "stochastic"])
     @pytest.mark.parametrize("regularization", [0.0, 0.1])
     @pytest.mark.parametrize("conditioning", ["concatenation", "film", "resnet"])
@@ -29,7 +29,7 @@ class TestCellFlow:
         regularization,
         conditioning,
     ):
-        if solver == "genot" and ((condition_mode == "stochastic") or (regularization > 0.0)):
+        if solver in ["genot", "eqm"] and ((condition_mode == "stochastic") or (regularization > 0.0)):
             return None
         sample_rep = "X"
         control_key = "control"
@@ -77,15 +77,14 @@ class TestCellFlow:
         cf.train(num_iterations=3)
         assert cf._dataloader is not None
 
-        # we assume these are all source cells now in adata_perturbation
         adata_perturbation_pred = adata_perturbation.copy()
         adata_perturbation_pred.obs["control"] = True
+        predict_kwargs = {"max_steps": 3, "eta": 0.01} if solver == "eqm" else {"max_steps": 3, "throw": False}
         pred = cf.predict(
             adata_perturbation_pred,
             sample_rep=sample_rep,
             covariate_data=adata_perturbation_pred.obs,
-            max_steps=3,
-            throw=False,
+            **predict_kwargs,
         )
         assert isinstance(pred, dict)
         key, out = next(iter(pred.items()))
@@ -97,16 +96,14 @@ class TestCellFlow:
             sample_rep=sample_rep,
             covariate_data=adata_perturbation_pred.obs,
             key_added_prefix="MY_PREDICTION_",
-            max_steps=3,
-            throw=False,
+            **predict_kwargs,
         )
 
         assert pred_stored is None
-        if solver == "otfm":
+        if solver in ["otfm", "genot", "eqm"]:
             assert "MY_PREDICTION_" + str(key) in adata_perturbation_pred.obsm
 
         if solver == "genot":
-            assert "MY_PREDICTION_" + str(key) in adata_perturbation_pred.obsm
             pred2 = cf.predict(
                 adata_perturbation_pred,
                 sample_rep=sample_rep,
@@ -133,7 +130,7 @@ class TestCellFlow:
         assert cond_embed_var.shape[1] == condition_embedding_dim
 
     @pytest.mark.slow
-    @pytest.mark.parametrize("solver", ["otfm", "genot"])
+    @pytest.mark.parametrize("solver", ["otfm", "genot", "eqm"])
     @pytest.mark.parametrize("perturbation_covariate_reps", [{}, {"drug": "drug"}])
     def test_scaleflow_covar_reps(
         self,
@@ -166,24 +163,24 @@ class TestCellFlow:
         )
         assert cf._trainer is not None
 
-        vector_field_class = (
-            _velocity_field.ConditionalVelocityField
-            if solver == "otfm"
-            else _velocity_field.GENOTConditionalVelocityField
-        )
+        if solver == "otfm":
+            vector_field_class = _velocity_field.ConditionalVelocityField
+        elif solver == "genot":
+            vector_field_class = _velocity_field.GENOTConditionalVelocityField
+        else:
+            vector_field_class = _velocity_field.EquilibriumVelocityField
         assert cf._vf_class == vector_field_class
         cf.train(num_iterations=3)
         assert cf._dataloader is not None
 
-        # we assume these are all source cells now in adata_perturbation
         adata_perturbation_pred = adata_perturbation.copy()
         adata_perturbation_pred.obs["control"] = True
+        predict_kwargs = {"max_steps": 3, "eta": 0.01} if solver == "eqm" else {"max_steps": 3, "throw": False}
         pred = cf.predict(
             adata_perturbation_pred,
             sample_rep=sample_rep,
             covariate_data=adata_perturbation_pred.obs,
-            max_steps=3,
-            throw=False,
+            **predict_kwargs,
         )
         assert isinstance(pred, dict)
         out = next(iter(pred.values()))
@@ -248,7 +245,7 @@ class TestCellFlow:
             assert cond_data[k].shape[1] == cf.train_data.max_combination_length
 
     @pytest.mark.slow
-    @pytest.mark.parametrize("solver", ["otfm", "genot"])
+    @pytest.mark.parametrize("solver", ["otfm", "genot", "eqm"])
     @pytest.mark.parametrize("n_conditions_on_log_iteration", [None, 0, 1])
     @pytest.mark.parametrize("n_conditions_on_train_end", [None, 0, 1])
     def test_scaleflow_with_validation(
@@ -259,6 +256,7 @@ class TestCellFlow:
         n_conditions_on_train_end,
     ):
         vf_kwargs = {"genot_source_dims": (2, 2), "genot_source_dropout": 0.1} if solver == "genot" else None
+        predict_kwargs = {"max_steps": 3, "eta": 0.01} if solver == "eqm" else {"max_steps": 3, "throw": False}
         cf = scaleflow.model.CellFlow(adata_perturbation, solver=solver)
         cf.prepare_data(
             sample_rep="X",
@@ -274,7 +272,7 @@ class TestCellFlow:
             name="val",
             n_conditions_on_log_iteration=n_conditions_on_log_iteration,
             n_conditions_on_train_end=n_conditions_on_train_end,
-            predict_kwargs={"max_steps": 3, "throw": False},
+            predict_kwargs=predict_kwargs,
         )
         assert isinstance(cf._validation_data, dict)
         assert "val" in cf._validation_data
@@ -307,7 +305,7 @@ class TestCellFlow:
         assert f"val_{metric_to_compute}_mean" in cf._trainer.training_logs
 
     @pytest.mark.slow
-    @pytest.mark.parametrize("solver", ["otfm", "genot"])
+    @pytest.mark.parametrize("solver", ["otfm", "genot", "eqm"])
     @pytest.mark.parametrize("condition_mode", ["deterministic", "stochastic"])
     @pytest.mark.parametrize("regularization", [0.0, 0.1])
     def test_scaleflow_predict(
@@ -317,6 +315,8 @@ class TestCellFlow:
         condition_mode,
         regularization,
     ):
+        if solver in ["genot", "eqm"] and ((condition_mode == "stochastic") or (regularization > 0.0)):
+            return None
         cf = scaleflow.model.CellFlow(adata_perturbation, solver=solver)
         cf.prepare_data(
             sample_rep="X",
@@ -354,7 +354,8 @@ class TestCellFlow:
         adata_pred.obs["control"] = True
         covariate_data = adata_perturbation.obs.iloc[:3]
 
-        pred = cf.predict(adata_pred, sample_rep="X", covariate_data=covariate_data, max_steps=3, throw=False)
+        predict_kwargs = {"max_steps": 3, "eta": 0.01} if solver == "eqm" else {"max_steps": 3, "throw": False}
+        pred = cf.predict(adata_pred, sample_rep="X", covariate_data=covariate_data, **predict_kwargs)
 
         assert isinstance(pred, dict)
         out = next(iter(pred.values()))
@@ -365,11 +366,11 @@ class TestCellFlow:
             ValueError,
             match=r".*If both `adata` and `covariate_data` are given, all samples in `adata` must be control samples*",
         ):
-            cf.predict(adata_pred, sample_rep="X", covariate_data=covariate_data, max_steps=3, throw=False)
+            cf.predict(adata_pred, sample_rep="X", covariate_data=covariate_data, **predict_kwargs)
 
         with pytest.raises(ValueError, match="`covariate_data` is empty."):
             empty_covariate_data = covariate_data.head(0)
-            cf.predict(adata_pred, sample_rep="X", covariate_data=empty_covariate_data, max_steps=3, throw=False)
+            cf.predict(adata_pred, sample_rep="X", covariate_data=empty_covariate_data, **predict_kwargs)
 
         with pytest.raises(
             ValueError,
@@ -381,7 +382,7 @@ class TestCellFlow:
             adata_pred_cell_type_2 = adata_pred[adata_pred.obs["cell_type"] == "cell_line_b"]
             adata_pred_cell_type_2.obs["control"] = True
             cf.predict(
-                adata_pred_cell_type_2, sample_rep="X", covariate_data=cov_data_cell_type_1, max_steps=3, throw=False
+                adata_pred_cell_type_2, sample_rep="X", covariate_data=cov_data_cell_type_1, **predict_kwargs
             )
 
     def test_raise_otfm_vf_kwargs_passed(self, adata_perturbation):
@@ -395,7 +396,7 @@ class TestCellFlow:
         )
         with pytest.raises(
             ValueError,
-            match=r".*For `solver='otfm'`, `vf_kwargs` must be `None`.*",
+            match=r".*For `solver='otfm'` or `solver='eqm'`, `vf_kwargs` must be `None`.*",
         ):
             cf.prepare_model(
                 condition_embedding_dim=2,

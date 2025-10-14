@@ -19,7 +19,7 @@ class TestVelocityField:
     @pytest.mark.parametrize("linear_projection_before_concatenation", [True, False])
     @pytest.mark.parametrize("condition_mode", ["deterministic", "stochastic"])
     @pytest.mark.parametrize(
-        "velocity_field_cls", [_velocity_field.ConditionalVelocityField, _velocity_field.GENOTConditionalVelocityField]
+        "velocity_field_cls", [_velocity_field.ConditionalVelocityField, _velocity_field.GENOTConditionalVelocityField, _velocity_field.EquilibriumVelocityField]
     )
     @pytest.mark.parametrize("conditioning", ["concatenation", "film", "resnet"])
     def test_velocity_field_init(
@@ -62,6 +62,15 @@ class TestVelocityField:
                 train=True,
                 rngs={"condition_encoder": apply_rng},
             )
+        elif isinstance(vf, _velocity_field.EquilibriumVelocityField):
+            out, out_mean, out_logvar = vf_state.apply_fn(
+                {"params": vf_state.params},
+                x_test,
+                cond,
+                encoder_noise,
+                train=True,
+                rngs={"condition_encoder": apply_rng},
+            )
         elif isinstance(vf, _velocity_field.ConditionalVelocityField):
             out, out_mean, out_logvar = vf_state.apply_fn(
                 {"params": vf_state.params},
@@ -84,7 +93,7 @@ class TestVelocityField:
 
     @pytest.mark.parametrize("condition_mode", ["deterministic", "stochastic"])
     @pytest.mark.parametrize(
-        "velocity_field_cls", [_velocity_field.ConditionalVelocityField, _velocity_field.GENOTConditionalVelocityField]
+        "velocity_field_cls", [_velocity_field.ConditionalVelocityField, _velocity_field.GENOTConditionalVelocityField, _velocity_field.EquilibriumVelocityField]
     )
     @pytest.mark.parametrize("conditioning", ["concatenation", "film", "resnet"])
     def test_velocityfield_conditioning_kwargs(self, condition_mode, velocity_field_cls, conditioning):
@@ -127,6 +136,15 @@ class TestVelocityField:
                 train=True,
                 rngs={"condition_encoder": apply_rng, "dropout": dropout_rng},
             )
+        elif isinstance(vf, _velocity_field.EquilibriumVelocityField):
+            out, out_mean, out_logvar = vf_state.apply_fn(
+                {"params": vf_state.params},
+                x_test,
+                cond,
+                encoder_noise,
+                train=True,
+                rngs={"condition_encoder": apply_rng, "dropout": dropout_rng},
+            )
         elif isinstance(vf, _velocity_field.ConditionalVelocityField):
             out, out_mean, out_logvar = vf_state.apply_fn(
                 {"params": vf_state.params},
@@ -145,7 +163,7 @@ class TestVelocityField:
 
     @pytest.mark.parametrize("condition_mode", ["deterministic", "stochastic"])
     @pytest.mark.parametrize(
-        "velocity_field_cls", [_velocity_field.ConditionalVelocityField, _velocity_field.GENOTConditionalVelocityField]
+        "velocity_field_cls", [_velocity_field.ConditionalVelocityField, _velocity_field.GENOTConditionalVelocityField, _velocity_field.EquilibriumVelocityField]
     )
     @pytest.mark.parametrize("conditioning", ["concatenation", "film", "resnet"])
     def test_velocityfield_conditioning_raises(self, condition_mode, velocity_field_cls, conditioning):

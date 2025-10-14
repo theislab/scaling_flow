@@ -23,10 +23,10 @@ class DataSplitter:
     making it memory-efficient for large datasets.
 
     Supports various splitting strategies:
-    - holdout_groups: Hold out specific groups (perturbations, cell lines, etc.) for validation/test
-    - holdout_combinations: Keep single treatments in training, hold out combinations for validation/test
-    - random: Random split of cells
-    - stratified: Stratified split maintaining proportions
+    - holdout_groups: Hold out specific groups (drugs, cell lines, donors, etc.) for validation/test
+    - holdout_combinations: Keep single treatments in training, hold out combination treatments for validation/test
+    - random: Random split of observations
+    - stratified: Stratified split maintaining condition proportions
 
     Parameters
     ----------
@@ -53,11 +53,25 @@ class DataSplitter:
         If False, validation and test can share groups, split at cell level.
         Applies to all split types for consistent val/test separation control.
     random_state : int
-        Random seed for reproducible splits
+        Random seed for reproducible splits. This controls:
+        - Observation-level splits in soft mode (hard_test_split=False)
+        - Fallback for test_random_state and val_random_state if they are None
+        Note: In hard mode with test_random_state and val_random_state specified,
+        this parameter only affects downstream training randomness (not DataSplitter itself).
+    test_random_state : int | None
+        Random seed specifically for selecting which conditions go to the test set.
+        If None, uses random_state as fallback. Only applies to 'holdout_groups' and
+        'holdout_combinations' split types. This enables running multiple experiments with
+        different train/val splits while keeping the test set fixed for fair comparison.
+    val_random_state : int | None
+        Random seed specifically for selecting which conditions go to the validation set
+        (from the remaining conditions after test set selection). If None, uses random_state
+        as fallback. Only applies to 'holdout_groups' and 'holdout_combinations' split types.
+        This enables varying the validation set across runs while keeping test set fixed
 
     Examples
     --------
-    >>> # Split by holdout groups with forced training values
+    >>> # Example 1: Basic split with forced training values
     >>> splitter = DataSplitter(
     ...     training_datasets=[train_data1, train_data2],
     ...     dataset_names=["dataset1", "dataset2"],
@@ -66,7 +80,8 @@ class DataSplitter:
     ...     split_key=["drug1", "drug2"],
     ...     force_training_values=["control", "dmso"],
     ... )
-    >>> # Split by holding out combinations (singletons in training)
+
+    >>> # Example 2: Split by holding out combinations (singletons in training)
     >>> splitter = DataSplitter(
     ...     training_datasets=[train_data],
     ...     dataset_names=["dataset"],
@@ -75,10 +90,37 @@ class DataSplitter:
     ...     split_key=["drug1", "drug2"],
     ...     control_value=["control", "dmso"],
     ... )
+
+    >>> # Example 3: Fixed test set across multiple runs (for drug discovery benchmarking)
+    >>> # All runs will test on the same drugs, but with different train/val splits
+    >>> for seed in [42, 43, 44, 45]:
+    ...     splitter = DataSplitter(
+    ...         training_datasets=[train_data],
+    ...         dataset_names=["experiment"],
+    ...         split_ratios=[[0.6, 0.2, 0.2]],
+    ...         split_type="holdout_groups",
+    ...         split_key=["drug"],
+    ...         test_random_state=999,      # Fixed: same test drugs across all runs
+    ...         val_random_state=seed,      # Varies: different validation drugs per run
+    ...         random_state=seed,          # Varies: different training randomness
+    ...     )
+    ...     results = splitter.split_all_datasets()
+    ...     # Train model with this split...
+
+    >>> # Example 4: Completely different splits per run (current behavior)
+    >>> for seed in [42, 43, 44]:
+    ...     splitter = DataSplitter(
+    ...         training_datasets=[train_data],
+    ...         dataset_names=["experiment"],
+    ...         split_ratios=[[0.8, 0.1, 0.1]],
+    ...         split_type="holdout_groups",
+    ...         split_key=["drug"],
+    ...         random_state=seed,  # All three seeds derived from this
+    ...     )
+
+    >>> # Save and load splits
     >>> results = splitter.split_all_datasets()
     >>> splitter.save_splits("./splits")
-
-    >>> # Load split information later
     >>> split_info = DataSplitter.load_split_info("./splits", "dataset1")
     >>> train_indices = split_info["indices"]["train"]
     """
@@ -94,6 +136,8 @@ class DataSplitter:
         control_value: str | list[str] | None = None,
         hard_test_split: bool = True,
         random_state: int = 42,
+        test_random_state: int | None = None,
+        val_random_state: int | None = None,
     ):
         self.training_datasets = training_datasets
         self.dataset_names = dataset_names
@@ -104,6 +148,8 @@ class DataSplitter:
         self.control_value = [control_value] if isinstance(control_value, str) else control_value
         self.hard_test_split = hard_test_split
         self.random_state = random_state
+        self.test_random_state = test_random_state if test_random_state is not None else random_state
+        self.val_random_state = val_random_state if val_random_state is not None else random_state
 
         self._validate_inputs()
 
@@ -151,7 +197,11 @@ class DataSplitter:
 
     def extract_perturbation_info(self, training_data: TrainingData | MappedCellData) -> dict:
         """
-        Extract perturbation information from TrainingData or MappedCellData.
+        Extract condition information from TrainingData or MappedCellData.
+
+        Note: Internal variable names use 'perturbation' for compatibility with
+        TrainingData structure, but conceptually these represent any conditions
+        (drugs, cell lines, donors, etc.).
 
         Parameters
         ----------
@@ -162,17 +212,17 @@ class DataSplitter:
         -------
         dict
             Dictionary containing:
-            - perturbation_covariates_mask: array mapping cells to perturbation indices
-            - perturbation_idx_to_covariates: dict mapping perturbation indices to covariate tuples
-            - n_cells: total number of cells
+            - perturbation_covariates_mask: array mapping observations to condition indices
+            - perturbation_idx_to_covariates: dict mapping condition indices to covariate tuples
+            - n_cells: total number of observations
         """
         perturbation_covariates_mask = np.asarray(training_data.perturbation_covariates_mask)
         perturbation_idx_to_covariates = training_data.perturbation_idx_to_covariates
 
         n_cells = len(perturbation_covariates_mask)
 
-        logger.info(f"Extracted perturbation info for {n_cells} cells")
-        logger.info(f"Number of unique perturbations: {len(perturbation_idx_to_covariates)}")
+        logger.info(f"Extracted condition info for {n_cells} observations")
+        logger.info(f"Number of unique conditions: {len(perturbation_idx_to_covariates)}")
 
         return {
             "perturbation_covariates_mask": perturbation_covariates_mask,
@@ -234,7 +284,7 @@ class DataSplitter:
         perturbation_idx_to_covariates: dict[int, tuple[str, ...]],
         split_ratios: list[float],
     ) -> dict[str, np.ndarray]:
-        """Split by holding out specific perturbations."""
+        """Split by holding out specific condition groups."""
         if self.split_key is None:
             raise ValueError("split_key must be provided for holdout_groups splitting")
 
@@ -258,28 +308,32 @@ class DataSplitter:
                 stacklevel=2,
             )
 
-        # Split values according to ratios
+        # Split values according to ratios using three-level seed hierarchy
         train_ratio, val_ratio, test_ratio = split_ratios
 
         # Calculate number of values for each split
-        n_train = max(1, int(train_ratio * n_values))
+        n_test = int(test_ratio * n_values)
         n_val = int(val_ratio * n_values)
-        n_test = n_values - n_train - n_val
+        n_train = n_values - n_test - n_val
 
-        # Ensure we don't exceed total values
-        if n_train + n_val + n_test != n_values:
-            n_test = n_values - n_train - n_val
+        # Ensure we have at least one value for train if train_ratio > 0
+        if train_ratio > 0 and n_train == 0:
+            n_train = 1
+            n_test = max(0, n_test - 1)
 
-        # Shuffle available values for random assignment (excluding forced training values)
-        np.random.seed(self.random_state)
-        shuffled_values = np.random.permutation(available_values)
+        # Step 1: Select test values using test_random_state
+        np.random.seed(self.test_random_state)
+        shuffled_for_test = np.random.permutation(available_values)
+        test_values = shuffled_for_test[-n_test:] if n_test > 0 else []
+        remaining_after_test = shuffled_for_test[:-n_test] if n_test > 0 else shuffled_for_test
 
-        # Assign values to splits
-        train_values_random = shuffled_values[:n_train]
-        val_values = shuffled_values[n_train : n_train + n_val] if n_val > 0 else []
-        test_values = shuffled_values[n_train + n_val :] if n_test > 0 else []
+        # Step 2: Select val values from remaining using val_random_state
+        np.random.seed(self.val_random_state)
+        shuffled_for_val = np.random.permutation(remaining_after_test)
+        val_values = shuffled_for_val[-n_val:] if n_val > 0 else []
+        train_values_random = shuffled_for_val[:-n_val] if n_val > 0 else shuffled_for_val
 
-        # Combine forced training values with randomly assigned training values
+        # Step 3: Combine forced training values with randomly assigned training values
         train_values = list(train_values_random) + forced_train_values
 
         logger.info(f"Split values - Train: {len(train_values)}, Val: {len(val_values)}, Test: {len(test_values)}")
@@ -335,7 +389,7 @@ class DataSplitter:
 
         # Log overlap information (important for combination treatments)
         total_assigned = len(set(train_idx) | set(val_idx) | set(test_idx))
-        logger.info(f"Total cells assigned to splits: {total_assigned} out of {len(perturbation_covariates_mask)}")
+        logger.info(f"Total observations assigned to splits: {total_assigned} out of {len(perturbation_covariates_mask)}")
 
         overlaps = []
         if len(set(train_idx) & set(val_idx)) > 0:
@@ -358,13 +412,13 @@ class DataSplitter:
         perturbation_idx_to_covariates: dict[int, tuple[str, ...]],
         split_ratios: list[float],
     ) -> dict[str, np.ndarray]:
-        """Split by keeping singletons in training and holding out combinations for val/test."""
+        """Split by keeping single conditions in training and holding out combinations for val/test."""
         if self.split_key is None:
             raise ValueError("split_key must be provided for holdout_combinations splitting")
         if self.control_value is None:
             raise ValueError("control_value must be provided for holdout_combinations splitting")
 
-        logger.info("Identifying combinations vs singletons from perturbation covariates")
+        logger.info("Identifying combinations vs singletons from condition covariates")
         logger.info(f"Control value(s): {self.control_value}")
 
         # Classify each perturbation index as control, singleton, or combination
@@ -438,36 +492,38 @@ class DataSplitter:
             unique_perturbations = list(set(perturbation_ids))
             n_unique_perturbations = len(unique_perturbations)
 
-            logger.info(f"Found {n_unique_perturbations} unique perturbation combinations")
+            logger.info(f"Found {n_unique_perturbations} unique condition combinations")
 
             if self.hard_test_split:
-                # HARD TEST SPLIT: Val and test get completely different perturbations
+                # HARD TEST SPLIT: Val and test get completely different conditions
                 # Calculate number of perturbation combinations for each split
-                n_train_perturbations = int(train_ratio * n_unique_perturbations)
+                n_test_perturbations = int(test_ratio * n_unique_perturbations)
                 n_val_perturbations = int(val_ratio * n_unique_perturbations)
-                n_test_perturbations = n_unique_perturbations - n_train_perturbations - n_val_perturbations
+                n_train_perturbations = n_unique_perturbations - n_test_perturbations - n_val_perturbations
 
-                # Ensure we don't exceed total perturbations
-                if n_train_perturbations + n_val_perturbations + n_test_perturbations != n_unique_perturbations:
-                    n_test_perturbations = n_unique_perturbations - n_train_perturbations - n_val_perturbations
+                # Ensure we have at least one perturbation for train if train_ratio > 0
+                if train_ratio > 0 and n_train_perturbations == 0:
+                    n_train_perturbations = 1
+                    n_test_perturbations = max(0, n_test_perturbations - 1)
 
-                # Shuffle perturbations for random assignment
-                np.random.seed(self.random_state)
-                shuffled_perturbations = np.random.permutation(unique_perturbations)
-
-                # Assign perturbations to splits
-                train_perturbations = (
-                    shuffled_perturbations[:n_train_perturbations] if n_train_perturbations > 0 else []
-                )
-                val_perturbations = (
-                    shuffled_perturbations[n_train_perturbations : n_train_perturbations + n_val_perturbations]
-                    if n_val_perturbations > 0
-                    else []
-                )
+                # Step 1: Select test perturbations using test_random_state
+                np.random.seed(self.test_random_state)
+                shuffled_for_test = np.random.permutation(unique_perturbations)
                 test_perturbations = (
-                    shuffled_perturbations[n_train_perturbations + n_val_perturbations :]
-                    if n_test_perturbations > 0
-                    else []
+                    [tuple(p) for p in shuffled_for_test[-n_test_perturbations:]] if n_test_perturbations > 0 else []
+                )
+                remaining_after_test = (
+                    shuffled_for_test[:-n_test_perturbations] if n_test_perturbations > 0 else shuffled_for_test
+                )
+
+                # Step 2: Select val perturbations from remaining using val_random_state
+                np.random.seed(self.val_random_state)
+                shuffled_for_val = np.random.permutation(remaining_after_test)
+                val_perturbations = (
+                    [tuple(p) for p in shuffled_for_val[-n_val_perturbations:]] if n_val_perturbations > 0 else []
+                )
+                train_perturbations = (
+                    [tuple(p) for p in shuffled_for_val[:-n_val_perturbations]] if n_val_perturbations > 0 else [tuple(p) for p in shuffled_for_val]
                 )
 
                 # Assign all cells with same perturbation to same split
@@ -485,17 +541,22 @@ class DataSplitter:
                         test_combo_idx.append(cell_idx)
 
                 logger.info(
-                    f"HARD TEST SPLIT - Perturbation split: Train={len(train_perturbations)}, Val={len(val_perturbations)}, Test={len(test_perturbations)}"
+                    f"HARD TEST SPLIT - Condition split: Train={len(train_perturbations)}, Val={len(val_perturbations)}, Test={len(test_perturbations)}"
                 )
+                if len(test_perturbations) > 0:
+                    logger.info(f"Test perturbations: {list(test_perturbations)[:3]}")
+                if len(val_perturbations) > 0:
+                    logger.info(f"Val perturbations: {list(val_perturbations)[:3]}")
 
             else:
-                # SOFT TEST SPLIT: Val and test can share perturbations, split at cell level
-                # First assign perturbations to train vs (val+test)
+                # SOFT TEST SPLIT: Val and test can share conditions, split at cell level
+                # First assign conditions to train vs (val+test) using test_random_state
+                # (In soft mode, val and test share conditions, so we only need one seed for this split)
                 n_train_perturbations = int(train_ratio * n_unique_perturbations)
                 n_val_test_perturbations = n_unique_perturbations - n_train_perturbations
 
-                # Shuffle perturbations
-                np.random.seed(self.random_state)
+                # Shuffle perturbations using test_random_state
+                np.random.seed(self.test_random_state)
                 shuffled_perturbations = np.random.permutation(unique_perturbations)
 
                 train_perturbations = (
@@ -529,7 +590,7 @@ class DataSplitter:
                     test_combo_idx = np.array([])
 
                 logger.info(
-                    f"SOFT TEST SPLIT - Perturbation split: Train={len(train_perturbations)}, Val+Test={len(val_test_perturbations)}"
+                    f"SOFT TEST SPLIT - Condition split: Train={len(train_perturbations)}, Val+Test={len(val_test_perturbations)}"
                 )
                 logger.info(f"Cell split within Val+Test: Val={len(val_combo_idx)}, Test={len(test_combo_idx)}")
 
@@ -551,10 +612,10 @@ class DataSplitter:
             test_idx = np.array([])
 
         logger.info(
-            f"Final split - Train: {len(train_idx)} (singletons + controls + {len(train_combo_idx) if n_combinations > 0 else 0} combination cells)"
+            f"Final split - Train: {len(train_idx)} (singletons + controls + {len(train_combo_idx) if n_combinations > 0 else 0} combination observations)"
         )
-        logger.info(f"Final split - Val: {len(val_idx)} (combination cells only)")
-        logger.info(f"Final split - Test: {len(test_idx)} (combination cells only)")
+        logger.info(f"Final split - Val: {len(val_idx)} (combination observations only)")
+        logger.info(f"Final split - Test: {len(test_idx)} (combination observations only)")
 
         return {"train": train_idx, "val": val_idx, "test": test_idx}
 
@@ -563,7 +624,7 @@ class DataSplitter:
         perturbation_covariates_mask: np.ndarray,
         split_ratios: list[float],
     ) -> dict[str, np.ndarray]:
-        """Perform stratified split maintaining proportions of perturbations."""
+        """Perform stratified split maintaining proportions of conditions."""
         if self.split_key is None:
             raise ValueError("split_key must be provided for stratified splitting")
 
@@ -672,6 +733,9 @@ class DataSplitter:
                 "split_key": self.split_key,
                 "split_ratios": current_split_ratios,
                 "random_state": self.random_state,
+                "test_random_state": self.test_random_state,
+                "val_random_state": self.val_random_state,
+                "hard_test_split": self.hard_test_split,
             },
         }
 
@@ -711,7 +775,7 @@ class DataSplitter:
         logger.info(f"Split results for {self.dataset_names[dataset_index]}:")
         for split_name, indices in split_indices.items():
             if len(indices) > 0:
-                logger.info(f"  {split_name}: {len(indices)} cells")
+                logger.info(f"  {split_name}: {len(indices)} observations")
 
         return result
 
@@ -739,9 +803,126 @@ class DataSplitter:
         logger.info(f"\nCompleted splitting {len(self.training_datasets)} datasets")
         return self.split_results
 
+    def generate_split_summary(self) -> dict[str, dict]:
+        """
+        Generate a human-readable summary of split conditions for each dataset.
+
+        This method creates a comprehensive summary showing which specific conditions
+        (perturbations, cell lines, donors, etc.) are assigned to train/val/test splits.
+        Useful for tracking what was tested across different random seeds.
+
+        Returns
+        -------
+        dict[str, dict]
+            Dictionary with dataset names as keys and split summaries as values.
+            Each summary contains:
+            - conditions_per_split: Lists of condition values in each split
+            - observations_per_condition: Number of observations for each condition in each split
+            - statistics: Observation and condition counts per split
+            - configuration: Random states and split parameters used
+
+        Examples
+        --------
+        >>> splitter = DataSplitter(...)
+        >>> results = splitter.split_all_datasets()
+        >>> summary = splitter.generate_split_summary()
+        >>> print(summary["dataset1"]["conditions_per_split"]["test"])
+        ['DrugA', 'DrugB', 'DrugC']
+        >>> print(summary["dataset1"]["observations_per_condition"]["test"]["DrugA"])
+        150
+        """
+        if not self.split_results:
+            raise ValueError("No split results available. Run split_all_datasets() first.")
+
+        summary = {}
+
+        for i, (dataset_name, split_info) in enumerate(self.split_results.items()):
+            dataset_summary = {
+                "configuration": {
+                    "split_type": split_info["metadata"]["split_type"],
+                    "split_key": split_info["metadata"]["split_key"],
+                    "split_ratios": split_info["metadata"]["split_ratios"],
+                    "random_state": split_info["metadata"]["random_state"],
+                    "test_random_state": split_info["metadata"]["test_random_state"],
+                    "val_random_state": split_info["metadata"]["val_random_state"],
+                    "hard_test_split": split_info["metadata"]["hard_test_split"],
+                },
+                "statistics": {
+                    "total_observations": split_info["metadata"]["total_cells"],
+                },
+            }
+
+            if self.force_training_values:
+                dataset_summary["configuration"]["force_training_values"] = self.force_training_values
+            if self.control_value:
+                dataset_summary["configuration"]["control_value"] = self.control_value
+
+            # Add split statistics
+            for split_name, indices in split_info["indices"].items():
+                dataset_summary["statistics"][f"{split_name}_observations"] = len(indices)
+                if split_info["metadata"]["total_cells"] > 0:
+                    percentage = 100 * len(indices) / split_info["metadata"]["total_cells"]
+                    dataset_summary["statistics"][f"{split_name}_percentage"] = round(percentage, 2)
+
+            # Add condition information if available
+            if "split_values" in split_info:
+                dataset_summary["conditions_per_split"] = {
+                    "train": sorted(split_info["split_values"]["train"]),
+                    "val": sorted(split_info["split_values"]["val"]),
+                    "test": sorted(split_info["split_values"]["test"]),
+                }
+                dataset_summary["statistics"]["total_unique_conditions"] = len(
+                    split_info["split_values"]["all_unique"]
+                )
+                dataset_summary["statistics"]["train_conditions"] = len(split_info["split_values"]["train"])
+                dataset_summary["statistics"]["val_conditions"] = len(split_info["split_values"]["val"])
+                dataset_summary["statistics"]["test_conditions"] = len(split_info["split_values"]["test"])
+
+            # Add observations per condition for each split
+            training_data = self.training_datasets[i]
+            pert_info = self.extract_perturbation_info(training_data)
+            perturbation_covariates_mask = pert_info["perturbation_covariates_mask"]
+            perturbation_idx_to_covariates = pert_info["perturbation_idx_to_covariates"]
+
+            observations_per_condition = {}
+            for split_name, indices in split_info["indices"].items():
+                if len(indices) == 0:
+                    observations_per_condition[split_name] = {}
+                    continue
+
+                # Count observations per condition for this split
+                condition_counts = {}
+                for idx in indices:
+                    pert_idx = perturbation_covariates_mask[idx]
+                    condition_tuple = perturbation_idx_to_covariates[pert_idx]
+
+                    # Convert tuple to string representation for JSON compatibility
+                    if len(condition_tuple) == 1:
+                        condition_str = condition_tuple[0]
+                    else:
+                        condition_str = "+".join(condition_tuple)
+
+                    condition_counts[condition_str] = condition_counts.get(condition_str, 0) + 1
+
+                # Sort by condition name for consistent output
+                observations_per_condition[split_name] = dict(sorted(condition_counts.items()))
+
+            dataset_summary["observations_per_condition"] = observations_per_condition
+
+            summary[dataset_name] = dataset_summary
+
+        return summary
+
     def save_splits(self, output_dir: str | Path) -> None:
         """
         Save all split information to the specified directory.
+
+        This saves multiple files per dataset:
+        - split_summary.json: Human-readable summary with conditions per split
+        - indices/*.npy: Cell indices for each split
+        - metadata.json: Configuration and parameters
+        - split_values.json: Condition values per split (if applicable)
+        - split_info.pkl: Complete split information
 
         Parameters
         ----------
@@ -756,6 +937,13 @@ class DataSplitter:
 
         logger.info(f"Saving splits to: {output_dir}")
 
+        # Generate and save split summary
+        split_summary = self.generate_split_summary()
+        summary_file = output_dir / "split_summary.json"
+        with open(summary_file, "w") as f:
+            json.dump(split_summary, f, indent=2)
+        logger.info(f"Saved split summary -> {summary_file}")
+
         for dataset_name, split_info in self.split_results.items():
             # Save indices as numpy arrays (more efficient for large datasets)
             indices_dir = output_dir / dataset_name / "indices"
@@ -765,7 +953,7 @@ class DataSplitter:
                 if len(indices) > 0:
                     indices_file = indices_dir / f"{split_name}_indices.npy"
                     np.save(indices_file, indices)
-                    logger.info(f"Saved {split_name} indices: {len(indices)} cells -> {indices_file}")
+                    logger.info(f"Saved {split_name} indices: {len(indices)} observations -> {indices_file}")
 
             # Save metadata as JSON
             metadata_file = output_dir / dataset_name / "metadata.json"
